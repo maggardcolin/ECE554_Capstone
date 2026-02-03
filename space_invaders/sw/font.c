@@ -1,5 +1,14 @@
 #include "font.h"
 
+/// l_draw_digit: Renders a single 3x5 digit to the framebuffer
+/// Parameters:
+///   lfb  - Pointer to logical framebuffer to draw into
+///   x0   - Starting x-coordinate in logical pixels
+///   y0   - Starting y-coordinate in logical pixels
+///   d    - Digit value (0-9) to render
+///   c    - Color (ARGB) for the digit
+/// Returns: void
+/// Notes: Ignores out-of-bounds pixels silently. Uses packed bit representation for each digit.
 void l_draw_digit(lfb_t *lfb, int x0, int y0, int d, uint32_t c) {
     static const uint8_t glyphs[10][5] = {
         {0b111,0b101,0b101,0b101,0b111}, //0
@@ -21,6 +30,16 @@ void l_draw_digit(lfb_t *lfb, int x0, int y0, int d, uint32_t c) {
     }
 }
 
+/// l_draw_score: Renders a decimal score as multiple digits
+/// Parameters:
+///   lfb   - Pointer to logical framebuffer to draw into
+///   x     - Starting x-coordinate in logical pixels (left-aligned)
+///   y     - Starting y-coordinate in logical pixels
+///   score - Numeric score value (clamped to 0 if negative)
+///   c     - Color (ARGB) for all digits
+/// Returns: void
+/// Notes: Converts score to decimal digits (up to 8 digits max), then renders left-to-right.
+///        Each digit is 4 logical pixels wide (3px digit + 1px spacing).
 void l_draw_score(lfb_t *lfb, int x, int y, int score, uint32_t c) {
     if (score < 0) score = 0;
     int digits[8], n = 0;
@@ -70,6 +89,11 @@ static const glyph5_t g5[] = {
     {' ',{0b00000,0b00000,0b00000,0b00000,0b00000}},
 };
 
+/// glyph5_find: Finds a 5x5 glyph bitmap for a character
+/// Parameters:
+///   c - Character to find (lowercase converted to uppercase)
+/// Returns: Pointer to 5-byte glyph pattern (or space glyph if not found)
+/// Notes: Case-insensitive for letters. Returns space glyph as fallback.
 static const uint8_t *glyph5_find(char c) {
     if (c >= 'a' && c <= 'z') c = (char)(c - 32);
     for (unsigned i = 0; i < sizeof(g5)/sizeof(g5[0]); i++) {
@@ -78,6 +102,16 @@ static const uint8_t *glyph5_find(char c) {
     return g5[sizeof(g5)/sizeof(g5[0]) - 1].rows; // space
 }
 
+/// l_draw_text: Renders a text string to the framebuffer with scaling
+/// Parameters:
+///   lfb   - Pointer to logical framebuffer to draw into
+///   x     - Starting x-coordinate in logical pixels (left-aligned)
+///   y     - Starting y-coordinate in logical pixels
+///   text  - Null-terminated string to render (A-Z, 0-9, :, space supported)
+///   scale - Integer scaling factor (clamped to minimum 1)
+///   c     - Color (ARGB) for all text
+/// Returns: void
+/// Notes: Advances x by (5+1)*scale pixels per character. Each pixel in glyph is scaled uniformly.
 void l_draw_text(lfb_t *lfb, int x, int y, const char *text, int scale, uint32_t c) {
     if (scale < 1) scale = 1;
     const int w = 5;

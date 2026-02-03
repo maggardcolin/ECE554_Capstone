@@ -1,4 +1,7 @@
-// hw_sim.c  (SDL "scanout" + input + vsync + buffer swap)
+// hw_sim.c: Hardware simulator - SDL2-based framebuffer display, input handler, and vsync generator
+// Simulates PYNQ hardware: creates shared memory MMIO for game software,
+// handles SDL2 window/rendering, keyboard input, and double-buffered framebuffer swap
+// USAGE: Run hw_sim first, then run sw_game in another terminal
 #include "hw_contract.h"
 #include <SDL2/SDL.h>
 #include <fcntl.h>
@@ -11,6 +14,8 @@
 
 #define SHM_NAME "/pynq_fbmmio"
 
+/// shm_total_size: Calculate total shared memory size needed
+/// Returns: Bytes needed = page-aligned registers + 2 framebuffers (double-buffered)
 static size_t shm_total_size(void) {
     size_t regs = sizeof(mmio_regs_t);
     size_t fbs  = (size_t)FB_COUNT * (size_t)FB_SIZE;
@@ -19,6 +24,11 @@ static size_t shm_total_size(void) {
     return regs_pages * page + fbs;
 }
 
+/// main: Hardware simulator main loop
+/// Creates shared memory and MMIO registers, initializes SDL2 window/renderer,
+/// polls keyboard input, increments vsync counter, handles buffer swaps,
+/// and displays framebuffer at ~60 Hz (16ms per frame)
+/// Returns: 0 on normal exit (window closed), 1 on initialization error
 int main(void) {
     size_t total = shm_total_size();
 

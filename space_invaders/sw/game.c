@@ -54,6 +54,15 @@ static const char *bunker_rows[] = {
     "....................",
 };
 
+/// draw_sprite1r: Render a 1-bit sprite to the framebuffer with a specified color
+/// Parameters:
+///   lfb   - Logical framebuffer to render to
+///   s     - Pointer to sprite1r_t containing width, height, stride, and packed bits
+///   x0    - Top-left x-coordinate in logical pixels
+///   y0    - Top-left y-coordinate in logical pixels
+///   color - 32-bit ARGB color to render sprite pixels in
+/// Returns: void
+/// Notes: Clips to framebuffer boundaries. Only renders pixels where sprite bit is 1.
 static void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color) {
     for (int y = 0; y < s->h; y++) {
         int yy = y0 + y;
@@ -67,6 +76,12 @@ static void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint3
     }
 }
 
+/// text_width_5x5: Calculate the width in logical pixels of text rendered at given scale
+/// Parameters:
+///   text  - Null-terminated string to measure
+///   scale - Scaling factor (clamped to minimum 1)
+/// Returns: Width in logical pixels; 0 if text is empty
+/// Notes: Uses formula (count*6-1)*scale where 6 = glyph_width(5) + spacing(1)
 static int text_width_5x5(const char *text, int scale) {
     if (scale < 1) scale = 1;
     int count = 0;
@@ -75,6 +90,14 @@ static int text_width_5x5(const char *text, int scale) {
     return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
 }
 
+/// draw_powerup_icon: Render a powerup icon (red circle with '2X' text) at specified location
+/// Parameters:
+///   lfb - Logical framebuffer to render to
+///   x0  - Center x-coordinate in logical pixels
+///   y0  - Center y-coordinate in logical pixels
+/// Returns: void
+/// Notes: Draws red (0xFFFF0000) filled circle with radius 6, and white '2X' text overlay.
+///        Used for powerup pickups and inventory display on HUD.
 static void draw_powerup_icon(lfb_t *lfb, int x0, int y0) {
     int r = 6;
     for (int y = -r; y <= r; y++) {
@@ -85,11 +108,21 @@ static void draw_powerup_icon(lfb_t *lfb, int x0, int y0) {
     l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFFFFFFFF);
 }
 
+/// double_shot_active: Check if any powerup slot is currently active (double damage multiplier)
+/// Parameters:
+///   g - Pointer to game state
+/// Returns: 1 if any powerup_slot_timer[i] > 0, 0 otherwise
+/// Notes: When active, alien kills grant 20 points instead of 10. Max 5 simultaneous powerups.
 static int double_shot_active(const game_t *g) {
     for (int i = 0; i < 5; i++) if (g->powerup_slot_timer[i] > 0) return 1;
     return 0;
 }
 
+/// aliens_remaining: Check if any aliens are still alive on the grid
+/// Parameters:
+///   g - Pointer to game state
+/// Returns: 1 if at least one alien_alive[r][c] is true, 0 if all defeated
+/// Notes: Used to detect level completion. Scans entire AROWS x ACOLS grid.
 static int aliens_remaining(const game_t *g) {
     for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) if (g->alien_alive[r][c]) return 1;
     return 0;
@@ -97,6 +130,14 @@ static int aliens_remaining(const game_t *g) {
 
 static void bunkers_rebuild(game_t *g);
 
+/// setup_level: Initialize or reinitialize all level parameters
+/// Parameters:
+///   g            - Pointer to game state
+///   level        - Level number to initialize (1 = first level)
+///   reset_score  - If true, reset score to 0; if false, keep current score
+/// Returns: void
+/// Notes: Sets player position, alien grid state, animation timers, powerup state, bullets.
+///        Called by game_reset() and during level progression.
 static void setup_level(game_t *g, int level, int reset_score) {
     if (reset_score) g->score = 0;
     g->level = level;
@@ -130,6 +171,12 @@ static void setup_level(game_t *g, int level, int reset_score) {
     bunkers_rebuild(g);
 }
 
+/// bunkers_rebuild: Recreate all 4 bunker sprites from template, clearing previous damage
+/// Parameters:
+///   g - Pointer to game state
+/// Returns: void
+/// Notes: Called during level initialization and setup_level(). Frees old bunker sprites first.
+///        Each bunker is 16 pixels wide x 20 pixels tall.
 static void bunkers_rebuild(game_t *g) {
     free_sprite(&g->BUNKER0);
     free_sprite(&g->BUNKER1);
@@ -147,6 +194,12 @@ static void bunkers_rebuild(game_t *g) {
     g->bunkers[3] = &g->BUNKER3;
 }
 
+/// game_init: Initialize game state and all sprites for a new game
+/// Parameters:
+///   g - Pointer to game_t structure to initialize
+/// Returns: void
+/// Notes: Allocates and initializes sprites (player, aliens, bunkers). Sets up initial state.
+///        Displays start screen. Must be called once before game_update/game_render.
 void game_init(game_t *g) {
     memset(g, 0, sizeof(*g));
     g->PLAYER  = make_sprite_from_ascii(player_rows, 8);
@@ -167,6 +220,12 @@ void game_init(game_t *g) {
     setup_level(g, 1, 1);
 }
 
+/// game_reset: Reset game to initial state after game-over or level completion
+/// Parameters:
+///   g - Pointer to game state
+/// Returns: void
+/// Notes: Resets lives to 2, clears powerup inventory, initializes level 1.
+///        Called when player presses SPACE after game-over screen.
 void game_reset(game_t *g) {
     g->game_over = 0;
     g->game_over_score = 0;
@@ -177,6 +236,14 @@ void game_reset(game_t *g) {
     setup_level(g, 1, 1);
 }
 
+/// game_update: Main game logic loop - process input, collisions, animations, and state changes
+/// Parameters:
+///   g              - Pointer to game state
+///   buttons        - Bitmask of current input: BTN_LEFT, BTN_RIGHT, BTN_FIRE, BTN_QUIT
+///   vsync_counter  - Monotonically increasing counter (increments ~60 times/second)
+/// Returns: void
+/// Notes: Called every frame. Handles startup screen, level completion, game-over delays,
+///        player movement, firing, alien movement, collision detection, powerup spawning.
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->start_screen) {
         if (buttons & BTN_FIRE) game_reset(g);
@@ -373,6 +440,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 }
 
+/// game_render: Render the entire game frame to the logical framebuffer
+/// Parameters:
+///   g   - Pointer to game state containing all visual data
+///   lfb - Logical framebuffer to draw to
+/// Returns: void
+/// Notes: Draws different screens based on game state: startup, gameplay, level-complete, game-over.
+///        Renders sprites (player, aliens, bunkers), bullets, HUD (score, level, lives), powerups.
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
         l_clear(lfb, 0xFF000000);

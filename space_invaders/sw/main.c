@@ -6,6 +6,12 @@
 
 #define SHM_NAME "/pynq_fbmmio"
 
+/// main: Software game loop - connects to hardware simulator and runs game
+/// Parameters: none (no command-line arguments)
+/// Returns: 0 on normal exit, 1 if initialization fails
+/// Notes: Creates logical framebuffer, initializes game, runs update/render loop,
+///        waits for hardware buffer swaps via shared memory MMIO,
+///        exits on BTN_QUIT input.
 int main(void) {
     shm_ctx_t shm;
     if (shm_open_map(&shm, SHM_NAME) != 0) return 1;
