@@ -900,7 +900,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
         l_clear(lfb, 0xFF000000);
-        const char *title = "SPACE INVADERS";
+        const char *title = "BULLET HELL";
+        const char *title2 = "SPACE INVADERS";
         const char *prompt = "PRESS SPACE TO START";
 
         int title_scale = 3;
@@ -909,10 +910,16 @@ void game_render(game_t *g, lfb_t *lfb) {
         int title_y = LH / 2 - 40;
         l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
 
+        int title2_scale = 3;
+        int title2_w = text_width_5x5(title2, title2_scale);
+        int title2_x = (LW - title2_w) / 2;
+        int title2_y = LH / 2 - 10;
+        l_draw_text(lfb, title2_x, title2_y, title2, title2_scale, 0xFF00FF00);
+
         int prompt_scale = 2;
         int prompt_w = text_width_5x5(prompt, prompt_scale);
         int prompt_x = (LW - prompt_w) / 2;
-        int prompt_y = title_y + 40;
+        int prompt_y = title2_y + 40;
         l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
         return;
     }
