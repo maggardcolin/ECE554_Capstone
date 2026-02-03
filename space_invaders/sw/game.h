@@ -16,6 +16,7 @@ typedef struct {
     int score;
     int level;
     int start_screen;
+    int start_screen_delay_timer;
     int lives;
     int level_complete;
     int level_complete_timer;

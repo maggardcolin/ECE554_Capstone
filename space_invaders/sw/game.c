@@ -259,6 +259,7 @@ void game_init(game_t *g) {
     g->game_over = 0;
     g->game_over_score = 0;
     g->start_screen = 1;
+    g->start_screen_delay_timer = 0;
     g->lives = 2;
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
@@ -278,6 +279,7 @@ void game_reset(game_t *g) {
     g->game_over = 0;
     g->game_over_score = 0;
     g->start_screen = 0;
+    g->start_screen_delay_timer = 0;
     g->lives = 2;
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
@@ -297,7 +299,8 @@ void game_reset(game_t *g) {
 ///        player movement, firing, alien movement, collision detection, powerup spawning.
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->start_screen) {
-        if (buttons & BTN_FIRE) game_reset(g);
+        if (g->start_screen_delay_timer > 0) g->start_screen_delay_timer--;
+        if (g->start_screen_delay_timer == 0 && (buttons & BTN_FIRE)) game_reset(g);
         return;
     }
     if (g->level_complete) {
@@ -310,7 +313,18 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->game_over) {
         g->alien_frame = (int)((vsync_counter / 20u) & 1u);
         if (g->game_over_delay_timer > 0) g->game_over_delay_timer--;
-        if (g->game_over_delay_timer == 0 && (buttons & BTN_FIRE)) game_reset(g);
+        if (g->game_over_delay_timer == 0 && (buttons & BTN_FIRE)) {
+            g->game_over = 0;
+            g->game_over_score = 0;
+            g->start_screen = 1;
+            g->start_screen_delay_timer = 30;
+            g->lives = 2;
+            for (int i = 0; i < 5; i++) {
+                g->powerup_slot_timer[i] = 0;
+                g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
+            }
+            setup_level(g, 1, 1);
+        }
         return;
     }
 
