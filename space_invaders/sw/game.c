@@ -189,6 +189,13 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->player_y = LH - 30;
 
     memset(g->alien_alive, 1, sizeof(g->alien_alive));
+    // Level 1: aliens have 1 HP, Level 2+: aliens have 2 HP (green -> white -> dead)
+    int hp = (level >= 2) ? 2 : 1;
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            g->alien_health[r][c] = hp;
+        }
+    }
 
     g->alien_origin_x = 50;
     g->alien_origin_y = 30;
@@ -472,9 +479,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                     int ay = g->alien_origin_y + r * (AS->h + spacing_y);
                     if (bullet_hits_sprite(AS, ax, ay, g->pshot.x, g->pshot.y)) {
-                        g->alien_alive[r][c] = 0;
+                        g->alien_health[r][c]--;
+                        if (g->alien_health[r][c] <= 0) {
+                            g->alien_alive[r][c] = 0;
+                            g->score += double_shot_active(g) ? 20 : 10;
+                        }
                         g->pshot.alive = 0;
-                        g->score += double_shot_active(g) ? 20 : 10;
                         hit = 1;
                     }
                 }
@@ -503,9 +513,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
                 if (bullet_hits_sprite(AS, ax, ay, g->pshot_left.x, g->pshot_left.y)) {
-                    g->alien_alive[r][c] = 0;
+                    g->alien_health[r][c]--;
+                    if (g->alien_health[r][c] <= 0) {
+                        g->alien_alive[r][c] = 0;
+                        g->score += double_shot_active(g) ? 20 : 10;
+                    }
                     g->pshot_left.alive = 0;
-                    g->score += double_shot_active(g) ? 20 : 10;
                     hit = 1;
                 }
             }
@@ -533,9 +546,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
                 if (bullet_hits_sprite(AS, ax, ay, g->pshot_right.x, g->pshot_right.y)) {
-                    g->alien_alive[r][c] = 0;
+                    g->alien_health[r][c]--;
+                    if (g->alien_health[r][c] <= 0) {
+                        g->alien_alive[r][c] = 0;
+                        g->score += double_shot_active(g) ? 20 : 10;
+                    }
                     g->pshot_right.alive = 0;
-                    g->score += double_shot_active(g) ? 20 : 10;
                     hit = 1;
                 }
             }
@@ -727,7 +743,9 @@ void game_render(game_t *g, lfb_t *lfb) {
             int ax = g->alien_origin_x + c * (AS->w + spacing_x);
             int ay = g->alien_origin_y + r * (AS->h + spacing_y);
 
-            draw_sprite1r(lfb, AS, ax, ay, 0xFFFFFFFF);
+            // Green if full health, white if damaged
+            uint32_t alien_color = (g->alien_health[r][c] > 1) ? 0xFF00FF00 : 0xFFFFFFFF;
+            draw_sprite1r(lfb, AS, ax, ay, alien_color);
         }
     }
 
@@ -740,8 +758,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // bullets
     if (g->pshot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot.x, g->pshot.y - i, 0xFFFFFFFF);
-    if (g->pshot_left.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left.x - i/2, g->pshot_left.y - i, 0xFFFFFF00);
-    if (g->pshot_right.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right.x + i/2, g->pshot_right.y - i, 0xFFFFFF00);
+    if (g->pshot_left.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left.x - i/2, g->pshot_left.y - i, 0xFF0000FF);
+    if (g->pshot_right.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right.x + i/2, g->pshot_right.y - i, 0xFF0000FF);
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
 
     {

@@ -39,6 +39,7 @@ typedef struct {
 
     enum { ACOLS = 11, AROWS = 5 };
     uint8_t alien_alive[AROWS][ACOLS];
+    int alien_health[AROWS][ACOLS];  // Hit points per alien (1 = one hit, 2 = two hits, etc.)
 
     int alien_origin_x, alien_origin_y;
     int alien_dx;
