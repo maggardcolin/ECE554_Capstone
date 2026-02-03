@@ -32,7 +32,7 @@ typedef struct {
     int powerup_slot_timer[5];       // Duration of each powerup slot (600 ticks = 10 seconds)
     int powerup_type_slot[5];        // Type of powerup in each slot
 
-    sprite1r_t PLAYER, ALIEN_A, ALIEN_B;
+    sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
     sprite1r_t *bunkers[4];
 
@@ -49,10 +49,20 @@ typedef struct {
     int alien_timer;
     int alien_period;
 
+    // Boss alien state
+    int boss_alive;
+    int boss_health; // 0-20 HP
+    int boss_x, boss_y;
+    int boss_dx;
+    int boss_frame;
+    int boss_timer;
+    int boss_period;
+
     bullet_t pshot;
     bullet_t pshot_left;   // For triple-shot: -15 degree angle
     bullet_t pshot_right;  // For triple-shot: +15 degree angle
     bullet_t ashot;
+    bullet_t boss_shot;
     int fire_cooldown;
 
     int bunker_x[4];

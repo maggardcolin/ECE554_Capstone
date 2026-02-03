@@ -35,6 +35,30 @@ static const char *alienB_rows[] = {
     "X..X...X..X",
     ".XX.....XX.",
 };
+static const char *bossA_rows[] = {
+    "....XXXX....XXXX....XXXX....",
+    "..XXXXXXXX..XXXX..XXXXXXXX..",
+    ".XXXX..XXXXXXXXXXXX..XXXX...",
+    "XXXX..XXXXXXXXXXXXXX..XXXX..",
+    "XXXXXX..XXXXXXXXXX..XXXXXX..",
+    "XXXXXXXX..XXXXXX..XXXXXXXX..",
+    "XXXX..XXXXXXXXXXXXXX..XXXX..",
+    "..XXXX..XXXXXXXXXX..XXXX....",
+    "....XXXXXXXX..XXXXXXXX......",
+    "......XX..XX..XX..XX........",
+};
+static const char *bossB_rows[] = {
+    "....XXXX....XXXX....XXXX....",
+    "..XXXXXXXX..XXXX..XXXXXXXX..",
+    ".XXXX..XXXXXXXXXXXX..XXXX...",
+    "XXXX..XXXXXXXXXXXXXX..XXXX..",
+    "XXXXXX..XXXXXXXXXX..XXXXXX..",
+    "XXXXXXXX..XXXXXX..XXXXXXXX..",
+    "XXXX..XXXXXXXXXXXXXX..XXXX..",
+    "..XXXX..XXXXXXXXXX..XXXX....",
+    "....XXXXXXXX..XXXXXXXX......",
+    "........XX..XX..XX..XX......",
+};
 static const char *bunker_rows[] = {
     "....XXXXXXXXXXXX....",
     "...XXXXXXXXXXXXXX...",
@@ -207,10 +231,21 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->alien_period = 20 - (level - 1) * 2; // Faster aliens at higher levels
     if (g->alien_period < 5) g->alien_period = 5; // Minimum period
 
+    // Boss alien setup (separate from regular aliens)
+    g->boss_alive = 1;
+    g->boss_health = 20;
+    g->boss_x = (LW - g->BOSS_A.w) / 2;
+    g->boss_y = 10;
+    g->boss_dx = 1;
+    g->boss_frame = 0;
+    g->boss_timer = 0;
+    g->boss_period = 15;
+
     g->pshot.alive = 0;
     g->pshot_left.alive = 0;
     g->pshot_right.alive = 0;
     g->ashot.alive = 0;
+    g->boss_shot.alive = 0;
     g->fire_cooldown = 0;
 
     bunkers_rebuild(g);
@@ -250,6 +285,8 @@ void game_init(game_t *g) {
     g->PLAYER  = make_sprite_from_ascii(player_rows, 8);
     g->ALIEN_A = make_sprite_from_ascii(alienA_rows, 8);
     g->ALIEN_B = make_sprite_from_ascii(alienB_rows, 8);
+    g->BOSS_A  = make_sprite_from_ascii(bossA_rows, 10);
+    g->BOSS_B  = make_sprite_from_ascii(bossB_rows, 10);
 
     bunkers_rebuild(g);
 
@@ -414,6 +451,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (next_left < 5 || next_right > LW - 5) {
                 g->alien_dx = -g->alien_dx;
                 g->alien_origin_y += g->alien_drop_px;
+                // After boss is killed, speed up aliens on each wall hit
+                if (!g->boss_alive && g->boss_health == 0) {
+                    g->alien_period -= 2;
+                    if (g->alien_period < 5) g->alien_period = 5;
+                }
             } else {
                 g->alien_origin_x = next_origin_x;
             }
@@ -424,6 +466,43 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 int target = 10 + alive_count / 6;
                 if (target < g->alien_period) g->alien_period = target;
             }
+        }
+    }
+
+    // Boss movement and animation (separate from grid)
+    if (g->boss_alive) {
+        g->boss_timer++;
+        if (g->boss_timer >= g->boss_period) {
+            g->boss_timer = 0;
+            g->boss_frame ^= 1;
+        }
+
+        int next_bx = g->boss_x + g->boss_dx;
+        int boss_w = g->BOSS_A.w;
+        if (next_bx < 0 || next_bx > LW - boss_w) {
+            g->boss_dx = -g->boss_dx;
+            next_bx = g->boss_x + g->boss_dx;
+        }
+        g->boss_x = next_bx;
+
+        // Descend once more than half of regular aliens are dead
+        int alive_count = 0;
+        for (int r = 0; r < AROWS; r++) {
+            for (int c = 0; c < ACOLS; c++) {
+                alive_count += g->alien_alive[r][c] ? 1 : 0;
+            }
+        }
+        int total_aliens = AROWS * ACOLS;
+        if (alive_count <= total_aliens / 2) {
+            if (g->boss_timer == 0) g->boss_y += 1;
+        }
+
+        // Game over if boss reaches the bottom of the screen
+        int boss_h = g->BOSS_A.h;
+        if (g->boss_y + boss_h >= LH) {
+            g->game_over = 1;
+            g->game_over_score = g->score;
+            g->game_over_delay_timer = 120;
         }
     }
 
@@ -465,6 +544,28 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->ashot.y > LH) g->ashot.alive = 0;
     }
 
+    // Boss shooting logic (rate depends on health)
+    if (g->boss_alive) {
+        int health_pct = (g->boss_health * 100) / 20;
+        int period = 90; // slow when green
+        if (health_pct <= 10) period = 20;       // fast when red
+        else if (health_pct <= 50) period = 45;  // medium when yellow
+
+        if (!g->boss_shot.alive) {
+            if ((vsync_counter % (uint32_t)period) == 0u) {
+                const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
+                g->boss_shot.alive = 1;
+                g->boss_shot.x = g->boss_x + BS->w / 2;
+                g->boss_shot.y = g->boss_y + BS->h + 1;
+            }
+        } else {
+            g->boss_shot.y += 2;
+            if (g->boss_shot.y > LH) g->boss_shot.alive = 0;
+        }
+    } else {
+        g->boss_shot.alive = 0;
+    }
+
     // collisions: player shot
     if (g->pshot.alive) {
         if (g->powerup_active) {
@@ -485,6 +586,27 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (!g->pshot.alive) {
             // consumed by powerup
         } else {
+            if (g->boss_alive) {
+                int boss_hit = 0;
+                for (int bi = 0; bi < 5 && !boss_hit; bi++) {
+                    if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
+                                           g->boss_x, g->boss_y,
+                                           g->pshot.x, g->pshot.y - bi)) {
+                        boss_hit = 1;
+                    }
+                }
+                if (boss_hit) {
+                    g->boss_health--;
+                    if (g->boss_health <= 0) {
+                        g->boss_health = 0;
+                        g->boss_alive = 0;
+                        g->score += 500;
+                    }
+                    g->pshot.alive = 0;
+                }
+            }
+        }
+        if (g->pshot.alive) {
             const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
             int spacing_x = 6, spacing_y = 5;
             int hit = 0;
@@ -526,6 +648,28 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     // collisions: player left shot (triple-shot)
     if (g->pshot_left.alive) {
+        if (g->boss_alive) {
+            int boss_hit = 0;
+            for (int bi = 0; bi < 5 && !boss_hit; bi++) {
+                if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
+                                       g->boss_x, g->boss_y,
+                                       g->pshot_left.x - bi / 2, g->pshot_left.y - bi)) {
+                    boss_hit = 1;
+                }
+            }
+            if (boss_hit) {
+                g->boss_health--;
+                if (g->boss_health <= 0) {
+                    g->boss_health = 0;
+                    g->boss_alive = 0;
+                    g->score += 500;
+                }
+                g->pshot_left.alive = 0;
+            }
+        }
+        if (!g->pshot_left.alive) {
+            // consumed by boss
+        } else {
         int hit = 0;
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
@@ -562,10 +706,33 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
             }
         }
+        }
     }
 
     // collisions: player right shot (triple-shot)
     if (g->pshot_right.alive) {
+        if (g->boss_alive) {
+            int boss_hit = 0;
+            for (int bi = 0; bi < 5 && !boss_hit; bi++) {
+                if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
+                                       g->boss_x, g->boss_y,
+                                       g->pshot_right.x + bi / 2, g->pshot_right.y - bi)) {
+                    boss_hit = 1;
+                }
+            }
+            if (boss_hit) {
+                g->boss_health--;
+                if (g->boss_health <= 0) {
+                    g->boss_health = 0;
+                    g->boss_alive = 0;
+                    g->score += 500;
+                }
+                g->pshot_right.alive = 0;
+            }
+        }
+        if (!g->pshot_right.alive) {
+            // consumed by boss
+        } else {
         int hit = 0;
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
@@ -602,6 +769,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
             }
         }
+        }
     }
 
     // collisions: alien shot
@@ -633,6 +801,34 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
+    // collisions: boss shot
+    if (g->boss_shot.alive) {
+        if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->boss_shot.x, g->boss_shot.y)) {
+            g->lives--;
+            g->pshot.alive = 0;
+            g->pshot_left.alive = 0;
+            g->pshot_right.alive = 0;
+            g->boss_shot.alive = 0;
+            g->player_x = LW/2 - g->PLAYER.w/2;
+            g->player_y = LH - 30;
+            for (int j = 0; j < 5; j++) g->powerup_slot_timer[j] = 0;
+            if (g->lives <= 0) {
+                g->game_over = 1;
+                g->game_over_score = g->score;
+                g->game_over_delay_timer = 120;
+            }
+        } else {
+            for (int i = 0; i < 4 && g->boss_shot.alive; i++) {
+                sprite1r_t *b = g->bunkers[i];
+                int bx = g->bunker_x[i], by = g->bunker_y;
+                if (bullet_hits_sprite(b, bx, by, g->boss_shot.x, g->boss_shot.y)) {
+                    bunker_damage(b, g->boss_shot.x - bx, g->boss_shot.y - by, 3);
+                    g->boss_shot.alive = 0;
+                }
+            }
+        }
+    }
+
     // Check if aliens have reached the player level
     if (!g->game_over) {
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
@@ -650,7 +846,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    if (!g->game_over && !aliens_remaining(g)) {
+    if (!g->game_over && !aliens_remaining(g) && !g->boss_alive) {
         g->level_complete = 1;
         g->level_complete_timer = 60;
         g->level_just_completed = g->level;
@@ -756,6 +952,45 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_score(lfb, x + label_w + 6, 5, g->score, 0xFFFFFFFF);
     }
 
+    // Boss health bar to the right of the score
+    if (g->boss_alive) {
+        uint32_t boss_color = 0xFF00FF00; // Green 50-100%
+        int health_pct = (g->boss_health * 100) / 20;
+        if (health_pct <= 10) boss_color = 0xFFFF0000; // Red < 10%
+        else if (health_pct <= 50) boss_color = 0xFFFFFF00; // Yellow 10-50%
+
+        const char *boss_label = "BOSS";
+        int boss_label_w = text_width_5x5(boss_label, 1);
+        int score_label_w = text_width_5x5("SCORE:", 1);
+        int score_max_w = 8 * 4; // 8 digits max, 4px per digit
+        int bx = 5 + score_label_w + 6 + score_max_w + 8;
+        int by = 5;
+
+        l_draw_text(lfb, bx, by, boss_label, 1, boss_color);
+
+        int bar_x = bx + boss_label_w + 6;
+        int bar_y = by + 1;
+        int bar_w = 50;
+        int bar_h = 6;
+
+        // White border
+        for (int i = 0; i <= bar_w; i++) {
+            l_putpix(lfb, bar_x + i, bar_y - 1, 0xFFFFFFFF);
+            l_putpix(lfb, bar_x + i, bar_y + bar_h, 0xFFFFFFFF);
+        }
+        for (int j = 0; j <= bar_h; j++) {
+            l_putpix(lfb, bar_x - 1, bar_y + j, 0xFFFFFFFF);
+            l_putpix(lfb, bar_x + bar_w, bar_y + j, 0xFFFFFFFF);
+        }
+
+        int fill_w = (g->boss_health * bar_w) / 20;
+        for (int i = 0; i < fill_w; i++) {
+            for (int j = 0; j < bar_h; j++) {
+                l_putpix(lfb, bar_x + i, bar_y + j, boss_color);
+            }
+        }
+    }
+
     {
         const char *label = "LEVEL:";
         int label_scale = 1;
@@ -787,6 +1022,17 @@ void game_render(game_t *g, lfb_t *lfb) {
         draw_sprite1r(lfb, b, x0, y0, 0xFF00FF00);
     }
 
+    // boss (drawn behind regular aliens)
+    if (g->boss_alive) {
+        int health_pct = (g->boss_health * 100) / 20;
+        uint32_t boss_color = 0xFF00FF00;
+        if (health_pct <= 10) boss_color = 0xFFFF0000;
+        else if (health_pct <= 50) boss_color = 0xFFFFFF00;
+
+        const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
+        draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
+    }
+
     // aliens
     const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
     int spacing_x = 6, spacing_y = 5;
@@ -814,6 +1060,13 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->pshot_left.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left.x - i/2, g->pshot_left.y - i, 0xFF0000FF);
     if (g->pshot_right.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right.x + i/2, g->pshot_right.y - i, 0xFF0000FF);
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
+    if (g->boss_shot.alive) {
+        int health_pct = (g->boss_health * 100) / 20;
+        uint32_t boss_color = 0xFF00FF00;
+        if (health_pct <= 10) boss_color = 0xFFFF0000;
+        else if (health_pct <= 50) boss_color = 0xFFFFFF00;
+        for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, boss_color);
+    }
 
     {
         int base_y = LH - 12;
