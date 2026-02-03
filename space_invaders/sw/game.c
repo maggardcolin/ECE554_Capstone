@@ -204,7 +204,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->alien_drop_px = 6;
     g->alien_frame = 0;
     g->alien_timer = 0;
-    g->alien_period = 20;
+    g->alien_period = 20 - (level - 1) * 2; // Faster aliens at higher levels
+    if (g->alien_period < 5) g->alien_period = 5; // Minimum period
 
     g->pshot.alive = 0;
     g->pshot_left.alive = 0;
@@ -478,7 +479,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     if (!g->alien_alive[r][c]) continue;
                     int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                     int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                    if (bullet_hits_sprite(AS, ax, ay, g->pshot.x, g->pshot.y)) {
+                    // Check multiple points along bullet trail for better collision
+                    int bullet_hit = 0;
+                    for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
+                        if (bullet_hits_sprite(AS, ax, ay, g->pshot.x, g->pshot.y - bi)) {
+                            bullet_hit = 1;
+                        }
+                    }
+                    if (bullet_hit) {
                         g->alien_health[r][c]--;
                         if (g->alien_health[r][c] <= 0) {
                             g->alien_alive[r][c] = 0;
@@ -512,7 +520,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (!g->alien_alive[r][c]) continue;
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                if (bullet_hits_sprite(AS, ax, ay, g->pshot_left.x, g->pshot_left.y)) {
+                // Check multiple points along bullet trail for better collision
+                int bullet_hit = 0;
+                for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
+                    if (bullet_hits_sprite(AS, ax, ay, g->pshot_left.x - bi/2, g->pshot_left.y - bi)) {
+                        bullet_hit = 1;
+                    }
+                }
+                if (bullet_hit) {
                     g->alien_health[r][c]--;
                     if (g->alien_health[r][c] <= 0) {
                         g->alien_alive[r][c] = 0;
@@ -545,7 +560,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (!g->alien_alive[r][c]) continue;
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                if (bullet_hits_sprite(AS, ax, ay, g->pshot_right.x, g->pshot_right.y)) {
+                // Check multiple points along bullet trail for better collision
+                int bullet_hit = 0;
+                for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
+                    if (bullet_hits_sprite(AS, ax, ay, g->pshot_right.x + bi/2, g->pshot_right.y - bi)) {
+                        bullet_hit = 1;
+                    }
+                }
+                if (bullet_hit) {
                     g->alien_health[r][c]--;
                     if (g->alien_health[r][c] <= 0) {
                         g->alien_alive[r][c] = 0;
@@ -592,6 +614,23 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (bullet_hits_sprite(b, bx, by, g->ashot.x, g->ashot.y)) {
                     bunker_damage(b, g->ashot.x - bx, g->ashot.y - by, 3);
                     g->ashot.alive = 0;
+                }
+            }
+        }
+    }
+
+    // Check if aliens have reached the player level
+    if (!g->game_over) {
+        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int spacing_x = 6, spacing_y = 5;
+        for (int r = 0; r < AROWS && !g->game_over; r++) {
+            for (int c = 0; c < ACOLS && !g->game_over; c++) {
+                if (!g->alien_alive[r][c]) continue;
+                int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+                if (ay >= g->player_y) {
+                    g->game_over = 1;
+                    g->game_over_score = g->score;
+                    g->game_over_delay_timer = 120;
                 }
             }
         }
