@@ -31,6 +31,9 @@ typedef struct {
     int bunker_x[4];
     int bunker_y;
 
+    int game_over;
+    int game_over_score;
+
 } game_t;
 
 void game_init(game_t *g);

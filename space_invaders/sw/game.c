@@ -53,6 +53,27 @@ static const char *bunker_rows[] = {
     "....................",
 };
 
+static void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color) {
+    for (int y = 0; y < s->h; y++) {
+        int yy = y0 + y;
+        if ((unsigned)yy >= (unsigned)LH) continue;
+        const uint8_t *row = s->bits + y * s->stride;
+        for (int x = 0; x < s->w; x++) {
+            int xx = x0 + x;
+            if ((unsigned)xx >= (unsigned)LW) continue;
+            if ((row[x >> 3] >> (7 - (x & 7))) & 1) lfb->px[yy * LW + xx] = color;
+        }
+    }
+}
+
+static int text_width_5x5(const char *text, int scale) {
+    if (scale < 1) scale = 1;
+    int count = 0;
+    for (const char *p = text; *p; p++) count++;
+    if (count == 0) return 0;
+    return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
+}
+
 static void bunkers_rebuild(game_t *g) {
     free_sprite(&g->BUNKER0);
     free_sprite(&g->BUNKER1);
@@ -89,6 +110,9 @@ void game_reset(game_t *g) {
     g->player_x = LW/2 - g->PLAYER.w/2;
     g->player_y = LH - 30;
 
+    g->game_over = 0;
+    g->game_over_score = 0;
+
     memset(g->alien_alive, 1, sizeof(g->alien_alive));
 
     g->alien_origin_x = 50;
@@ -108,6 +132,11 @@ void game_reset(game_t *g) {
 }
 
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
+    if (g->game_over) {
+        g->alien_frame = (int)((vsync_counter / 20u) & 1u);
+        if (buttons & BTN_FIRE) game_reset(g);
+        return;
+    }
     if (buttons & BTN_LEFT)  g->player_x -= 2;
     if (buttons & BTN_RIGHT) g->player_x += 2;
 
@@ -216,7 +245,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     // collisions: alien shot
     if (g->ashot.alive) {
         if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->ashot.x, g->ashot.y)) {
-            game_reset(g);
+            g->game_over = 1;
+            g->game_over_score = g->score;
+            g->pshot.alive = 0;
+            g->ashot.alive = 0;
         } else {
             for (int i = 0; i < 4 && g->ashot.alive; i++) {
                 sprite1r_t *b = g->bunkers[i];
@@ -231,6 +263,44 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 }
 
 void game_render(game_t *g, lfb_t *lfb) {
+    if (g->game_over) {
+        l_clear(lfb, 0xFF000000);
+
+        const char *title = "GAME OVER";
+        int title_scale = 4;
+        int title_w = text_width_5x5(title, title_scale);
+        int title_x = (LW - title_w) / 2;
+        int title_y = 10;
+        l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFFFF0000);
+
+        int cx = LW / 2;
+        int cy = LH / 2 + 10;
+
+        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int a_w = AS->w;
+        int a_h = AS->h;
+        int p_w = g->PLAYER.w;
+        int p_h = g->PLAYER.h;
+
+        draw_sprite1r(lfb, &g->PLAYER, cx - p_w / 2, cy - p_h / 2, 0xFF00FF00);
+
+        int r = 22;
+        int hx[6] = { cx, cx + r, cx + r, cx, cx - r, cx - r };
+        int hy[6] = { cy - r, cy - r/2, cy + r/2, cy + r, cy + r/2, cy - r/2 };
+        for (int i = 0; i < 6; i++) {
+            draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
+        }
+
+        const char *score_label = "SCORE:";
+        int label_scale = 2;
+        int label_w = text_width_5x5(score_label, label_scale);
+        int label_x = (LW - label_w) / 2 - 12;
+        int label_y = cy + r + 20;
+        l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
+        l_draw_score(lfb, label_x + label_w + 6, label_y + 2, g->game_over_score, 0xFFFFFFFF);
+        return;
+    }
+
     l_clear(lfb, 0xFF000000);
     l_draw_score(lfb, 5, 5, g->score, 0xFFFFFFFF);
 
@@ -239,16 +309,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         // blit sprite bits onto lfb
         sprite1r_t *b = g->bunkers[i];
         int x0 = g->bunker_x[i], y0 = g->bunker_y;
-        for (int y = 0; y < b->h; y++) {
-            int yy = y0 + y;
-            if ((unsigned)yy >= (unsigned)LH) continue;
-            const uint8_t *row = b->bits + y * b->stride;
-            for (int x = 0; x < b->w; x++) {
-                int xx = x0 + x;
-                if ((unsigned)xx >= (unsigned)LW) continue;
-                if ((row[x >> 3] >> (7 - (x & 7))) & 1) lfb->px[yy * LW + xx] = 0xFF00FF00;
-            }
-        }
+        draw_sprite1r(lfb, b, x0, y0, 0xFF00FF00);
     }
 
     // aliens
@@ -260,34 +321,12 @@ void game_render(game_t *g, lfb_t *lfb) {
             int ax = g->alien_origin_x + c * (AS->w + spacing_x);
             int ay = g->alien_origin_y + r * (AS->h + spacing_y);
 
-            for (int y = 0; y < AS->h; y++) {
-                int yy = ay + y;
-                if ((unsigned)yy >= (unsigned)LH) continue;
-                const uint8_t *row = AS->bits + y * AS->stride;
-                for (int x = 0; x < AS->w; x++) {
-                    int xx = ax + x;
-                    if ((unsigned)xx >= (unsigned)LW) continue;
-                    if ((row[x >> 3] >> (7 - (x & 7))) & 1) lfb->px[yy * LW + xx] = 0xFFFFFFFF;
-                }
-            }
+            draw_sprite1r(lfb, AS, ax, ay, 0xFFFFFFFF);
         }
     }
 
     // player
-    {
-        sprite1r_t *P = &g->PLAYER;
-        int x0 = g->player_x, y0 = g->player_y;
-        for (int y = 0; y < P->h; y++) {
-            int yy = y0 + y;
-            if ((unsigned)yy >= (unsigned)LH) continue;
-            const uint8_t *row = P->bits + y * P->stride;
-            for (int x = 0; x < P->w; x++) {
-                int xx = x0 + x;
-                if ((unsigned)xx >= (unsigned)LW) continue;
-                if ((row[x >> 3] >> (7 - (x & 7))) & 1) lfb->px[yy * LW + xx] = 0xFF00FF00;
-            }
-        }
-    }
+    draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, 0xFF00FF00);
 
     // bullets
     if (g->pshot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot.x, g->pshot.y - i, 0xFFFFFFFF);

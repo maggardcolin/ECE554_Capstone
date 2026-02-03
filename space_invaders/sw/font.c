@@ -31,3 +31,54 @@ void l_draw_score(lfb_t *lfb, int x, int y, int score, uint32_t c) {
         x += 4; // logical pixels
     }
 }
+
+typedef struct {
+    char c;
+    uint8_t rows[5]; // 5x5 glyph, MSB->LSB
+} glyph5_t;
+
+static const glyph5_t g5[] = {
+    {'A',{0b01110,0b10001,0b11111,0b10001,0b10001}},
+    {'C',{0b01110,0b10001,0b10000,0b10001,0b01110}},
+    {'E',{0b11111,0b10000,0b11110,0b10000,0b11111}},
+    {'G',{0b01110,0b10001,0b10011,0b10001,0b01110}},
+    {'M',{0b10001,0b11011,0b10101,0b10001,0b10001}},
+    {'O',{0b01110,0b10001,0b10001,0b10001,0b01110}},
+    {'R',{0b11110,0b10001,0b11110,0b10100,0b10010}},
+    {'S',{0b01111,0b10000,0b01110,0b00001,0b11110}},
+    {'V',{0b10001,0b10001,0b10001,0b01010,0b00100}},
+    {':',{0b00000,0b00100,0b00000,0b00100,0b00000}},
+    {' ',{0b00000,0b00000,0b00000,0b00000,0b00000}},
+};
+
+static const uint8_t *glyph5_find(char c) {
+    if (c >= 'a' && c <= 'z') c = (char)(c - 32);
+    for (unsigned i = 0; i < sizeof(g5)/sizeof(g5[0]); i++) {
+        if (g5[i].c == c) return g5[i].rows;
+    }
+    return g5[sizeof(g5)/sizeof(g5[0]) - 1].rows; // space
+}
+
+void l_draw_text(lfb_t *lfb, int x, int y, const char *text, int scale, uint32_t c) {
+    if (scale < 1) scale = 1;
+    const int w = 5;
+    const int h = 5;
+    const int spacing = 1;
+    for (const char *p = text; *p; p++) {
+        const uint8_t *rows = glyph5_find(*p);
+        for (int gy = 0; gy < h; gy++) {
+            for (int gx = 0; gx < w; gx++) {
+                if (rows[gy] & (1u << (w - 1 - gx))) {
+                    int px = x + gx * scale;
+                    int py = y + gy * scale;
+                    for (int sy = 0; sy < scale; sy++) {
+                        for (int sx = 0; sx < scale; sx++) {
+                            l_putpix(lfb, px + sx, py + sy, c);
+                        }
+                    }
+                }
+            }
+        }
+        x += (w + spacing) * scale;
+    }
+}
