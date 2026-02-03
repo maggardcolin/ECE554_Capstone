@@ -14,6 +14,7 @@ typedef enum {
 typedef struct { int x,y; int alive; } bullet_t;
 
 #define MAX_PSHOTS 8
+#define PLAYER_LIVES 3
 
 typedef struct {
     int score;

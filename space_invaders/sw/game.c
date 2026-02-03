@@ -322,7 +322,7 @@ void game_init(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 1;
     g->start_screen_delay_timer = 0;
-    g->lives = 2;
+    g->lives = PLAYER_LIVES;
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
         g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
@@ -342,7 +342,7 @@ void game_reset(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
-    g->lives = 2;
+    g->lives = PLAYER_LIVES;
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
         g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
@@ -380,7 +380,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->game_over_score = 0;
             g->start_screen = 1;
             g->start_screen_delay_timer = 30;
-            g->lives = 2;
+            g->lives = PLAYER_LIVES;
             for (int i = 0; i < 5; i++) {
                 g->powerup_slot_timer[i] = 0;
                 g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
@@ -1081,13 +1081,13 @@ void game_render(game_t *g, lfb_t *lfb) {
         int bar_h = 6;
         int bar_y = y - 1;
 
-        int max_lives = 2;
+        int max_lives = PLAYER_LIVES;
         if (g->lives > max_lives) max_lives = g->lives;
         int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
 
         uint32_t life_color = 0xFF00FF00; // green >= 50%
-        if (health_pct <= 10) life_color = 0xFFFF0000;
-        else if (health_pct <= 50) life_color = 0xFFFFFF00;
+        if (health_pct <= 33) life_color = 0xFFFF0000;
+        else if (health_pct <= 67) life_color = 0xFFFFFF00;
 
         // White border
         for (int i = 0; i <= bar_w; i++) {
