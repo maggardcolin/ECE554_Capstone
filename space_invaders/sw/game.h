@@ -14,6 +14,13 @@ typedef struct {
     int level_complete_timer;
     int level_just_completed;
 
+    int powerup_active;
+    int powerup_x;
+    int powerup_y;
+    int powerup_timer;
+    int powerup_spawn_timer;
+    int powerup_slot_timer[5];
+
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
     sprite1r_t *bunkers[4];
@@ -39,6 +46,7 @@ typedef struct {
 
     int game_over;
     int game_over_score;
+    int game_over_delay_timer;
 
 } game_t;
 

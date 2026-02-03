@@ -75,6 +75,21 @@ static int text_width_5x5(const char *text, int scale) {
     return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
 }
 
+static void draw_powerup_icon(lfb_t *lfb, int x0, int y0) {
+    int r = 6;
+    for (int y = -r; y <= r; y++) {
+        for (int x = -r; x <= r; x++) {
+            if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFF0000);
+        }
+    }
+    l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFFFFFFFF);
+}
+
+static int double_shot_active(const game_t *g) {
+    for (int i = 0; i < 5; i++) if (g->powerup_slot_timer[i] > 0) return 1;
+    return 0;
+}
+
 static int aliens_remaining(const game_t *g) {
     for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) if (g->alien_alive[r][c]) return 1;
     return 0;
@@ -88,6 +103,11 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->level_complete = 0;
     g->level_complete_timer = 0;
     g->level_just_completed = 0;
+
+    g->powerup_active = 0;
+    g->powerup_timer = 0;
+    g->powerup_spawn_timer = 0;
+    for (int i = 0; i < 5; i++) g->powerup_slot_timer[i] = 0;
 
     g->player_x = LW/2 - g->PLAYER.w/2;
     g->player_y = LH - 30;
@@ -142,6 +162,7 @@ void game_init(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 1;
     g->lives = 2;
+    for (int i = 0; i < 5; i++) g->powerup_slot_timer[i] = 0;
 
     setup_level(g, 1, 1);
 }
@@ -151,6 +172,7 @@ void game_reset(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 0;
     g->lives = 2;
+    for (int i = 0; i < 5; i++) g->powerup_slot_timer[i] = 0;
 
     setup_level(g, 1, 1);
 }
@@ -169,8 +191,32 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
     if (g->game_over) {
         g->alien_frame = (int)((vsync_counter / 20u) & 1u);
-        if (buttons & BTN_FIRE) game_reset(g);
+        if (g->game_over_delay_timer > 0) g->game_over_delay_timer--;
+        if (g->game_over_delay_timer == 0 && (buttons & BTN_FIRE)) game_reset(g);
         return;
+    }
+
+    for (int i = 0; i < 5; i++) {
+        if (g->powerup_slot_timer[i] > 0) g->powerup_slot_timer[i]--;
+    }
+
+    if (!g->powerup_active) {
+        g->powerup_spawn_timer++;
+        if (g->powerup_spawn_timer >= 900) {
+            int tile = 8;
+            int cols = LW / tile;
+            int rows = LH / tile;
+            int tx = rand() % cols;
+            int ty = rand() % rows;
+            g->powerup_x = tx * tile + tile / 2;
+            g->powerup_y = ty * tile + tile / 2;
+            g->powerup_active = 1;
+            g->powerup_timer = 300;
+            g->powerup_spawn_timer = 0;
+        }
+    } else {
+        if (g->powerup_timer > 0) g->powerup_timer--;
+        if (g->powerup_timer == 0) g->powerup_active = 0;
     }
     if (buttons & BTN_LEFT)  g->player_x -= 2;
     if (buttons & BTN_RIGHT) g->player_x += 2;
@@ -249,29 +295,47 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     // collisions: player shot
     if (g->pshot.alive) {
-        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-        int spacing_x = 6, spacing_y = 5;
-        int hit = 0;
-        for (int r = 0; r < AROWS && !hit; r++) {
-            for (int c = 0; c < ACOLS && !hit; c++) {
-                if (!g->alien_alive[r][c]) continue;
-                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
-                int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                if (bullet_hits_sprite(AS, ax, ay, g->pshot.x, g->pshot.y)) {
-                    g->alien_alive[r][c] = 0;
-                    g->pshot.alive = 0;
-                    g->score += 10;
-                    hit = 1;
+        if (g->powerup_active) {
+            int dx = g->pshot.x - g->powerup_x;
+            int dy = g->pshot.y - g->powerup_y;
+            if ((dx*dx + dy*dy) <= 36) {
+                for (int i = 0; i < 5; i++) {
+                    if (g->powerup_slot_timer[i] == 0) {
+                        g->powerup_slot_timer[i] = 600;
+                        break;
+                    }
                 }
+                g->powerup_active = 0;
+                g->pshot.alive = 0;
             }
         }
-        if (!hit && g->pshot.alive) {
-            for (int i = 0; i < 4 && g->pshot.alive; i++) {
-                sprite1r_t *b = g->bunkers[i];
-                int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, g->pshot.x, g->pshot.y)) {
-                    bunker_damage(b, g->pshot.x - bx, g->pshot.y - by, 3);
-                    g->pshot.alive = 0;
+        if (!g->pshot.alive) {
+            // consumed by powerup
+        } else {
+            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+            int spacing_x = 6, spacing_y = 5;
+            int hit = 0;
+            for (int r = 0; r < AROWS && !hit; r++) {
+                for (int c = 0; c < ACOLS && !hit; c++) {
+                    if (!g->alien_alive[r][c]) continue;
+                    int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+                    int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+                    if (bullet_hits_sprite(AS, ax, ay, g->pshot.x, g->pshot.y)) {
+                        g->alien_alive[r][c] = 0;
+                        g->pshot.alive = 0;
+                        g->score += double_shot_active(g) ? 20 : 10;
+                        hit = 1;
+                    }
+                }
+            }
+            if (!hit && g->pshot.alive) {
+                for (int i = 0; i < 4 && g->pshot.alive; i++) {
+                    sprite1r_t *b = g->bunkers[i];
+                    int bx = g->bunker_x[i], by = g->bunker_y;
+                    if (bullet_hits_sprite(b, bx, by, g->pshot.x, g->pshot.y)) {
+                        bunker_damage(b, g->pshot.x - bx, g->pshot.y - by, 3);
+                        g->pshot.alive = 0;
+                    }
                 }
             }
         }
@@ -288,6 +352,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (g->lives <= 0) {
                 g->game_over = 1;
                 g->game_over_score = g->score;
+                g->game_over_delay_timer = 120;
             }
         } else {
             for (int i = 0; i < 4 && g->ashot.alive; i++) {
@@ -443,7 +508,21 @@ void game_render(game_t *g, lfb_t *lfb) {
     // player
     draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, 0xFF00FF00);
 
+    if (g->powerup_active) {
+        draw_powerup_icon(lfb, g->powerup_x, g->powerup_y);
+    }
+
     // bullets
     if (g->pshot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot.x, g->pshot.y - i, 0xFFFFFFFF);
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
+
+    {
+        int base_y = LH - 12;
+        int spacing = 14;
+        int right_x = LW - 6;
+        for (int i = 0; i < 5; i++) {
+            int x = right_x - (4 - i) * spacing;
+            if (g->powerup_slot_timer[i] > 0) draw_powerup_icon(lfb, x, base_y + 4);
+        }
+    }
 }
