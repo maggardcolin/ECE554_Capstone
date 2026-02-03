@@ -12,6 +12,8 @@ typedef enum {
 
 typedef struct { int x,y; int alive; } bullet_t;
 
+#define MAX_PSHOTS 8
+
 typedef struct {
     int score;
     int level;
@@ -58,9 +60,9 @@ typedef struct {
     int boss_timer;
     int boss_period;
 
-    bullet_t pshot;
-    bullet_t pshot_left;   // For triple-shot: -15 degree angle
-    bullet_t pshot_right;  // For triple-shot: +15 degree angle
+    bullet_t pshot[MAX_PSHOTS];       // Center shots
+    bullet_t pshot_left[MAX_PSHOTS];  // Triple-shot: -15 degree angle
+    bullet_t pshot_right[MAX_PSHOTS]; // Triple-shot: +15 degree angle
     bullet_t ashot;
     bullet_t boss_shot;
     int fire_cooldown;

@@ -241,9 +241,11 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_timer = 0;
     g->boss_period = 15;
 
-    g->pshot.alive = 0;
-    g->pshot_left.alive = 0;
-    g->pshot_right.alive = 0;
+    for (int i = 0; i < MAX_PSHOTS; i++) {
+        g->pshot[i].alive = 0;
+        g->pshot_left[i].alive = 0;
+        g->pshot_right[i].alive = 0;
+    }
     g->ashot.alive = 0;
     g->boss_shot.alive = 0;
     g->fire_cooldown = 0;
@@ -404,29 +406,41 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
 
     if (g->fire_cooldown > 0) g->fire_cooldown--;
-    if ((buttons & BTN_FIRE) && !g->pshot.alive && g->fire_cooldown == 0) {
+    if ((buttons & BTN_FIRE) && g->fire_cooldown == 0) {
         int center_x = g->player_x + g->PLAYER.w/2;
         int center_y = g->player_y - 1;
-        
-        // Always fire main center bullet
-        g->pshot.alive = 1;
-        g->pshot.x = center_x;
-        g->pshot.y = center_y;
-        
+
+        // Fire main center bullet into first free slot
+        for (int i = 0; i < MAX_PSHOTS; i++) {
+            if (!g->pshot[i].alive) {
+                g->pshot[i].alive = 1;
+                g->pshot[i].x = center_x;
+                g->pshot[i].y = center_y;
+                break;
+            }
+        }
+
         // Fire angled bullets if triple-shot is active
         if (triple_shot_active(g)) {
-            // Left bullet at -15 degrees (slopes down-left): dx/dy = -0.268
-            g->pshot_left.alive = 1;
-            g->pshot_left.x = center_x - 2;  // offset left
-            g->pshot_left.y = center_y;
-            
-            // Right bullet at +15 degrees (slopes down-right): dx/dy = 0.268
-            g->pshot_right.alive = 1;
-            g->pshot_right.x = center_x + 2;  // offset right
-            g->pshot_right.y = center_y;
+            for (int i = 0; i < MAX_PSHOTS; i++) {
+                if (!g->pshot_left[i].alive) {
+                    g->pshot_left[i].alive = 1;
+                    g->pshot_left[i].x = center_x - 2;
+                    g->pshot_left[i].y = center_y;
+                    break;
+                }
+            }
+            for (int i = 0; i < MAX_PSHOTS; i++) {
+                if (!g->pshot_right[i].alive) {
+                    g->pshot_right[i].alive = 1;
+                    g->pshot_right[i].x = center_x + 2;
+                    g->pshot_right[i].y = center_y;
+                    break;
+                }
+            }
         }
-        
-        g->fire_cooldown = 6;
+
+        g->fire_cooldown = 20;
     }
 
     g->alien_timer++;
@@ -506,21 +520,21 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    if (g->pshot.alive) {
-        g->pshot.y -= 4;
-        if (g->pshot.y < 0) g->pshot.alive = 0;
-    }
-
-    if (g->pshot_left.alive) {
-        g->pshot_left.x -= 1;  // Move left at -15 degree angle
-        g->pshot_left.y -= 4;
-        if (g->pshot_left.y < 0 || g->pshot_left.x < 0) g->pshot_left.alive = 0;
-    }
-
-    if (g->pshot_right.alive) {
-        g->pshot_right.x += 1;  // Move right at +15 degree angle
-        g->pshot_right.y -= 4;
-        if (g->pshot_right.y < 0 || g->pshot_right.x >= LW) g->pshot_right.alive = 0;
+    for (int i = 0; i < MAX_PSHOTS; i++) {
+        if (g->pshot[i].alive) {
+            g->pshot[i].y -= 4;
+            if (g->pshot[i].y < 0) g->pshot[i].alive = 0;
+        }
+        if (g->pshot_left[i].alive) {
+            g->pshot_left[i].x -= 1;  // Move left at -15 degree angle
+            g->pshot_left[i].y -= 4;
+            if (g->pshot_left[i].y < 0 || g->pshot_left[i].x < 0) g->pshot_left[i].alive = 0;
+        }
+        if (g->pshot_right[i].alive) {
+            g->pshot_right[i].x += 1;  // Move right at +15 degree angle
+            g->pshot_right[i].y -= 4;
+            if (g->pshot_right[i].y < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
+        }
     }
 
     if (!g->ashot.alive) {
@@ -566,11 +580,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         g->boss_shot.alive = 0;
     }
 
-    // collisions: player shot
-    if (g->pshot.alive) {
+    // collisions: player shot (center)
+    for (int si = 0; si < MAX_PSHOTS; si++) {
+        if (!g->pshot[si].alive) continue;
+
         if (g->powerup_active) {
-            int dx = g->pshot.x - g->powerup_x;
-            int dy = g->pshot.y - g->powerup_y;
+            int dx = g->pshot[si].x - g->powerup_x;
+            int dy = g->pshot[si].y - g->powerup_y;
             if ((dx*dx + dy*dy) <= 36) {
                 for (int i = 0; i < 5; i++) {
                     if (g->powerup_slot_timer[i] == 0) {
@@ -580,80 +596,79 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     }
                 }
                 g->powerup_active = 0;
-                g->pshot.alive = 0;
+                g->pshot[si].alive = 0;
             }
         }
-        if (!g->pshot.alive) {
-            // consumed by powerup
-        } else {
-            if (g->boss_alive) {
-                int boss_hit = 0;
-                for (int bi = 0; bi < 5 && !boss_hit; bi++) {
-                    if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
-                                           g->boss_x, g->boss_y,
-                                           g->pshot.x, g->pshot.y - bi)) {
-                        boss_hit = 1;
+        if (!g->pshot[si].alive) continue;
+
+        if (g->boss_alive) {
+            int boss_hit = 0;
+            for (int bi = 0; bi < 5 && !boss_hit; bi++) {
+                if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
+                                       g->boss_x, g->boss_y,
+                                       g->pshot[si].x, g->pshot[si].y - bi)) {
+                    boss_hit = 1;
+                }
+            }
+            if (boss_hit) {
+                g->boss_health--;
+                if (g->boss_health <= 0) {
+                    g->boss_health = 0;
+                    g->boss_alive = 0;
+                    g->score += 500;
+                }
+                g->pshot[si].alive = 0;
+            }
+        }
+        if (!g->pshot[si].alive) continue;
+
+        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int spacing_x = 6, spacing_y = 5;
+        int hit = 0;
+        for (int r = 0; r < AROWS && !hit; r++) {
+            for (int c = 0; c < ACOLS && !hit; c++) {
+                if (!g->alien_alive[r][c]) continue;
+                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+                int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+                int bullet_hit = 0;
+                for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
+                    if (bullet_hits_sprite(AS, ax, ay, g->pshot[si].x, g->pshot[si].y - bi)) {
+                        bullet_hit = 1;
                     }
                 }
-                if (boss_hit) {
-                    g->boss_health--;
-                    if (g->boss_health <= 0) {
-                        g->boss_health = 0;
-                        g->boss_alive = 0;
-                        g->score += 500;
+                if (bullet_hit) {
+                    g->alien_health[r][c]--;
+                    if (g->alien_health[r][c] <= 0) {
+                        g->alien_alive[r][c] = 0;
+                        g->score += double_shot_active(g) ? 20 : 10;
                     }
-                    g->pshot.alive = 0;
+                    g->pshot[si].alive = 0;
+                    hit = 1;
                 }
             }
         }
-        if (g->pshot.alive) {
-            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-            int spacing_x = 6, spacing_y = 5;
-            int hit = 0;
-            for (int r = 0; r < AROWS && !hit; r++) {
-                for (int c = 0; c < ACOLS && !hit; c++) {
-                    if (!g->alien_alive[r][c]) continue;
-                    int ax = g->alien_origin_x + c * (AS->w + spacing_x);
-                    int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                    // Check multiple points along bullet trail for better collision
-                    int bullet_hit = 0;
-                    for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
-                        if (bullet_hits_sprite(AS, ax, ay, g->pshot.x, g->pshot.y - bi)) {
-                            bullet_hit = 1;
-                        }
-                    }
-                    if (bullet_hit) {
-                        g->alien_health[r][c]--;
-                        if (g->alien_health[r][c] <= 0) {
-                            g->alien_alive[r][c] = 0;
-                            g->score += double_shot_active(g) ? 20 : 10;
-                        }
-                        g->pshot.alive = 0;
-                        hit = 1;
-                    }
-                }
-            }
-            if (!hit && g->pshot.alive) {
-                for (int i = 0; i < 4 && g->pshot.alive; i++) {
-                    sprite1r_t *b = g->bunkers[i];
-                    int bx = g->bunker_x[i], by = g->bunker_y;
-                    if (bullet_hits_sprite(b, bx, by, g->pshot.x, g->pshot.y)) {
-                        bunker_damage(b, g->pshot.x - bx, g->pshot.y - by, 3);
-                        g->pshot.alive = 0;
-                    }
+        if (!hit && g->pshot[si].alive) {
+            for (int i = 0; i < 4 && g->pshot[si].alive; i++) {
+                sprite1r_t *b = g->bunkers[i];
+                int bx = g->bunker_x[i], by = g->bunker_y;
+                if (bullet_hits_sprite(b, bx, by, g->pshot[si].x, g->pshot[si].y)) {
+                    bunker_damage(b, g->pshot[si].x - bx, g->pshot[si].y - by, 3);
+                    g->pshot[si].alive = 0;
                 }
             }
         }
     }
 
     // collisions: player left shot (triple-shot)
-    if (g->pshot_left.alive) {
+    for (int si = 0; si < MAX_PSHOTS; si++) {
+        if (!g->pshot_left[si].alive) continue;
+
         if (g->boss_alive) {
             int boss_hit = 0;
             for (int bi = 0; bi < 5 && !boss_hit; bi++) {
                 if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
                                        g->boss_x, g->boss_y,
-                                       g->pshot_left.x - bi / 2, g->pshot_left.y - bi)) {
+                                       g->pshot_left[si].x - bi / 2, g->pshot_left[si].y - bi)) {
                     boss_hit = 1;
                 }
             }
@@ -664,12 +679,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     g->boss_alive = 0;
                     g->score += 500;
                 }
-                g->pshot_left.alive = 0;
+                g->pshot_left[si].alive = 0;
             }
         }
-        if (!g->pshot_left.alive) {
-            // consumed by boss
-        } else {
+        if (!g->pshot_left[si].alive) continue;
+
         int hit = 0;
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
@@ -678,10 +692,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (!g->alien_alive[r][c]) continue;
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                // Check multiple points along bullet trail for better collision
                 int bullet_hit = 0;
                 for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
-                    if (bullet_hits_sprite(AS, ax, ay, g->pshot_left.x - bi/2, g->pshot_left.y - bi)) {
+                    if (bullet_hits_sprite(AS, ax, ay, g->pshot_left[si].x - bi/2, g->pshot_left[si].y - bi)) {
                         bullet_hit = 1;
                     }
                 }
@@ -691,32 +704,33 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->alien_alive[r][c] = 0;
                         g->score += double_shot_active(g) ? 20 : 10;
                     }
-                    g->pshot_left.alive = 0;
+                    g->pshot_left[si].alive = 0;
                     hit = 1;
                 }
             }
         }
-        if (!hit && g->pshot_left.alive) {
-            for (int i = 0; i < 4 && g->pshot_left.alive; i++) {
+        if (!hit && g->pshot_left[si].alive) {
+            for (int i = 0; i < 4 && g->pshot_left[si].alive; i++) {
                 sprite1r_t *b = g->bunkers[i];
                 int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, g->pshot_left.x, g->pshot_left.y)) {
-                    bunker_damage(b, g->pshot_left.x - bx, g->pshot_left.y - by, 3);
-                    g->pshot_left.alive = 0;
+                if (bullet_hits_sprite(b, bx, by, g->pshot_left[si].x, g->pshot_left[si].y)) {
+                    bunker_damage(b, g->pshot_left[si].x - bx, g->pshot_left[si].y - by, 3);
+                    g->pshot_left[si].alive = 0;
                 }
             }
-        }
         }
     }
 
     // collisions: player right shot (triple-shot)
-    if (g->pshot_right.alive) {
+    for (int si = 0; si < MAX_PSHOTS; si++) {
+        if (!g->pshot_right[si].alive) continue;
+
         if (g->boss_alive) {
             int boss_hit = 0;
             for (int bi = 0; bi < 5 && !boss_hit; bi++) {
                 if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
                                        g->boss_x, g->boss_y,
-                                       g->pshot_right.x + bi / 2, g->pshot_right.y - bi)) {
+                                       g->pshot_right[si].x + bi / 2, g->pshot_right[si].y - bi)) {
                     boss_hit = 1;
                 }
             }
@@ -727,12 +741,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     g->boss_alive = 0;
                     g->score += 500;
                 }
-                g->pshot_right.alive = 0;
+                g->pshot_right[si].alive = 0;
             }
         }
-        if (!g->pshot_right.alive) {
-            // consumed by boss
-        } else {
+        if (!g->pshot_right[si].alive) continue;
+
         int hit = 0;
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
@@ -741,10 +754,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (!g->alien_alive[r][c]) continue;
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                // Check multiple points along bullet trail for better collision
                 int bullet_hit = 0;
                 for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
-                    if (bullet_hits_sprite(AS, ax, ay, g->pshot_right.x + bi/2, g->pshot_right.y - bi)) {
+                    if (bullet_hits_sprite(AS, ax, ay, g->pshot_right[si].x + bi/2, g->pshot_right[si].y - bi)) {
                         bullet_hit = 1;
                     }
                 }
@@ -754,21 +766,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->alien_alive[r][c] = 0;
                         g->score += double_shot_active(g) ? 20 : 10;
                     }
-                    g->pshot_right.alive = 0;
+                    g->pshot_right[si].alive = 0;
                     hit = 1;
                 }
             }
         }
-        if (!hit && g->pshot_right.alive) {
-            for (int i = 0; i < 4 && g->pshot_right.alive; i++) {
+        if (!hit && g->pshot_right[si].alive) {
+            for (int i = 0; i < 4 && g->pshot_right[si].alive; i++) {
                 sprite1r_t *b = g->bunkers[i];
                 int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, g->pshot_right.x, g->pshot_right.y)) {
-                    bunker_damage(b, g->pshot_right.x - bx, g->pshot_right.y - by, 3);
-                    g->pshot_right.alive = 0;
+                if (bullet_hits_sprite(b, bx, by, g->pshot_right[si].x, g->pshot_right[si].y)) {
+                    bunker_damage(b, g->pshot_right[si].x - bx, g->pshot_right[si].y - by, 3);
+                    g->pshot_right[si].alive = 0;
                 }
             }
-        }
         }
     }
 
@@ -776,9 +787,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->ashot.alive) {
         if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->ashot.x, g->ashot.y)) {
             g->lives--;
-            g->pshot.alive = 0;
-            g->pshot_left.alive = 0;
-            g->pshot_right.alive = 0;
+            for (int i = 0; i < MAX_PSHOTS; i++) {
+                g->pshot[i].alive = 0;
+                g->pshot_left[i].alive = 0;
+                g->pshot_right[i].alive = 0;
+            }
             g->ashot.alive = 0;
             g->player_x = LW/2 - g->PLAYER.w/2;
             g->player_y = LH - 30;
@@ -805,9 +818,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->boss_shot.alive) {
         if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->boss_shot.x, g->boss_shot.y)) {
             g->lives--;
-            g->pshot.alive = 0;
-            g->pshot_left.alive = 0;
-            g->pshot_right.alive = 0;
+            for (int i = 0; i < MAX_PSHOTS; i++) {
+                g->pshot[i].alive = 0;
+                g->pshot_left[i].alive = 0;
+                g->pshot_right[i].alive = 0;
+            }
             g->boss_shot.alive = 0;
             g->player_x = LW/2 - g->PLAYER.w/2;
             g->player_y = LH - 30;
@@ -1056,9 +1071,17 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     // bullets
-    if (g->pshot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot.x, g->pshot.y - i, 0xFFFFFFFF);
-    if (g->pshot_left.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left.x - i/2, g->pshot_left.y - i, 0xFF0000FF);
-    if (g->pshot_right.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right.x + i/2, g->pshot_right.y - i, 0xFF0000FF);
+    for (int s = 0; s < MAX_PSHOTS; s++) {
+        if (g->pshot[s].alive) {
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y - i, 0xFFFFFFFF);
+        }
+        if (g->pshot_left[s].alive) {
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - i/2, g->pshot_left[s].y - i, 0xFF0000FF);
+        }
+        if (g->pshot_right[s].alive) {
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + i/2, g->pshot_right[s].y - i, 0xFF0000FF);
+        }
+    }
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
     if (g->boss_shot.alive) {
         for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
