@@ -121,7 +121,8 @@ static int text_width_5x5(const char *text, int scale) {
 ///   y0   - Center y-coordinate in logical pixels
 ///   type - Powerup type to render icon for
 /// Returns: void
-/// Notes: Draws colored circle with text overlay. Double-shot = red "2X", Triple-shot = blue "3X"
+/// Notes: Draws colored circle with text overlay. Double-shot = red "2X", Triple-shot = blue lines,
+///        Rapid-fire = red circle with bullet icon
 ///        Used for powerup pickups and inventory display on HUD.
 static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
     if (type == POWERUP_DOUBLE_SHOT) {
@@ -133,7 +134,7 @@ static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
             }
         }
         l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFFFFFFFF);
-    } else {
+    } else if (type == POWERUP_TRIPLE_SHOT) {
         // Blue circle with line
         int r = 6;
         for (int y = -r; y <= r; y++) {
@@ -143,6 +144,18 @@ static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
         }
         // Draw vertical line (white, center)
         for (int i = -4; i <= 4; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
+    } else {
+        // Rapid-fire: red circle with bullet icon
+        int r = 6;
+        for (int y = -r; y <= r; y++) {
+            for (int x = -r; x <= r; x++) {
+                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFF0000);
+            }
+        }
+        // Bullet body (white)
+        for (int i = -3; i <= 3; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
+        // Bullet tip (white)
+        l_putpix(lfb, x0, y0 - 4, 0xFFFFFFFF);
     }
 }
 
@@ -175,6 +188,15 @@ static int double_shot_active(const game_t *g) {
 /// Notes: When active, firing creates 3 bullets spread at angles.
 static int triple_shot_active(const game_t *g) {
     return is_powerup_active(g, POWERUP_TRIPLE_SHOT);
+}
+
+/// rapid_fire_active: Check if rapid fire powerup is currently active
+/// Parameters:
+///   g - Pointer to game state
+/// Returns: 1 if POWERUP_RAPID_FIRE is active in any slot, 0 otherwise
+/// Notes: When active, firing uses a different cooldown.
+static int rapid_fire_active(const game_t *g) {
+    return is_powerup_active(g, POWERUP_RAPID_FIRE);
 }
 
 /// aliens_remaining: Check if any aliens are still alive on the grid
@@ -440,7 +462,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
         }
 
-        g->fire_cooldown = 20;
+        g->fire_cooldown = rapid_fire_active(g) ? 10 : 20;
     }
 
     g->alien_timer++;

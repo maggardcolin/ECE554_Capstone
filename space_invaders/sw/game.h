@@ -7,7 +7,8 @@
 typedef enum {
     POWERUP_DOUBLE_SHOT = 0,  // Double damage (20 points per kill instead of 10)
     POWERUP_TRIPLE_SHOT = 1,  // Triple bullet spread (main + ±15 degrees)
-    POWERUP_COUNT = 2         // Total number of powerup types (update when adding new powerups)
+    POWERUP_RAPID_FIRE = 2,   // Rapid fire (changes fire cooldown)
+    POWERUP_COUNT = 3         // Total number of powerup types (update when adding new powerups)
 } powerup_type_t;
 
 typedef struct { int x,y; int alive; } bullet_t;
