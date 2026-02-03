@@ -9,6 +9,10 @@ typedef struct {
     int score;
     int level;
     int start_screen;
+    int lives;
+    int level_complete;
+    int level_complete_timer;
+    int level_just_completed;
 
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;

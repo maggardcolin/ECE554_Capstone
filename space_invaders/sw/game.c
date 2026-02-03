@@ -3,6 +3,7 @@
 #include "font.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 static const char *player_rows[] = {
     "....XX....",
@@ -84,6 +85,9 @@ static void bunkers_rebuild(game_t *g);
 static void setup_level(game_t *g, int level, int reset_score) {
     if (reset_score) g->score = 0;
     g->level = level;
+    g->level_complete = 0;
+    g->level_complete_timer = 0;
+    g->level_just_completed = 0;
 
     g->player_x = LW/2 - g->PLAYER.w/2;
     g->player_y = LH - 30;
@@ -137,6 +141,7 @@ void game_init(game_t *g) {
     g->game_over = 0;
     g->game_over_score = 0;
     g->start_screen = 1;
+    g->lives = 2;
 
     setup_level(g, 1, 1);
 }
@@ -145,6 +150,7 @@ void game_reset(game_t *g) {
     g->game_over = 0;
     g->game_over_score = 0;
     g->start_screen = 0;
+    g->lives = 2;
 
     setup_level(g, 1, 1);
 }
@@ -152,6 +158,13 @@ void game_reset(game_t *g) {
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->start_screen) {
         if (buttons & BTN_FIRE) game_reset(g);
+        return;
+    }
+    if (g->level_complete) {
+        if (g->level_complete_timer > 0) g->level_complete_timer--;
+        if (g->level_complete_timer == 0) {
+            setup_level(g, g->level + 1, 0);
+        }
         return;
     }
     if (g->game_over) {
@@ -267,10 +280,15 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     // collisions: alien shot
     if (g->ashot.alive) {
         if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->ashot.x, g->ashot.y)) {
-            g->game_over = 1;
-            g->game_over_score = g->score;
+            g->lives--;
             g->pshot.alive = 0;
             g->ashot.alive = 0;
+            g->player_x = LW/2 - g->PLAYER.w/2;
+            g->player_y = LH - 30;
+            if (g->lives <= 0) {
+                g->game_over = 1;
+                g->game_over_score = g->score;
+            }
         } else {
             for (int i = 0; i < 4 && g->ashot.alive; i++) {
                 sprite1r_t *b = g->bunkers[i];
@@ -284,7 +302,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     if (!g->game_over && !aliens_remaining(g)) {
-        setup_level(g, g->level + 1, 0);
+        g->level_complete = 1;
+        g->level_complete_timer = 60;
+        g->level_just_completed = g->level;
     }
 }
 
@@ -305,6 +325,20 @@ void game_render(game_t *g, lfb_t *lfb) {
         int prompt_x = (LW - prompt_w) / 2;
         int prompt_y = title_y + 30;
         l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
+        return;
+    }
+
+    if (g->level_complete) {
+        l_clear(lfb, 0xFF000000);
+        char msg[32];
+        int lvl = g->level_just_completed;
+        if (lvl < 0) lvl = 0;
+        snprintf(msg, sizeof(msg), "LEVEL %d COMPLETE", lvl);
+        int scale = 3;
+        int w = text_width_5x5(msg, scale);
+        int x = (LW - w) / 2;
+        int y = LH / 2 - 10;
+        l_draw_text(lfb, x, y, msg, scale, 0xFFFFFFFF);
         return;
     }
 
@@ -354,7 +388,14 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     l_clear(lfb, 0xFF000000);
-    l_draw_score(lfb, 5, 5, g->score, 0xFFFFFFFF);
+    {
+        const char *label = "SCORE:";
+        int label_scale = 1;
+        int label_w = text_width_5x5(label, label_scale);
+        int x = 5;
+        l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
+        l_draw_score(lfb, x + label_w + 6, 5, g->score, 0xFFFFFFFF);
+    }
 
     {
         const char *label = "LEVEL:";
@@ -363,6 +404,19 @@ void game_render(game_t *g, lfb_t *lfb) {
         int x = LW - (label_w + 6 + 3) - 5;
         l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, x + label_w + 6, 5, g->level, 0xFFFFFFFF);
+    }
+
+    {
+        const char *p1 = "PLAYER 1";
+        int scale = 1;
+        int x = 5;
+        int y = LH - 12;
+        l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
+
+        int lx = x + text_width_5x5(p1, scale) + 6;
+        for (int i = 0; i < g->lives; i++) {
+            draw_sprite1r(lfb, &g->PLAYER, lx + i * (g->PLAYER.w + 2), y - 2, 0xFF00FF00);
+        }
     }
 
     // bunkers
