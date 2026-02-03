@@ -63,9 +63,9 @@ int main(void) {
         }
 
         const Uint8 *k = SDL_GetKeyboardState(NULL);
-        if (k[SDL_SCANCODE_LEFT])   regs->buttons |= BTN_LEFT;
-        if (k[SDL_SCANCODE_RIGHT])  regs->buttons |= BTN_RIGHT;
-        if (k[SDL_SCANCODE_SPACE])  regs->buttons |= BTN_FIRE;
+        if (k[SDL_SCANCODE_LEFT]  || k[SDL_SCANCODE_A]) regs->buttons |= BTN_LEFT;
+        if (k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_D]) regs->buttons |= BTN_RIGHT;
+        if (k[SDL_SCANCODE_SPACE]) regs->buttons |= BTN_FIRE;
         if (k[SDL_SCANCODE_ESCAPE]) regs->buttons |= BTN_QUIT;
 
         if (regs->buttons & BTN_QUIT) running = false;

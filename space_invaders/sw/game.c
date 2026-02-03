@@ -379,7 +379,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         const char *title = "SPACE INVADERS";
         const char *prompt = "PRESS SPACE TO START";
 
-        int title_scale = 4;
+        int title_scale = 3;
         int title_w = text_width_5x5(title, title_scale);
         int title_x = (LW - title_w) / 2;
         int title_y = LH / 2 - 40;
@@ -388,7 +388,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int prompt_scale = 2;
         int prompt_w = text_width_5x5(prompt, prompt_scale);
         int prompt_x = (LW - prompt_w) / 2;
-        int prompt_y = title_y + 30;
+        int prompt_y = title_y + 40;
         l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
         return;
     }
@@ -418,7 +418,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFFFF0000);
 
         int cx = LW / 2;
-        int cy = LH / 2 + 10;
+        int cy = LH / 2 - 10;
 
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int a_w = AS->w;
@@ -439,7 +439,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int label_scale = 2;
         int label_w = text_width_5x5(score_label, label_scale);
         int label_x = (LW - label_w) / 2 - 12;
-        int label_y = cy + r + 20;
+        int label_y = cy + r + 15;
         l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, label_x + label_w + 6, label_y + 2, g->game_over_score, 0xFFFFFFFF);
 
@@ -447,7 +447,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int prompt_scale = 2;
         int prompt_w = text_width_5x5(prompt, prompt_scale);
         int prompt_x = (LW - prompt_w) / 2;
-        int prompt_y = label_y + 16;
+        int prompt_y = label_y + 25;
         l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
         return;
     }
