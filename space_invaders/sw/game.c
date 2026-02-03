@@ -257,7 +257,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_alive = 1;
     g->boss_health = 20 + (level - 1) * 5; // More HP at higher levels
     g->boss_x = (LW - g->BOSS_A.w) / 2;
-    g->boss_y = 10;
+    g->boss_y = 15;
     g->boss_dx = 1;
     g->boss_frame = 0;
     g->boss_timer = 0;
@@ -534,12 +534,43 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (g->boss_timer == 0) g->boss_y += 1;
         }
 
-        // Game over if boss reaches the bottom of the screen
+        // Game over if boss reaches player's y position
         int boss_h = g->BOSS_A.h;
-        if (g->boss_y + boss_h >= LH) {
+        if (g->boss_y + boss_h >= g->player_y) {
             g->game_over = 1;
             g->game_over_score = g->score;
             g->game_over_delay_timer = 120;
+        }
+
+        // Boss destroys bunkers on collision
+        for (int i = 0; i < 4; i++) {
+            sprite1r_t *b = g->bunkers[i];
+            int bx = g->bunker_x[i], by = g->bunker_y;
+            if (g->boss_x < bx + b->w && g->boss_x + boss_w > bx &&
+                g->boss_y < by + b->h && g->boss_y + boss_h > by) {
+                memset(b->bits, 0, (size_t)b->stride * (size_t)b->h);
+            }
+        }
+    }
+
+    // Aliens destroy bunkers on collision
+    {
+        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int spacing_x = 6, spacing_y = 5;
+        for (int r = 0; r < AROWS; r++) {
+            for (int c = 0; c < ACOLS; c++) {
+                if (!g->alien_alive[r][c]) continue;
+                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+                int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+                for (int i = 0; i < 4; i++) {
+                    sprite1r_t *b = g->bunkers[i];
+                    int bx = g->bunker_x[i], by = g->bunker_y;
+                    if (ax < bx + b->w && ax + AS->w > bx &&
+                        ay < by + b->h && ay + AS->h > by) {
+                        memset(b->bits, 0, (size_t)b->stride * (size_t)b->h);
+                    }
+                }
+            }
         }
     }
 
