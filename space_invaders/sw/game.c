@@ -637,7 +637,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     g->boss_alive = 0;
-                    g->score += 500;
+                    g->score += double_shot_active(g) ? 1000 : 500;
                 }
                 g->pshot[si].alive = 0;
             }
@@ -699,7 +699,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     g->boss_alive = 0;
-                    g->score += 500;
+                    g->score += double_shot_active(g) ? 1000 : 500;
                 }
                 g->pshot_left[si].alive = 0;
             }
@@ -761,7 +761,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     g->boss_alive = 0;
-                    g->score += 500;
+                    g->score += double_shot_active(g) ? 1000 : 500;
                 }
                 g->pshot_right[si].alive = 0;
             }
