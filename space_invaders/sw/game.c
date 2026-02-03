@@ -74,6 +74,38 @@ static int text_width_5x5(const char *text, int scale) {
     return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
 }
 
+static int aliens_remaining(const game_t *g) {
+    for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) if (g->alien_alive[r][c]) return 1;
+    return 0;
+}
+
+static void bunkers_rebuild(game_t *g);
+
+static void setup_level(game_t *g, int level, int reset_score) {
+    if (reset_score) g->score = 0;
+    g->level = level;
+
+    g->player_x = LW/2 - g->PLAYER.w/2;
+    g->player_y = LH - 30;
+
+    memset(g->alien_alive, 1, sizeof(g->alien_alive));
+
+    g->alien_origin_x = 50;
+    g->alien_origin_y = 30;
+    g->alien_dx = 1;
+    g->alien_step_px = 2;
+    g->alien_drop_px = 6;
+    g->alien_frame = 0;
+    g->alien_timer = 0;
+    g->alien_period = 20;
+
+    g->pshot.alive = 0;
+    g->ashot.alive = 0;
+    g->fire_cooldown = 0;
+
+    bunkers_rebuild(g);
+}
+
 static void bunkers_rebuild(game_t *g) {
     free_sprite(&g->BUNKER0);
     free_sprite(&g->BUNKER1);
@@ -102,36 +134,26 @@ void game_init(game_t *g) {
     g->bunker_x[0] = 55;  g->bunker_x[1] = 115; g->bunker_x[2] = 175; g->bunker_x[3] = 235;
     g->bunker_y = LH - 65;
 
-    game_reset(g);
+    g->game_over = 0;
+    g->game_over_score = 0;
+    g->start_screen = 1;
+
+    setup_level(g, 1, 1);
 }
 
 void game_reset(game_t *g) {
-    g->score = 0;
-    g->player_x = LW/2 - g->PLAYER.w/2;
-    g->player_y = LH - 30;
-
     g->game_over = 0;
     g->game_over_score = 0;
+    g->start_screen = 0;
 
-    memset(g->alien_alive, 1, sizeof(g->alien_alive));
-
-    g->alien_origin_x = 50;
-    g->alien_origin_y = 30;
-    g->alien_dx = 1;
-    g->alien_step_px = 2;
-    g->alien_drop_px = 6;
-    g->alien_frame = 0;
-    g->alien_timer = 0;
-    g->alien_period = 20;
-
-    g->pshot.alive = 0;
-    g->ashot.alive = 0;
-    g->fire_cooldown = 0;
-
-    bunkers_rebuild(g);
+    setup_level(g, 1, 1);
 }
 
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
+    if (g->start_screen) {
+        if (buttons & BTN_FIRE) game_reset(g);
+        return;
+    }
     if (g->game_over) {
         g->alien_frame = (int)((vsync_counter / 20u) & 1u);
         if (buttons & BTN_FIRE) game_reset(g);
@@ -260,9 +282,32 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
         }
     }
+
+    if (!g->game_over && !aliens_remaining(g)) {
+        setup_level(g, g->level + 1, 0);
+    }
 }
 
 void game_render(game_t *g, lfb_t *lfb) {
+    if (g->start_screen) {
+        l_clear(lfb, 0xFF000000);
+        const char *title = "SPACE INVADERS";
+        const char *prompt = "PRESS SPACE TO START";
+
+        int title_scale = 4;
+        int title_w = text_width_5x5(title, title_scale);
+        int title_x = (LW - title_w) / 2;
+        int title_y = LH / 2 - 40;
+        l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
+
+        int prompt_scale = 2;
+        int prompt_w = text_width_5x5(prompt, prompt_scale);
+        int prompt_x = (LW - prompt_w) / 2;
+        int prompt_y = title_y + 30;
+        l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
+        return;
+    }
+
     if (g->game_over) {
         l_clear(lfb, 0xFF000000);
 
@@ -298,11 +343,27 @@ void game_render(game_t *g, lfb_t *lfb) {
         int label_y = cy + r + 20;
         l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, label_x + label_w + 6, label_y + 2, g->game_over_score, 0xFFFFFFFF);
+
+        const char *prompt = "PRESS SPACE TO CONTINUE";
+        int prompt_scale = 2;
+        int prompt_w = text_width_5x5(prompt, prompt_scale);
+        int prompt_x = (LW - prompt_w) / 2;
+        int prompt_y = label_y + 16;
+        l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
         return;
     }
 
     l_clear(lfb, 0xFF000000);
     l_draw_score(lfb, 5, 5, g->score, 0xFFFFFFFF);
+
+    {
+        const char *label = "LEVEL:";
+        int label_scale = 1;
+        int label_w = text_width_5x5(label, label_scale);
+        int x = LW - (label_w + 6 + 3) - 5;
+        l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
+        l_draw_score(lfb, x + label_w + 6, 5, g->level, 0xFFFFFFFF);
+    }
 
     // bunkers
     for (int i = 0; i < 4; i++) {

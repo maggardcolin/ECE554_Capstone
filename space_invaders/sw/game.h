@@ -7,6 +7,8 @@ typedef struct { int x,y; int alive; } bullet_t;
 
 typedef struct {
     int score;
+    int level;
+    int start_screen;
 
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
