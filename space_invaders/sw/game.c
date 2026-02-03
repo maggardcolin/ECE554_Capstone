@@ -585,8 +585,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->boss_alive) {
         int health_pct = (g->boss_health * 100) / 20;
         int period = 90; // slow when green
-        if (health_pct <= 10) period = 20;       // fast when red
-        else if (health_pct <= 50) period = 45;  // medium when yellow
+        if (health_pct <= 10) period = 15;       // fast when red
+        else if (health_pct <= 50) period = 30;  // medium when yellow
 
         if (!g->boss_shot.alive) {
             if ((vsync_counter % (uint32_t)period) == 0u) {
@@ -816,10 +816,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->pshot_right[i].alive = 0;
             }
             g->ashot.alive = 0;
-            g->player_x = LW/2 - g->PLAYER.w/2;
-            g->player_y = LH - 30;
-            // Clear all powerups on death
-            for (int j = 0; j < 5; j++) g->powerup_slot_timer[j] = 0;
             if (g->lives <= 0) {
                 g->game_over = 1;
                 g->game_over_score = g->score;
@@ -847,9 +843,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->pshot_right[i].alive = 0;
             }
             g->boss_shot.alive = 0;
-            g->player_x = LW/2 - g->PLAYER.w/2;
-            g->player_y = LH - 30;
-            for (int j = 0; j < 5; j++) g->powerup_slot_timer[j] = 0;
             if (g->lives <= 0) {
                 g->game_over = 1;
                 g->game_over_score = g->score;
@@ -1053,9 +1046,33 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
 
         int lx = x + text_width_5x5(p1, scale) + 6;
-        uint32_t life_color = 0xFF00FF00;
-        for (int i = 0; i < g->lives; i++) {
-            draw_sprite1r(lfb, &g->PLAYER, lx + i * (g->PLAYER.w + 2), y - 2, life_color);
+        int bar_w = 40;
+        int bar_h = 6;
+        int bar_y = y - 1;
+
+        int max_lives = 2;
+        if (g->lives > max_lives) max_lives = g->lives;
+        int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
+
+        uint32_t life_color = 0xFF00FF00; // green >= 50%
+        if (health_pct <= 10) life_color = 0xFFFF0000;
+        else if (health_pct <= 50) life_color = 0xFFFFFF00;
+
+        // White border
+        for (int i = 0; i <= bar_w; i++) {
+            l_putpix(lfb, lx + i, bar_y - 1, 0xFFFFFFFF);
+            l_putpix(lfb, lx + i, bar_y + bar_h, 0xFFFFFFFF);
+        }
+        for (int j = 0; j <= bar_h; j++) {
+            l_putpix(lfb, lx - 1, bar_y + j, 0xFFFFFFFF);
+            l_putpix(lfb, lx + bar_w, bar_y + j, 0xFFFFFFFF);
+        }
+
+        int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
+        for (int i = 0; i < fill_w; i++) {
+            for (int j = 0; j < bar_h; j++) {
+                l_putpix(lfb, lx + i, bar_y + j, life_color);
+            }
         }
     }
 
