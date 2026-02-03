@@ -1061,11 +1061,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->pshot_right.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right.x + i/2, g->pshot_right.y - i, 0xFF0000FF);
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
     if (g->boss_shot.alive) {
-        int health_pct = (g->boss_health * 100) / 20;
-        uint32_t boss_color = 0xFF00FF00;
-        if (health_pct <= 10) boss_color = 0xFFFF0000;
-        else if (health_pct <= 50) boss_color = 0xFFFFFF00;
-        for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, boss_color);
+        for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
     }
 
     {
