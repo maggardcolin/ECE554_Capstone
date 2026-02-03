@@ -1,0 +1,103 @@
+// hw_sim.c  (SDL "scanout" + input + vsync + buffer swap)
+#include "hw_contract.h"
+#include <SDL2/SDL.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdio.h>
+
+#define SHM_NAME "/pynq_fbmmio"
+
+static size_t shm_total_size(void) {
+    size_t regs = sizeof(mmio_regs_t);
+    size_t fbs  = (size_t)FB_COUNT * (size_t)FB_SIZE;
+    size_t page = 4096;
+    size_t regs_pages = (regs + page - 1) / page;
+    return regs_pages * page + fbs;
+}
+
+int main(void) {
+    size_t total = shm_total_size();
+
+    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+    if (fd < 0) { perror("shm_open"); return 1; }
+    if (ftruncate(fd, (off_t)total) != 0) { perror("ftruncate"); return 1; }
+
+    uint8_t *base = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+
+    size_t page = 4096;
+    mmio_regs_t *regs = (mmio_regs_t *)(base + 0);
+    uint8_t *fb_base  = base + page;
+
+    memset((void*)regs, 0, sizeof(*regs));
+    regs->front_idx = 0;
+    regs->back_idx  = 1;
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+        fprintf(stderr, "SDL_Init failed\n");
+        return 1;
+    }
+
+    SDL_Window *win = SDL_CreateWindow("hw_sim 720p",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, W, H, 0);
+    if (!win) { fprintf(stderr, "SDL_CreateWindow failed\n"); return 1; }
+
+    SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+    if (!ren) { fprintf(stderr, "SDL_CreateRenderer failed\n"); return 1; }
+
+    SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING, W, H);
+    if (!tex) { fprintf(stderr, "SDL_CreateTexture failed\n"); return 1; }
+
+    bool running = true;
+    while (running) {
+        regs->buttons = 0;
+
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) regs->buttons |= BTN_QUIT;
+        }
+
+        const Uint8 *k = SDL_GetKeyboardState(NULL);
+        if (k[SDL_SCANCODE_LEFT])   regs->buttons |= BTN_LEFT;
+        if (k[SDL_SCANCODE_RIGHT])  regs->buttons |= BTN_RIGHT;
+        if (k[SDL_SCANCODE_SPACE])  regs->buttons |= BTN_FIRE;
+        if (k[SDL_SCANCODE_ESCAPE]) regs->buttons |= BTN_QUIT;
+
+        if (regs->buttons & BTN_QUIT) running = false;
+
+        regs->vsync_counter++;
+
+        if (regs->swap_request) {
+            uint32_t new_front = regs->back_idx % FB_COUNT;
+            uint32_t new_back  = regs->front_idx % FB_COUNT;
+            regs->front_idx = new_front;
+            regs->back_idx  = new_back;
+            regs->swap_request = 0;
+            regs->swap_ack = regs->vsync_counter;
+        }
+
+        uint32_t fi = regs->front_idx % FB_COUNT;
+        uint8_t *front = fb_base + (size_t)fi * (size_t)FB_SIZE;
+
+        SDL_UpdateTexture(tex, NULL, front, W * 4);
+        SDL_RenderClear(ren);
+        SDL_RenderCopy(ren, tex, NULL, NULL);
+        SDL_RenderPresent(ren);
+
+        SDL_Delay(16);
+    }
+
+    SDL_DestroyTexture(tex);
+    SDL_DestroyRenderer(ren);
+    SDL_DestroyWindow(win);
+    SDL_Quit();
+
+    munmap(base, total);
+    close(fd);
+    return 0;
+}
