@@ -567,19 +567,19 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     // Bullets
     render_player_shots(g, lfb);
 
-    // Score (top-left)
+    // Score (bottom-right)
     const char *score_label = "SCORE:";
     int score_label_w = text_width_5x5(score_label, 1);
-    l_draw_text(lfb, 5, 5, score_label, 1, 0xFFFFFFFF);
-    l_draw_score(lfb, 5 + score_label_w + 6, 5, g->score, 0xFFFFFFFF);
+    int score_max_w = 8 * 4; // 8 digits max, 4px per digit
+    int score_x = LW - (score_label_w + 6 + score_max_w) - 5;
+    int score_y = LH - 10;
+    l_draw_text(lfb, score_x, score_y, score_label, 1, 0xFFFFFFFF);
+    l_draw_score(lfb, score_x + score_label_w + 6, score_y, g->score, 0xFFFFFFFF);
 
-    // SHOP sign where boss health bar would be
+    // SHOP sign on top-left
     {
         const char *shop_label = "SHOP";
-        int shop_label_w = text_width_5x5(shop_label, 1);
-        int score_max_w = 8 * 4; // 8 digits max, 4px per digit
-        int bx = 5 + score_label_w + 6 + score_max_w + 8;
-        l_draw_text(lfb, bx, 5, shop_label, 1, 0xFF8000FF);
+        l_draw_text(lfb, 5, 5, shop_label, 1, 0xFF8000FF);
     }
 
     // PLAYER 1 label and health bar
@@ -1126,13 +1126,15 @@ void game_render(game_t *g, lfb_t *lfb) {
         const char *label = "SCORE:";
         int label_scale = 1;
         int label_w = text_width_5x5(label, label_scale);
-        int x = 5;
+        int score_max_w = 8 * 4; // 8 digits max, 4px per digit
+        int x = LW - (label_w + 6 + score_max_w) - 5;
+        int y = LH - 10; // Bottom of screen
         uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;  // Yellow if double-shot active, white otherwise
-        l_draw_text(lfb, x, 5, label, label_scale, score_color);
-        l_draw_score(lfb, x + label_w + 6, 5, g->score, score_color);
+        l_draw_text(lfb, x, y, label, label_scale, score_color);
+        l_draw_score(lfb, x + label_w + 6, y, g->score, score_color);
     }
 
-    // Boss health bar to the right of the score
+    // Boss health bar on the left side of screen
     if (g->boss_alive) {
         uint32_t boss_color = 0xFF00FF00; // Green 50-100%
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
@@ -1141,9 +1143,7 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         const char *boss_label = "BOSS";
         int boss_label_w = text_width_5x5(boss_label, 1);
-        int score_label_w = text_width_5x5("SCORE:", 1);
-        int score_max_w = 8 * 4; // 8 digits max, 4px per digit
-        int bx = 5 + score_label_w + 6 + score_max_w + 8;
+        int bx = 5;
         int by = 5;
 
         l_draw_text(lfb, bx, by, boss_label, 1, boss_color);
