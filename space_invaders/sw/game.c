@@ -421,6 +421,40 @@ static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
     }
 }
 
+static void reset_powerup_slots(game_t *g, powerup_type_t default_type) {
+    for (int i = 0; i < 5; i++) {
+        g->powerup_slot_timer[i] = 0;
+        g->powerup_type_slot[i] = default_type;
+    }
+}
+
+static void reset_shop_state(game_t *g) {
+    g->in_shop = 0;
+    g->shop_count = 0;
+    g->shop_next_level = 1;
+    g->shop_anim_timer = 0;
+    g->shopkeeper_frame = 0;
+    for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
+}
+
+static void reset_player_progression(game_t *g) {
+    g->lives = PLAYER_LIVES;
+    g->player_speed = 2;
+    g->fire_speed_bonus = 0;
+    reset_shop_state(g);
+    reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
+}
+
+static void destroy_bunkers_on_overlap(game_t *g, int x, int y, int w, int h) {
+    for (int i = 0; i < 4; i++) {
+        sprite1r_t *b = g->bunkers[i];
+        int bx = g->bunker_x[i], by = g->bunker_y;
+        if (x < bx + b->w && x + w > bx && y < by + b->h && y + h > by) {
+            memset(b->bits, 0, (size_t)b->stride * (size_t)b->h);
+        }
+    }
+}
+
 static void setup_level(game_t *g, int level, int reset_score);
 
 static const char *shop_item_label(shop_item_type_t type) {
@@ -798,19 +832,7 @@ void game_init(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 1;
     g->start_screen_delay_timer = 0;
-    g->lives = PLAYER_LIVES;
-    g->player_speed = 2;
-    g->fire_speed_bonus = 0;
-    g->in_shop = 0;
-    g->shop_count = 0;
-    g->shop_next_level = 1;
-    g->shop_anim_timer = 0;
-    g->shopkeeper_frame = 0;
-    for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
-    for (int i = 0; i < 5; i++) {
-        g->powerup_slot_timer[i] = 0;
-        g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
-    }
+    reset_player_progression(g);
 
     setup_level(g, 1, 1);
 }
@@ -826,19 +848,7 @@ void game_reset(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
-    g->lives = PLAYER_LIVES;
-    g->player_speed = 2;
-    g->fire_speed_bonus = 0;
-    g->in_shop = 0;
-    g->shop_count = 0;
-    g->shop_next_level = 1;
-    g->shop_anim_timer = 0;
-    g->shopkeeper_frame = 0;
-    for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
-    for (int i = 0; i < 5; i++) {
-        g->powerup_slot_timer[i] = 0;
-        g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
-    }
+    reset_player_progression(g);
 
     setup_level(g, 1, 1);
 }
@@ -878,19 +888,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->game_over_score = 0;
             g->start_screen = 1;
             g->start_screen_delay_timer = 30;
-            g->lives = PLAYER_LIVES;
-            g->player_speed = 2;
-            g->fire_speed_bonus = 0;
-            g->in_shop = 0;
-            g->shop_count = 0;
-            g->shop_next_level = 1;
-            g->shop_anim_timer = 0;
-            g->shopkeeper_frame = 0;
-            for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
-            for (int i = 0; i < 5; i++) {
-                g->powerup_slot_timer[i] = 0;
-                g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
-            }
+            reset_player_progression(g);
             setup_level(g, 1, 1);
         }
         return;
@@ -1024,14 +1022,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
 
         // Boss destroys bunkers on collision
-        for (int i = 0; i < 4; i++) {
-            sprite1r_t *b = g->bunkers[i];
-            int bx = g->bunker_x[i], by = g->bunker_y;
-            if (g->boss_x < bx + b->w && g->boss_x + boss_w > bx &&
-                g->boss_y < by + b->h && g->boss_y + boss_h > by) {
-                memset(b->bits, 0, (size_t)b->stride * (size_t)b->h);
-            }
-        }
+        destroy_bunkers_on_overlap(g, g->boss_x, g->boss_y, boss_w, boss_h);
     }
 
     // Aliens destroy bunkers on collision
@@ -1043,14 +1034,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (!g->alien_alive[r][c]) continue;
                 int ax = g->alien_origin_x + c * (AS->w + spacing_x);
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                for (int i = 0; i < 4; i++) {
-                    sprite1r_t *b = g->bunkers[i];
-                    int bx = g->bunker_x[i], by = g->bunker_y;
-                    if (ax < bx + b->w && ax + AS->w > bx &&
-                        ay < by + b->h && ay + AS->h > by) {
-                        memset(b->bits, 0, (size_t)b->stride * (size_t)b->h);
-                    }
-                }
+                destroy_bunkers_on_overlap(g, ax, ay, AS->w, AS->h);
             }
         }
     }
