@@ -271,7 +271,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
             }
             if (boss_hit) {
-                g->boss_health--;
+                g->boss_health -= g->player_damage;
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     g->boss_alive = 0;
@@ -298,7 +298,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     }
                 }
                 if (bullet_hit) {
-                    g->alien_health[r][c]--;
+                    g->alien_health[r][c] -= g->player_damage;
                     if (g->alien_health[r][c] <= 0) {
                         g->alien_alive[r][c] = 0;
                         int remaining = count_aliens_remaining(g);
@@ -368,6 +368,7 @@ static void reset_player_progression(game_t *g) {
     g->lives = PLAYER_LIVES;
     g->player_speed = 2;
     g->fire_speed_bonus = 0;
+    g->player_damage = 1;
     reset_shop_state(g);
     reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
 }
@@ -389,6 +390,7 @@ static const char *shop_item_label(shop_item_type_t type) {
         case SHOP_ITEM_FIRE_SPEED: return "FIRE";
         case SHOP_ITEM_MOVE_SPEED: return "MOVE";
         case SHOP_ITEM_LIFE:       return "LIFE";
+        case SHOP_ITEM_DAMAGE:     return "DMG";
         default:                   return "ITEM";
     }
 }
@@ -470,6 +472,7 @@ static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         if (g->shop_items[it].type == SHOP_ITEM_FIRE_SPEED) g->fire_speed_bonus++;
                         else if (g->shop_items[it].type == SHOP_ITEM_MOVE_SPEED) g->player_speed++;
                         else if (g->shop_items[it].type == SHOP_ITEM_LIFE) g->lives++;
+                        else if (g->shop_items[it].type == SHOP_ITEM_DAMAGE) g->player_damage++;
                         g->shop_items[it].active = 0;
                     }
                     if (bi == 0) g->pshot[si].alive = 0;
@@ -527,6 +530,9 @@ static void shop_render(game_t *g, lfb_t *lfb) {
         } else if (g->shop_items[i].type == SHOP_ITEM_MOVE_SPEED) {
             icon = &g->SHOP_MOVE;
             icon_color = 0xFF00FF00;
+        } else if (g->shop_items[i].type == SHOP_ITEM_DAMAGE) {
+            icon = &g->SHOP_DMG;
+            icon_color = 0xFFFF0000;
         }
         if (icon) {
             int icon_x = center_x - icon->w / 2;
@@ -735,6 +741,7 @@ void game_init(game_t *g) {
     g->SHOP_LIFE = make_sprite_from_ascii(shop_life_rows, 7);
     g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
     g->SHOP_MOVE = make_sprite_from_ascii(shop_move_rows, 7);
+    g->SHOP_DMG  = make_sprite_from_ascii(shop_dmg_rows, 7);
 
     bunkers_rebuild(g);
 

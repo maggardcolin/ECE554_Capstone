@@ -103,6 +103,15 @@ static const char *shop_move_rows[] = {
     "..X....",
     ".......",
 };
+static const char *shop_dmg_rows[] = {
+    "...X...",
+    "...X...",
+    "XXXXXXX",
+    "...X...",
+    "...X...",
+    ".......",
+    ".......",
+};
 
 typedef struct {
     int w, h;

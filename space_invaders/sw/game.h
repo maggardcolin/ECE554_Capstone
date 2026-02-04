@@ -16,7 +16,8 @@ typedef enum {
     SHOP_ITEM_FIRE_SPEED = 0,
     SHOP_ITEM_MOVE_SPEED = 1,
     SHOP_ITEM_LIFE = 2,
-    SHOP_ITEM_COUNT = 3
+    SHOP_ITEM_DAMAGE = 3,
+    SHOP_ITEM_COUNT = 4
 } shop_item_type_t;
 
 typedef struct { int x,y; int alive; } bullet_t;
@@ -48,7 +49,7 @@ typedef struct {
     int powerup_type_slot[5];        // Type of powerup in each slot
 
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B;
-    sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE;
+    sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE, SHOP_DMG;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
     sprite1r_t *bunkers[4];
 
@@ -91,6 +92,7 @@ typedef struct {
     // Player upgrades (shop)
     int player_speed;          // Base 2, increased by shop item
     int fire_speed_bonus;      // Each point reduces cooldown
+    int player_damage;         // Base 1, increased by shop item
 
     // Shop state
     int in_shop;
