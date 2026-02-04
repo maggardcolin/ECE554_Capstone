@@ -74,12 +74,18 @@ typedef struct {
     int boss_frame;
     int boss_timer;
     int boss_period;
+    int boss_power_timer;      // Charges from 0 to 600 (10 seconds)
+    int boss_power_max;        // 600 ticks
+    int boss_power_active;     // 1 when special attack is happening
+    int boss_power_cooldown;   // Duration of purple/frozen state (30 ticks = 0.5 seconds)
+    int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
 
     bullet_t pshot[MAX_PSHOTS];       // Center shots
     bullet_t pshot_left[MAX_PSHOTS];  // Triple-shot: -15 degree angle
     bullet_t pshot_right[MAX_PSHOTS]; // Triple-shot: +15 degree angle
     bullet_t ashot;
     bullet_t boss_shot;
+    bullet_t boss_laser;              // Purple laser straight down
     int fire_cooldown;
 
     int bunker_x[4];

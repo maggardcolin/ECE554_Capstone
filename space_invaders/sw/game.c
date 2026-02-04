@@ -275,6 +275,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     g->boss_alive = 0;
+                    g->boss_laser.alive = 0;  // Clear laser when boss dies
                     g->score += double_shot_active(g) ? 1000 : 500;
                 }
                 shots[si].alive = 0;
@@ -337,7 +338,7 @@ static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
         if (g->lives <= 0) {
             g->game_over = 1;
             g->game_over_score = g->score;
-            g->game_over_delay_timer = 120;
+            g->game_over_delay_timer = 90;
         }
     } else {
         // No bunker collisions on level 0 (tutorial)
@@ -714,7 +715,15 @@ static void setup_level(game_t *g, int level, int reset_score) {
     clear_player_shots(g);
     g->ashot.alive = 0;
     g->boss_shot.alive = 0;
+    g->boss_laser.alive = 0;
     g->fire_cooldown = 0;
+
+    // Initialize boss power system
+    g->boss_power_timer = 0;
+    g->boss_power_max = 600;  // 10 seconds at 60 FPS
+    g->boss_power_active = 0;
+    g->boss_power_cooldown = 0;
+    g->boss_laser_last_hit_y = -1000;  // Far off screen
 
     bunkers_rebuild(g);
 }
@@ -933,43 +942,77 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     // Boss movement and animation (separate from grid)
     if (g->boss_alive) {
-        g->boss_timer++;
-        if (g->boss_timer >= g->boss_period) {
-            g->boss_timer = 0;
-            g->boss_frame ^= 1;
-        }
-
-        int next_bx = g->boss_x + g->boss_dx;
         int boss_w = g->BOSS_A.w;
-        if (next_bx < 0 || next_bx > LW - boss_w) {
-            g->boss_dx = -g->boss_dx;
-            next_bx = g->boss_x + g->boss_dx;
-        }
-        g->boss_x = next_bx;
+        int boss_h = g->BOSS_A.h;
 
-        // Descend once more than half of regular aliens are dead
-        int alive_count = 0;
-        for (int r = 0; r < AROWS; r++) {
-            for (int c = 0; c < ACOLS; c++) {
-                alive_count += g->alien_alive[r][c] ? 1 : 0;
-            }
+        // Boss power charging system
+        g->boss_power_timer++;
+        if (g->boss_power_timer > g->boss_power_max) {
+            g->boss_power_timer = g->boss_power_max;
         }
-        int total_aliens = AROWS * ACOLS;
-        if (alive_count <= total_aliens / 2) {
-            if (g->boss_timer == 0) g->boss_y += 1;
+
+        // When power reaches max, trigger special attack
+        if (g->boss_power_timer >= g->boss_power_max && g->boss_power_active == 0) {
+            g->boss_power_active = 1;
+            g->boss_power_cooldown = 30;  // 0.5 seconds at 60 FPS
+            g->boss_laser.alive = 1;
+            g->boss_laser.x = g->boss_x + boss_w / 2;
+            g->boss_laser.y = g->boss_y + boss_h + 1;
+            g->boss_laser_last_hit_y = -1000;  // Reset hit tracking
+            g->boss_power_timer = 0;  // Reset for next charge
+        }
+
+        // Handle stun/frozen state during special attack
+        if (g->boss_power_cooldown > 0) {
+            g->boss_power_cooldown--;
+            // Boss doesn't move during stun
+        } else {
+            // Normal movement
+            g->boss_timer++;
+            if (g->boss_timer >= g->boss_period) {
+                g->boss_timer = 0;
+                g->boss_frame ^= 1;
+            }
+
+            int next_bx = g->boss_x + g->boss_dx;
+            if (next_bx < 0 || next_bx > LW - boss_w) {
+                g->boss_dx = -g->boss_dx;
+                next_bx = g->boss_x + g->boss_dx;
+            }
+            g->boss_x = next_bx;
+
+            // Descend once more than half of regular aliens are dead
+            int alive_count = 0;
+            for (int r = 0; r < AROWS; r++) {
+                for (int c = 0; c < ACOLS; c++) {
+                    alive_count += g->alien_alive[r][c] ? 1 : 0;
+                }
+            }
+            int total_aliens = AROWS * ACOLS;
+            if (alive_count <= total_aliens / 2) {
+                if (g->boss_timer == 0) g->boss_y += 1;
+            }
         }
 
         // Game over if boss reaches player's y position
-        int boss_h = g->BOSS_A.h;
         if (g->boss_y + boss_h >= g->player_y) {
             g->game_over = 1;
             g->game_over_score = g->score;
-            g->game_over_delay_timer = 120;
+            g->game_over_delay_timer = 90;
         }
 
         // Boss destroys bunkers on collision (not on level 0)
         if (g->level != 0) {
             destroy_bunkers_on_overlap(g, g->boss_x, g->boss_y, boss_w, boss_h);
+        }
+
+        // Update laser position (moves straight down)
+        if (g->boss_laser.alive) {
+            g->boss_laser.y += 3;
+            if (g->boss_laser.y > LH) {
+                g->boss_laser.alive = 0;
+                g->boss_power_active = 0;
+            }
         }
     }
 
@@ -1044,6 +1087,31 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     handle_enemy_shot_collisions(g, &g->ashot);
     handle_enemy_shot_collisions(g, &g->boss_shot);
 
+    // Handle boss laser collision (only with player, phases through)
+    if (g->boss_laser.alive) {
+        const sprite1r_t *p = &g->PLAYER;
+        int laser_w = g->BOSS_A.w;  // Laser width matches boss width
+        int laser_left = g->boss_laser.x - laser_w / 2;
+        int laser_right = laser_left + laser_w;
+        int player_left = g->player_x;
+        int player_right = g->player_x + p->w;
+        
+        // Check if laser overlaps with player and we haven't already hit at this position
+        if (laser_left < player_right && laser_right > player_left &&
+            g->boss_laser.y + 1 >= g->player_y && g->boss_laser.y <= g->player_y + p->h &&
+            (g->boss_laser.y - g->boss_laser_last_hit_y) > 5) {  // Only hit once per 5 pixels
+            g->lives--;
+            g->boss_laser_last_hit_y = g->boss_laser.y;  // Track where we hit
+            clear_player_shots(g);
+            if (g->lives <= 0) {
+                g->game_over = 1;
+                g->game_over_score = g->score;
+                g->game_over_delay_timer = 90;
+            }
+            // Laser continues through player (not destroyed)
+        }
+    }
+
     // Check if player reached right side to exit level (when exit is available)
     if (g->exit_available && g->player_x >= LW - g->PLAYER.w) {
         g->level_complete = 1;
@@ -1061,7 +1129,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (ay >= g->player_y) {
                     g->game_over = 1;
                     g->game_over_score = g->score;
-                    g->game_over_delay_timer = 120;
+                    g->game_over_delay_timer = 90;
                 }
             }
         }
@@ -1249,6 +1317,34 @@ void game_render(game_t *g, lfb_t *lfb) {
                 l_putpix(lfb, bar_x + i, bar_y + j, boss_color);
             }
         }
+
+        // Boss power bar (to the right of health bar on same line)
+        const char *power_label = "POWER:";
+        int power_label_w = text_width_5x5(power_label, 1);
+        int power_bar_y = by - 1;
+        int power_bar_x_start = bar_x + bar_w + 15;  // 15 pixels to the right of health bar
+        l_draw_text(lfb, power_bar_x_start, power_bar_y, power_label, 1, 0xFFFFFFFF);
+
+        int power_bar_x = power_bar_x_start + power_label_w + 6;
+        int power_bar_h = 6;
+        uint32_t power_color = 0xFF8000FF;  // Purple
+
+        // White border for power bar
+        for (int i = 0; i <= bar_w; i++) {
+            l_putpix(lfb, power_bar_x + i, power_bar_y - 1, 0xFFFFFFFF);
+            l_putpix(lfb, power_bar_x + i, power_bar_y + power_bar_h, 0xFFFFFFFF);
+        }
+        for (int j = 0; j <= power_bar_h; j++) {
+            l_putpix(lfb, power_bar_x - 1, power_bar_y + j, 0xFFFFFFFF);
+            l_putpix(lfb, power_bar_x + bar_w, power_bar_y + j, 0xFFFFFFFF);
+        }
+
+        int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * bar_w) / g->boss_power_max : 0;
+        for (int i = 0; i < power_fill_w; i++) {
+            for (int j = 0; j < power_bar_h; j++) {
+                l_putpix(lfb, power_bar_x + i, power_bar_y + j, power_color);
+            }
+        }
     }
 
     {
@@ -1371,6 +1467,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         if (health_pct <= 33) boss_color = 0xFFFF0000;
         else if (health_pct <= 67) boss_color = 0xFFFFFF00;
 
+        // Turn purple when stunned/using special attack
+        if (g->boss_power_cooldown > 0) boss_color = 0xFF8000FF;
+
         const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
         draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
     }
@@ -1404,6 +1503,17 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
     if (g->boss_shot.alive) {
         for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
+    }
+
+    // Boss purple laser beam (straight down)
+    if (g->boss_laser.alive) {
+        int laser_w = g->BOSS_A.w;  // Width matches boss width
+        int laser_left = g->boss_laser.x - laser_w / 2;
+        for (int px = laser_left; px < laser_left + laser_w; px++) {
+            if (px >= 0 && px < LW && g->boss_laser.y >= 0 && g->boss_laser.y < LH) {
+                l_putpix(lfb, px, g->boss_laser.y, 0xFF8000FF);  // Purple
+            }
+        }
     }
 
     // Exit sign when boss is killed
