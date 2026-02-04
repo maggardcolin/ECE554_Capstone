@@ -172,7 +172,7 @@ static int is_powerup_active(const game_t *g, powerup_type_t type) {
     return 0;
 }
 
-/// double_shot_active: Check if double damage powerup is currently active
+/// double_shot_active: Check if double points powerup is currently active
 /// Parameters:
 ///   g - Pointer to game state
 /// Returns: 1 if POWERUP_DOUBLE_SHOT is active in any slot, 0 otherwise
@@ -695,7 +695,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     g->alien_health[r][c]--;
                     if (g->alien_health[r][c] <= 0) {
                         g->alien_alive[r][c] = 0;
-                        g->score += double_shot_active(g) ? 20 : 10;
+                        // Check if this is the last regular alien
+                        int remaining = 0;
+                        for (int rr = 0; rr < AROWS; rr++) {
+                            for (int cc = 0; cc < ACOLS; cc++) {
+                                if (g->alien_alive[rr][cc]) remaining++;
+                            }
+                        }
+                        int points;
+                        if (remaining == 0) {
+                            points = double_shot_active(g) ? 200 : 100;  // Last alien bonus
+                        } else {
+                            points = double_shot_active(g) ? 20 : 10;
+                        }
+                        g->score += points;
                     }
                     g->pshot[si].alive = 0;
                     hit = 1;
@@ -757,7 +770,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     g->alien_health[r][c]--;
                     if (g->alien_health[r][c] <= 0) {
                         g->alien_alive[r][c] = 0;
-                        g->score += double_shot_active(g) ? 20 : 10;
+                        // Check if this is the last regular alien
+                        int remaining = 0;
+                        for (int rr = 0; rr < AROWS; rr++) {
+                            for (int cc = 0; cc < ACOLS; cc++) {
+                                if (g->alien_alive[rr][cc]) remaining++;
+                            }
+                        }
+                        int points;
+                        if (remaining == 0) {
+                            points = double_shot_active(g) ? 200 : 100;  // Last alien bonus
+                        } else {
+                            points = double_shot_active(g) ? 20 : 10;
+                        }
+                        g->score += points;
                     }
                     g->pshot_left[si].alive = 0;
                     hit = 1;
@@ -819,7 +845,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     g->alien_health[r][c]--;
                     if (g->alien_health[r][c] <= 0) {
                         g->alien_alive[r][c] = 0;
-                        g->score += double_shot_active(g) ? 20 : 10;
+                        // Check if this is the last regular alien
+                        int remaining = 0;
+                        for (int rr = 0; rr < AROWS; rr++) {
+                            for (int cc = 0; cc < ACOLS; cc++) {
+                                if (g->alien_alive[rr][cc]) remaining++;
+                            }
+                        }
+                        int points;
+                        if (remaining == 0) {
+                            points = double_shot_active(g) ? 200 : 100;  // Last alien bonus
+                        } else {
+                            points = double_shot_active(g) ? 20 : 10;
+                        }
+                        g->score += points;
                     }
                     g->pshot_right[si].alive = 0;
                     hit = 1;
@@ -926,26 +965,19 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
         l_clear(lfb, 0xFF000000);
-        const char *title = "BULLET HELL";
-        const char *title2 = "SPACE INVADERS";
+        const char *title = "SPACE INVADERS";
         const char *prompt = "PRESS SPACE TO START";
 
         int title_scale = 3;
         int title_w = text_width_5x5(title, title_scale);
         int title_x = (LW - title_w) / 2;
-        int title_y = LH / 2 - 40;
+        int title_y = LH / 2 - 30;
         l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
-
-        int title2_scale = 3;
-        int title2_w = text_width_5x5(title2, title2_scale);
-        int title2_x = (LW - title2_w) / 2;
-        int title2_y = LH / 2 - 10;
-        l_draw_text(lfb, title2_x, title2_y, title2, title2_scale, 0xFF00FF00);
 
         int prompt_scale = 2;
         int prompt_w = text_width_5x5(prompt, prompt_scale);
         int prompt_x = (LW - prompt_w) / 2;
-        int prompt_y = title2_y + 40;
+        int prompt_y = title_y + 40;
         l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
         return;
     }
