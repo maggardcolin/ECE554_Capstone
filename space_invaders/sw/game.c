@@ -271,7 +271,9 @@ static void enter_shop(game_t *g) {
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
     }
-    g->player_x = LW / 2 - g->PLAYER.w / 2;
+
+    // Position player on left side, keep y position constant
+    g->player_x = 10;
 
     g->shop_anim_timer = 0;
     g->shopkeeper_frame = 0;
@@ -572,8 +574,14 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->powerup_spawn_timer = 0;
     for (int i = 0; i < 5; i++) g->powerup_slot_timer[i] = 0;
 
-    g->player_x = LW/2 - g->PLAYER.w/2;
+    // Spawn in middle x on level 1, left side on subsequent levels
+    if (level == 1) {
+        g->player_x = LW / 2 - g->PLAYER.w / 2;
+    } else {
+        g->player_x = 10;  // Spawn on left side
+    }
     g->player_y = LH - 30;
+    g->exit_available = 0;
 
     memset(g->alien_alive, 1, sizeof(g->alien_alive));
     // Level 1: aliens have 1 HP, Level 2+: aliens have 2 HP (green -> white -> dead)
@@ -1310,7 +1318,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    // Check if aliens have reached the player level
+    // Check if player reached right side to exit level (when exit is available)
+    if (g->exit_available && g->player_x >= LW - g->PLAYER.w) {
+        g->level_complete = 1;
+        g->level_complete_timer = 0;
+        g->level_just_completed = g->level;
+        g->exit_available = 0;
+    }
     if (!g->game_over) {
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
@@ -1327,10 +1341,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    if (!g->game_over && !g->boss_alive) {
-        g->level_complete = 1;
-        g->level_complete_timer = 60;
-        g->level_just_completed = g->level;
+    if (!g->game_over && !g->boss_alive && !g->exit_available) {
+        g->exit_available = 1;
     }
 }
 
@@ -1358,20 +1370,6 @@ void game_render(game_t *g, lfb_t *lfb) {
         int prompt_x = (LW - prompt_w) / 2;
         int prompt_y = title_y + 40;
         l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
-        return;
-    }
-
-    if (g->level_complete) {
-        l_clear(lfb, 0xFF000000);
-        char msg[32];
-        int lvl = g->level_just_completed;
-        if (lvl < 0) lvl = 0;
-        snprintf(msg, sizeof(msg), "LEVEL %d COMPLETE", lvl);
-        int scale = 3;
-        int w = text_width_5x5(msg, scale);
-        int x = (LW - w) / 2;
-        int y = LH / 2 - 10;
-        l_draw_text(lfb, x, y, msg, scale, 0xFFFFFFFF);
         return;
     }
 
@@ -1584,5 +1582,14 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
     if (g->boss_shot.alive) {
         for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
+    }
+
+    // Exit sign when boss is killed
+    if (g->exit_available) {
+        const char *exit_label = "EXIT";
+        int exit_w = text_width_5x5(exit_label, 1);
+        int exit_x = LW - exit_w - 4;
+        int exit_y = g->player_y - 10;
+        l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
     }
 }
