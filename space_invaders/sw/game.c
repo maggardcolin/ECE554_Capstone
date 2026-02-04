@@ -305,7 +305,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                         int remaining = count_aliens_remaining(g);
                         int points;
                         if (remaining == 0) points = double_shot_active(g) ? 200 : 100;
-                        else points = double_shot_active(g) ? 10 : 5;
+                        else points = double_shot_active(g) ? 20 : 10;
                         g->score += points;
                     }
                     shots[si].alive = 0;
