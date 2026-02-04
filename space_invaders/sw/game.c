@@ -126,14 +126,14 @@ static int text_width_5x5(const char *text, int scale) {
 ///        Used for powerup pickups and inventory display on HUD.
 static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
     if (type == POWERUP_DOUBLE_SHOT) {
-        // Red circle with "2X" text
+        // Yellow circle with "2X" text
         int r = 6;
         for (int y = -r; y <= r; y++) {
             for (int x = -r; x <= r; x++) {
-                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFF0000);
+                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFFFF00);
             }
         }
-        l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFFFFFFFF);
+        l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFF000000);
     } else if (type == POWERUP_TRIPLE_SHOT) {
         // Blue circle with line
         int r = 6;
@@ -1018,16 +1018,17 @@ void game_render(game_t *g, lfb_t *lfb) {
         int label_scale = 1;
         int label_w = text_width_5x5(label, label_scale);
         int x = 5;
-        l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
-        l_draw_score(lfb, x + label_w + 6, 5, g->score, 0xFFFFFFFF);
+        uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;  // Yellow if double-shot active, white otherwise
+        l_draw_text(lfb, x, 5, label, label_scale, score_color);
+        l_draw_score(lfb, x + label_w + 6, 5, g->score, score_color);
     }
 
     // Boss health bar to the right of the score
     if (g->boss_alive) {
         uint32_t boss_color = 0xFF00FF00; // Green 50-100%
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
-        if (health_pct <= 10) boss_color = 0xFFFF0000; // Red < 10%
-        else if (health_pct <= 50) boss_color = 0xFFFFFF00; // Yellow 10-50%
+        if (health_pct <= 33) boss_color = 0xFFFF0000; // Red < 10%
+        else if (health_pct <= 67) boss_color = 0xFFFFFF00; // Yellow 10-50%
 
         const char *boss_label = "BOSS";
         int boss_label_w = text_width_5x5(boss_label, 1);
@@ -1120,8 +1121,8 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->boss_alive) {
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         uint32_t boss_color = 0xFF00FF00;
-        if (health_pct <= 10) boss_color = 0xFFFF0000;
-        else if (health_pct <= 50) boss_color = 0xFFFFFF00;
+        if (health_pct <= 33) boss_color = 0xFFFF0000;
+        else if (health_pct <= 67) boss_color = 0xFFFFFF00;
 
         const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
         draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
@@ -1142,7 +1143,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
     }
 
-    uint32_t player_color = triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00;
+    uint32_t player_color = 0xFF00FF00;  // Default green
+    if (rapid_fire_active(g)) player_color = 0xFFFF0000;  // Red when rapid-fire active
+    else if (triple_shot_active(g)) player_color = 0xFF0000FF;  // Blue when triple-shot active
     draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
 
     if (g->powerup_active) {
@@ -1152,7 +1155,8 @@ void game_render(game_t *g, lfb_t *lfb) {
     // bullets
     for (int s = 0; s < MAX_PSHOTS; s++) {
         if (g->pshot[s].alive) {
-            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y - i, 0xFFFFFFFF);
+            uint32_t bullet_color = rapid_fire_active(g) ? 0xFFFFA500 : 0xFFFFFFFF;  // Orange if rapid-fire, white otherwise
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y - i, bullet_color);
         }
         if (g->pshot_left[s].alive) {
             for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - i/2, g->pshot_left[s].y - i, 0xFF0000FF);
@@ -1164,15 +1168,5 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
     if (g->boss_shot.alive) {
         for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
-    }
-
-    {
-        int base_y = LH - 12;
-        int spacing = 14;
-        int right_x = LW - 6;
-        for (int i = 0; i < 5; i++) {
-            int x = right_x - (4 - i) * spacing;
-            if (g->powerup_slot_timer[i] > 0) draw_powerup_icon(lfb, x, base_y + 4, g->powerup_type_slot[i]);
-        }
     }
 }
