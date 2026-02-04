@@ -267,6 +267,12 @@ static void enter_shop(game_t *g) {
     g->boss_shot.alive = 0;
     g->fire_cooldown = 0;
 
+    // Reset powerups
+    for (int i = 0; i < 5; i++) {
+        g->powerup_slot_timer[i] = 0;
+    }
+    g->player_x = LW / 2 - g->PLAYER.w / 2;
+
     g->shop_anim_timer = 0;
     g->shopkeeper_frame = 0;
 }
@@ -403,6 +409,44 @@ static void shop_render(game_t *g, lfb_t *lfb) {
             l_putpix(lfb, x0 + item_w, y0 + y, 0xFFFFFFFF);
         }
 
+        // Draw icon based on item type
+        int center_x = g->shop_items[i].x;
+        int center_y = g->shop_items[i].y;
+        
+        if (g->shop_items[i].type == SHOP_ITEM_LIFE) {
+            // Green square with white cross
+            for (int dx = -3; dx <= 3; dx++) {
+                for (int dy = -3; dy <= 3; dy++) {
+                    if (dx >= -2 && dx <= 2 && dy >= -2 && dy <= 2) {
+                        l_putpix(lfb, center_x + dx, center_y + dy, 0xFF00FF00);
+                    }
+                }
+            }
+            // White cross
+            for (int d = -2; d <= 2; d++) {
+                l_putpix(lfb, center_x + d, center_y, 0xFFFFFFFF);
+                l_putpix(lfb, center_x, center_y + d, 0xFFFFFFFF);
+            }
+        } else if (g->shop_items[i].type == SHOP_ITEM_FIRE_SPEED) {
+            // Red arrow pointing up
+            l_putpix(lfb, center_x, center_y - 3, 0xFFFF0000);
+            l_putpix(lfb, center_x - 1, center_y - 1, 0xFFFF0000);
+            l_putpix(lfb, center_x + 1, center_y - 1, 0xFFFF0000);
+            l_putpix(lfb, center_x, center_y - 2, 0xFFFF0000);
+            l_putpix(lfb, center_x, center_y - 1, 0xFFFF0000);
+            l_putpix(lfb, center_x, center_y, 0xFFFF0000);
+            l_putpix(lfb, center_x, center_y + 1, 0xFFFF0000);
+        } else if (g->shop_items[i].type == SHOP_ITEM_MOVE_SPEED) {
+            // Green arrow pointing up
+            l_putpix(lfb, center_x, center_y - 3, 0xFF00FF00);
+            l_putpix(lfb, center_x - 1, center_y - 1, 0xFF00FF00);
+            l_putpix(lfb, center_x + 1, center_y - 1, 0xFF00FF00);
+            l_putpix(lfb, center_x, center_y - 2, 0xFF00FF00);
+            l_putpix(lfb, center_x, center_y - 1, 0xFF00FF00);
+            l_putpix(lfb, center_x, center_y, 0xFF00FF00);
+            l_putpix(lfb, center_x, center_y + 1, 0xFF00FF00);
+        }
+
         // Label and price
         const char *label = shop_item_label(g->shop_items[i].type);
         int label_w = text_width_5x5(label, 1);
@@ -536,7 +580,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     int hp = (level >= 2) ? 2 : 1;
     for (int r = 0; r < AROWS; r++) {
         for (int c = 0; c < ACOLS; c++) {
-            g->alien_health[r][c] = hp;
+            g->alien_health[r][c] = (rand() % hp) + 1;
         }
     }
 
