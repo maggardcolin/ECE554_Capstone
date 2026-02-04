@@ -1296,8 +1296,64 @@ void game_render(game_t *g, lfb_t *lfb) {
                 l_putpix(lfb, lx + i, bar_y + j, life_color);
             }
         }
+        
+        // Powerup progress bars
+        {
+            int px = lx + bar_w + 10;  // Start after health bar
+            int py = y;
+            int powerup_bar_h = 6;
+            int powerup_bar_w = 30;
+            int icon_size = 6;
+            int spacing = 45;  // Space between each powerup display
+            
+            for (int slot = 0; slot < 5; slot++) {
+                if (g->powerup_slot_timer[slot] > 0) {
+                    // Draw powerup icon
+                    uint32_t icon_color = 0xFFFFFFFF;
+                    if (g->powerup_type_slot[slot] == POWERUP_DOUBLE_SHOT) {
+                        icon_color = 0xFFFFFF00;  // Yellow
+                    } else if (g->powerup_type_slot[slot] == POWERUP_TRIPLE_SHOT) {
+                        icon_color = 0xFF0000FF;  // Blue
+                    } else if (g->powerup_type_slot[slot] == POWERUP_RAPID_FIRE) {
+                        icon_color = 0xFFFF0000;  // Red
+                    }
+                    
+                    // Draw "POWER:" label
+                    const char *power_label = "POWER:";
+                    l_draw_text(lfb, px, py, power_label, 1, 0xFFFFFFFF);
+                    int label_w = text_width_5x5(power_label, 1);
+                    
+                    // Draw progress bar to the right of label
+                    int bar_x = px + label_w + 3;
+                    int bar_y = py - 1;
+                    
+                    // White border
+                    for (int i = 0; i <= powerup_bar_w; i++) {
+                        l_putpix(lfb, bar_x + i, bar_y - 1, 0xFFFFFFFF);
+                        l_putpix(lfb, bar_x + i, bar_y + powerup_bar_h, 0xFFFFFFFF);
+                    }
+                    for (int j = 0; j <= powerup_bar_h; j++) {
+                        l_putpix(lfb, bar_x - 1, bar_y + j, 0xFFFFFFFF);
+                        l_putpix(lfb, bar_x + powerup_bar_w, bar_y + j, 0xFFFFFFFF);
+                    }
+                    
+                    // Filled portion (proportional to remaining time)
+                    int max_timer = 600;  // 600 frames = 10 seconds at 60 FPS
+                    int fill_w = (g->powerup_slot_timer[slot] * powerup_bar_w) / max_timer;
+                    if (fill_w > powerup_bar_w) fill_w = powerup_bar_w;
+                    
+                    for (int i = 0; i < fill_w; i++) {
+                        for (int j = 0; j < powerup_bar_h; j++) {
+                            l_putpix(lfb, bar_x + i, bar_y + j, icon_color);
+                        }
+                    }
+                    
+                    // Move to next slot position
+                    px += spacing;
+                }
+            }
+        }
     }
-
     // bunkers (not on level 0)
     if (g->level != 0) {
         for (int i = 0; i < 4; i++) {
