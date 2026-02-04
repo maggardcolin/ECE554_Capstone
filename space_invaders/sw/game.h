@@ -27,7 +27,7 @@ typedef struct { int x,y; int alive; } bullet_t;
 #define MAX_SHOP_ITEMS 3
 #define ACOLS 11
 #define AROWS 5
-#define START_LEVEL 3
+#define START_LEVEL 1
 
 typedef struct {
     int score;
