@@ -75,6 +75,35 @@ static const char *bunker_rows[] = {
     "....................",
 };
 
+// Shop item icons (7x7)
+static const char *shop_life_rows[] = {
+    "...X...",
+    "...X...",
+    "XXXXXXX",
+    "...X...",
+    "...X...",
+    ".......",
+    ".......",
+};
+static const char *shop_fire_rows[] = {
+    "...X...",
+    "..XXX..",
+    ".XXXXX.",
+    "...X...",
+    "...X...",
+    "...X...",
+    ".......",
+};
+static const char *shop_move_rows[] = {
+    ".......",
+    "..X....",
+    "...X...",
+    "XXXXX..",
+    "...X...",
+    "..X....",
+    ".......",
+};
+
 typedef struct {
     int w, h;
     int stride;    // bytes per row

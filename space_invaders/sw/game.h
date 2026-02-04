@@ -48,6 +48,7 @@ typedef struct {
     int powerup_type_slot[5];        // Type of powerup in each slot
 
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B;
+    sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
     sprite1r_t *bunkers[4];
 

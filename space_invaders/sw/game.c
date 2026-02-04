@@ -513,42 +513,25 @@ static void shop_render(game_t *g, lfb_t *lfb) {
             l_putpix(lfb, x0 + item_w, y0 + y, 0xFFFFFFFF);
         }
 
-        // Draw icon based on item type
+        // Draw icon based on item type (ASCII sprites)
         int center_x = g->shop_items[i].x;
         int center_y = g->shop_items[i].y;
-        
+        const sprite1r_t *icon = NULL;
+        uint32_t icon_color = 0xFFFFFFFF;
         if (g->shop_items[i].type == SHOP_ITEM_LIFE) {
-            // Green square with white cross
-            for (int dx = -3; dx <= 3; dx++) {
-                for (int dy = -3; dy <= 3; dy++) {
-                    if (dx >= -2 && dx <= 2 && dy >= -2 && dy <= 2) {
-                        l_putpix(lfb, center_x + dx, center_y + dy, 0xFF00FF00);
-                    }
-                }
-            }
-            // White cross
-            for (int d = -2; d <= 2; d++) {
-                l_putpix(lfb, center_x + d, center_y, 0xFFFFFFFF);
-                l_putpix(lfb, center_x, center_y + d, 0xFFFFFFFF);
-            }
+            icon = &g->SHOP_LIFE;
+            icon_color = 0xFF00FF00;
         } else if (g->shop_items[i].type == SHOP_ITEM_FIRE_SPEED) {
-            // Red arrow pointing up
-            l_putpix(lfb, center_x, center_y - 3, 0xFFFF0000);
-            l_putpix(lfb, center_x - 1, center_y - 1, 0xFFFF0000);
-            l_putpix(lfb, center_x + 1, center_y - 1, 0xFFFF0000);
-            l_putpix(lfb, center_x, center_y - 2, 0xFFFF0000);
-            l_putpix(lfb, center_x, center_y - 1, 0xFFFF0000);
-            l_putpix(lfb, center_x, center_y, 0xFFFF0000);
-            l_putpix(lfb, center_x, center_y + 1, 0xFFFF0000);
+            icon = &g->SHOP_FIRE;
+            icon_color = 0xFFFF0000;
         } else if (g->shop_items[i].type == SHOP_ITEM_MOVE_SPEED) {
-            // Green arrow pointing up
-            l_putpix(lfb, center_x, center_y - 3, 0xFF00FF00);
-            l_putpix(lfb, center_x - 1, center_y - 1, 0xFF00FF00);
-            l_putpix(lfb, center_x + 1, center_y - 1, 0xFF00FF00);
-            l_putpix(lfb, center_x, center_y - 2, 0xFF00FF00);
-            l_putpix(lfb, center_x, center_y - 1, 0xFF00FF00);
-            l_putpix(lfb, center_x, center_y, 0xFF00FF00);
-            l_putpix(lfb, center_x, center_y + 1, 0xFF00FF00);
+            icon = &g->SHOP_MOVE;
+            icon_color = 0xFF00FF00;
+        }
+        if (icon) {
+            int icon_x = center_x - icon->w / 2;
+            int icon_y = center_y - icon->h / 2;
+            draw_sprite1r(lfb, icon, icon_x, icon_y, icon_color);
         }
 
         // Label and price
@@ -749,6 +732,9 @@ void game_init(game_t *g) {
     g->ALIEN_B = make_sprite_from_ascii(alienB_rows, 8);
     g->BOSS_A  = make_sprite_from_ascii(bossA_rows, 10);
     g->BOSS_B  = make_sprite_from_ascii(bossB_rows, 10);
+    g->SHOP_LIFE = make_sprite_from_ascii(shop_life_rows, 7);
+    g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
+    g->SHOP_MOVE = make_sprite_from_ascii(shop_move_rows, 7);
 
     bunkers_rebuild(g);
 
