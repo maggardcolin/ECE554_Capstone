@@ -949,7 +949,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         int boss_h = g->BOSS_A.h;
 
         // Boss power charging system
-        g->boss_power_timer++;
+        int health_pct = (g->boss_health * 100) / g->boss_max_health;
+        if (health_pct <= 33) g->boss_power_timer += 3 + (g->level / 6);
+        else if (health_pct <= 67) g->boss_power_timer += 2 + (g->level / 6);
+        else g->boss_power_timer += 1 + (g->level / 6);
         if (g->boss_power_timer > g->boss_power_max) {
             g->boss_power_timer = g->boss_power_max;
         }
@@ -980,8 +983,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         // When power reaches max, trigger special attack
         if (g->boss_power_timer >= g->boss_power_max && g->boss_power_active == 0) {
             g->boss_power_active = 1;
-            int health_pct = (g->boss_health * 100) / g->boss_max_health;
-            g->boss_power_cooldown = (health_pct <= 33) ? 10 : (health_pct <= 67) ? 20 : 30;
+            g->boss_power_cooldown = 30;
             
             // Use the next attack type that was determined during charging
             g->boss_attack_type = g->next_boss_attack_type;
