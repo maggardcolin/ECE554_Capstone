@@ -1167,6 +1167,26 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     l_clear(lfb, 0xFF000000);
     
+    // Starfield background (static tiling pattern)
+    {
+        int star_spacing = 20;
+        for (int y = 0; y < LH; y += star_spacing) {
+            for (int x = 0; x < LW; x += star_spacing) {
+                // Pseudo-random star pattern based on position
+                int seed = (x ^ y) * 73856093;
+                if ((seed % 7) == 0) {  // ~14% of positions have stars
+                    uint32_t star_color = 0xFF333333;  // Dark gray
+                    l_putpix(lfb, x, y, star_color);
+                    if ((seed % 13) == 0 && x + 1 < LW) {  // Some stars are 2x2
+                        l_putpix(lfb, x + 1, y, star_color);
+                        if (y + 1 < LH) l_putpix(lfb, x, y + 1, star_color);
+                        l_putpix(lfb, x + 1, y + 1, star_color);
+                    }
+                }
+            }
+        }
+    }
+    
     // Level 0 tutorial text
     if (g->level == 0) {
         const char *tutorial1 = "USE A/D OR LEFT/RIGHT TO MOVE";
