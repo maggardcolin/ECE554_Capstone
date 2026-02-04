@@ -673,8 +673,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
         g->alien_health[2][5] = 1;
     } else {
         memset(g->alien_alive, 1, sizeof(g->alien_alive));
-        // Level 1: aliens have 1 HP, Level 2+: aliens have 2 HP (green -> white -> dead)
-        int hp = (level >= 2) ? 2 : 1;
+        // Level 1: aliens have 1 HP, Level 3+: aliens have 2 HP (green -> white -> dead)
+        int hp = (level >= 5) ? 3 : (level >= 3) ? 2 : 1;
         for (int r = 0; r < AROWS; r++) {
             for (int c = 0; c < ACOLS; c++) {
                 g->alien_health[r][c] = (rand() % hp) + 1;
@@ -1068,17 +1068,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     if (!g->game_over && !g->boss_alive && !g->exit_available) {
-        // On level 0, check if all aliens are dead (tutorial alien)
-        // On other levels, boss must also be dead
-        int all_aliens_dead = 1;
-        for (int r = 0; r < AROWS && all_aliens_dead; r++) {
-            for (int c = 0; c < ACOLS && all_aliens_dead; c++) {
-                if (g->alien_alive[r][c]) all_aliens_dead = 0;
+        if (g->level == 0) {
+            int all_aliens_dead = 1;
+            for (int r = 0; r < AROWS && all_aliens_dead; r++) {
+                for (int c = 0; c < ACOLS && all_aliens_dead; c++) {
+                    if (g->alien_alive[r][c]) all_aliens_dead = 0;
+                }
             }
-        }
-        if (all_aliens_dead) {
+            if (all_aliens_dead) {
+                g->exit_available = 1;
+            }
+        } else {
             g->exit_available = 1;
         }
+        
     }
 }
 
@@ -1305,8 +1308,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             int ax = g->alien_origin_x + c * (AS->w + spacing_x);
             int ay = g->alien_origin_y + r * (AS->h + spacing_y);
 
-            // Green if full health, white if damaged
-            uint32_t alien_color = (g->alien_health[r][c] > 1) ? 0xFF00FF00 : 0xFFFFFFFF;
+            // Red if 3+, Green if 2, white if 1
+            uint32_t alien_color = (g->alien_health[r][c] >= 3) ? 0xFFFF0000 : (g->alien_health[r][c] == 2) ? 0xFF00FF00 : 0xFFFFFFFF;
             draw_sprite1r(lfb, AS, ax, ay, alien_color);
         }
     }
