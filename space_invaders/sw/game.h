@@ -11,10 +11,21 @@ typedef enum {
     POWERUP_COUNT = 3         // Total number of powerup types (update when adding new powerups)
 } powerup_type_t;
 
+/// Shop item types - extend to add more items later
+typedef enum {
+    SHOP_ITEM_FIRE_SPEED = 0,
+    SHOP_ITEM_MOVE_SPEED = 1,
+    SHOP_ITEM_LIFE = 2,
+    SHOP_ITEM_COUNT = 3
+} shop_item_type_t;
+
 typedef struct { int x,y; int alive; } bullet_t;
 
 #define MAX_PSHOTS 8
 #define PLAYER_LIVES 3
+#define MAX_SHOP_ITEMS 3
+#define ACOLS 11
+#define AROWS 5
 
 typedef struct {
     int score;
@@ -42,7 +53,6 @@ typedef struct {
 
     int player_x, player_y;
 
-    enum { ACOLS = 11, AROWS = 5 };
     uint8_t alien_alive[AROWS][ACOLS];
     int alien_health[AROWS][ACOLS];  // Hit points per alien (1 = one hit, 2 = two hits, etc.)
 
@@ -76,6 +86,23 @@ typedef struct {
     int game_over;
     int game_over_score;
     int game_over_delay_timer;
+
+    // Player upgrades (shop)
+    int player_speed;          // Base 2, increased by shop item
+    int fire_speed_bonus;      // Each point reduces cooldown
+
+    // Shop state
+    int in_shop;
+    int shop_count;            // Number of shops seen
+    int shop_next_level;       // Level to start after exiting shop
+    int shop_anim_timer;
+    int shopkeeper_frame;
+    struct {
+        int active;
+        int x, y;
+        shop_item_type_t type;
+        int price;
+    } shop_items[MAX_SHOP_ITEMS];
 
 } game_t;
 

@@ -100,6 +100,37 @@ static void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint3
     }
 }
 
+/// draw_sprite1r_scaled: Render a 1-bit sprite scaled by an integer factor
+/// Parameters:
+///   lfb   - Logical framebuffer to render to
+///   s     - Pointer to sprite1r_t containing width, height, stride, and packed bits
+///   x0    - Top-left x-coordinate in logical pixels
+///   y0    - Top-left y-coordinate in logical pixels
+///   color - 32-bit ARGB color to render sprite pixels in
+///   scale - Integer scale factor (minimum 1)
+static void draw_sprite1r_scaled(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color, int scale) {
+    if (scale < 1) scale = 1;
+    for (int y = 0; y < s->h; y++) {
+        int yy = y0 + y * scale;
+        if ((unsigned)yy >= (unsigned)LH) continue;
+        const uint8_t *row = s->bits + y * s->stride;
+        for (int x = 0; x < s->w; x++) {
+            if (!((row[x >> 3] >> (7 - (x & 7))) & 1)) continue;
+            int xx = x0 + x * scale;
+            if ((unsigned)xx >= (unsigned)LW) continue;
+            for (int dy = 0; dy < scale; dy++) {
+                int yyy = yy + dy;
+                if ((unsigned)yyy >= (unsigned)LH) continue;
+                for (int dx = 0; dx < scale; dx++) {
+                    int xxx = xx + dx;
+                    if ((unsigned)xxx >= (unsigned)LW) continue;
+                    lfb->px[yyy * LW + xxx] = color;
+                }
+            }
+        }
+    }
+}
+
 /// text_width_5x5: Calculate the width in logical pixels of text rendered at given scale
 /// Parameters:
 ///   text  - Null-terminated string to measure
@@ -197,6 +228,272 @@ static int triple_shot_active(const game_t *g) {
 /// Notes: When active, firing uses a different cooldown.
 static int rapid_fire_active(const game_t *g) {
     return is_powerup_active(g, POWERUP_RAPID_FIRE);
+}
+
+static void setup_level(game_t *g, int level, int reset_score);
+
+static const char *shop_item_label(shop_item_type_t type) {
+    switch (type) {
+        case SHOP_ITEM_FIRE_SPEED: return "FIRE";
+        case SHOP_ITEM_MOVE_SPEED: return "MOVE";
+        case SHOP_ITEM_LIFE:       return "LIFE";
+        default:                   return "ITEM";
+    }
+}
+
+static void enter_shop(game_t *g) {
+    g->in_shop = 1;
+    g->shop_next_level = g->level + 1;
+    g->shop_count++;
+
+    int price_multiplier = g->shop_count; // Base * shops seen
+    int spacing = 60;
+    int start_x = LW / 2 - spacing;
+    int y = LH / 2;
+    for (int i = 0; i < MAX_SHOP_ITEMS; i++) {
+        g->shop_items[i].active = 1;
+        g->shop_items[i].type = (shop_item_type_t)(rand() % SHOP_ITEM_COUNT);
+        g->shop_items[i].price = 500 * price_multiplier;
+        g->shop_items[i].x = start_x + i * spacing;
+        g->shop_items[i].y = y;
+    }
+
+    for (int i = 0; i < MAX_PSHOTS; i++) {
+        g->pshot[i].alive = 0;
+        g->pshot_left[i].alive = 0;
+        g->pshot_right[i].alive = 0;
+    }
+    g->ashot.alive = 0;
+    g->boss_shot.alive = 0;
+    g->fire_cooldown = 0;
+
+    g->shop_anim_timer = 0;
+    g->shopkeeper_frame = 0;
+}
+
+static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
+    (void)vsync_counter;
+    g->shop_anim_timer++;
+    if (g->shop_anim_timer >= 20) {
+        g->shop_anim_timer = 0;
+        g->shopkeeper_frame ^= 1;
+    }
+
+    if (buttons & BTN_LEFT)  g->player_x -= g->player_speed;
+    if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
+
+    if (g->player_x < 0) g->player_x = 0;
+    if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
+
+    if (g->fire_cooldown > 0) g->fire_cooldown--;
+    if ((buttons & BTN_FIRE) && g->fire_cooldown == 0) {
+        int center_x = g->player_x + g->PLAYER.w/2;
+        int center_y = g->player_y - 1;
+
+        for (int i = 0; i < MAX_PSHOTS; i++) {
+            if (!g->pshot[i].alive) {
+                g->pshot[i].alive = 1;
+                g->pshot[i].x = center_x;
+                g->pshot[i].y = center_y;
+                break;
+            }
+        }
+
+        if (triple_shot_active(g)) {
+            for (int i = 0; i < MAX_PSHOTS; i++) {
+                if (!g->pshot_left[i].alive) {
+                    g->pshot_left[i].alive = 1;
+                    g->pshot_left[i].x = center_x - 2;
+                    g->pshot_left[i].y = center_y;
+                    break;
+                }
+            }
+            for (int i = 0; i < MAX_PSHOTS; i++) {
+                if (!g->pshot_right[i].alive) {
+                    g->pshot_right[i].alive = 1;
+                    g->pshot_right[i].x = center_x + 2;
+                    g->pshot_right[i].y = center_y;
+                    break;
+                }
+            }
+        }
+
+        int base = 20 - g->fire_speed_bonus * 2;
+        if (base < 5) base = 5;
+        g->fire_cooldown = rapid_fire_active(g) ? (base / 2) : base;
+        if (g->fire_cooldown < 3) g->fire_cooldown = 3;
+    }
+
+    for (int i = 0; i < MAX_PSHOTS; i++) {
+        if (g->pshot[i].alive) {
+            g->pshot[i].y -= 4;
+            if (g->pshot[i].y < 0) g->pshot[i].alive = 0;
+        }
+        if (g->pshot_left[i].alive) {
+            g->pshot_left[i].x -= 1;
+            g->pshot_left[i].y -= 4;
+            if (g->pshot_left[i].y < 0 || g->pshot_left[i].x < 0) g->pshot_left[i].alive = 0;
+        }
+        if (g->pshot_right[i].alive) {
+            g->pshot_right[i].x += 1;
+            g->pshot_right[i].y -= 4;
+            if (g->pshot_right[i].y < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
+        }
+    }
+
+    int item_w = 18;
+    int item_h = 12;
+    for (int si = 0; si < MAX_PSHOTS; si++) {
+        int bx[3] = { g->pshot[si].x, g->pshot_left[si].x, g->pshot_right[si].x };
+        int by[3] = { g->pshot[si].y, g->pshot_left[si].y, g->pshot_right[si].y };
+        int alive[3] = { g->pshot[si].alive, g->pshot_left[si].alive, g->pshot_right[si].alive };
+
+        for (int bi = 0; bi < 3; bi++) {
+            if (!alive[bi]) continue;
+            for (int it = 0; it < MAX_SHOP_ITEMS; it++) {
+                if (!g->shop_items[it].active) continue;
+                int ix = g->shop_items[it].x - item_w / 2;
+                int iy = g->shop_items[it].y - item_h / 2;
+                if (bx[bi] >= ix && bx[bi] <= ix + item_w && by[bi] >= iy && by[bi] <= iy + item_h) {
+                    if (g->score >= g->shop_items[it].price) {
+                        g->score -= g->shop_items[it].price;
+                        if (g->shop_items[it].type == SHOP_ITEM_FIRE_SPEED) g->fire_speed_bonus++;
+                        else if (g->shop_items[it].type == SHOP_ITEM_MOVE_SPEED) g->player_speed++;
+                        else if (g->shop_items[it].type == SHOP_ITEM_LIFE) g->lives++;
+                        g->shop_items[it].active = 0;
+                    }
+                    if (bi == 0) g->pshot[si].alive = 0;
+                    if (bi == 1) g->pshot_left[si].alive = 0;
+                    if (bi == 2) g->pshot_right[si].alive = 0;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Exit shop if player moves to far right edge
+    if (g->player_x >= LW - g->PLAYER.w) {
+        g->in_shop = 0;
+        setup_level(g, g->shop_next_level, 0);
+    }
+}
+
+static void shop_render(game_t *g, lfb_t *lfb) {
+    l_clear(lfb, 0xFF000000);
+
+    // Shopkeeper (purple animated alien) at top-left
+    const sprite1r_t *SK = g->shopkeeper_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    draw_sprite1r_scaled(lfb, SK, 12, 24, 0xFF8000FF, 2);
+
+    // Draw shop items
+    int item_w = 18;
+    int item_h = 12;
+    for (int i = 0; i < MAX_SHOP_ITEMS; i++) {
+        if (!g->shop_items[i].active) continue;
+        int x0 = g->shop_items[i].x - item_w / 2;
+        int y0 = g->shop_items[i].y - item_h / 2;
+
+        // Border
+        for (int x = 0; x <= item_w; x++) {
+            l_putpix(lfb, x0 + x, y0 - 1, 0xFFFFFFFF);
+            l_putpix(lfb, x0 + x, y0 + item_h, 0xFFFFFFFF);
+        }
+        for (int y = 0; y <= item_h; y++) {
+            l_putpix(lfb, x0 - 1, y0 + y, 0xFFFFFFFF);
+            l_putpix(lfb, x0 + item_w, y0 + y, 0xFFFFFFFF);
+        }
+
+        // Label and price
+        const char *label = shop_item_label(g->shop_items[i].type);
+        int label_w = text_width_5x5(label, 1);
+        l_draw_text(lfb, g->shop_items[i].x - label_w / 2, y0 - 10, label, 1, 0xFFFFFFFF);
+
+        char price_text[16];
+        snprintf(price_text, sizeof(price_text), "%d", g->shop_items[i].price);
+        int price_w = text_width_5x5(price_text, 1);
+        l_draw_text(lfb, g->shop_items[i].x - price_w / 2, y0 + item_h + 2, price_text, 1, 0xFFFFFFFF);
+    }
+
+    // Exit sign
+    const char *exit_label = "EXIT";
+    int exit_w = text_width_5x5(exit_label, 1);
+    int exit_x = LW - exit_w - 4;
+    int exit_y = g->player_y - 10;
+    l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
+
+    // Player
+    uint32_t player_color = 0xFF00FF00;  // Default green
+    if (rapid_fire_active(g)) player_color = 0xFFFF0000;  // Red when rapid-fire active
+    else if (triple_shot_active(g)) player_color = 0xFF0000FF;  // Blue when triple-shot active
+    draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
+
+    // Bullets
+    for (int s = 0; s < MAX_PSHOTS; s++) {
+        if (g->pshot[s].alive) {
+            uint32_t bullet_color = rapid_fire_active(g) ? 0xFFFFA500 : 0xFFFFFFFF;
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y - i, bullet_color);
+        }
+        if (g->pshot_left[s].alive) {
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - i/2, g->pshot_left[s].y - i, 0xFF0000FF);
+        }
+        if (g->pshot_right[s].alive) {
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + i/2, g->pshot_right[s].y - i, 0xFF0000FF);
+        }
+    }
+
+    // Score (top-left)
+    const char *score_label = "SCORE:";
+    int score_label_w = text_width_5x5(score_label, 1);
+    l_draw_text(lfb, 5, 5, score_label, 1, 0xFFFFFFFF);
+    l_draw_score(lfb, 5 + score_label_w + 6, 5, g->score, 0xFFFFFFFF);
+
+    // SHOP sign where boss health bar would be
+    {
+        const char *shop_label = "SHOP";
+        int shop_label_w = text_width_5x5(shop_label, 1);
+        int score_max_w = 8 * 4; // 8 digits max, 4px per digit
+        int bx = 5 + score_label_w + 6 + score_max_w + 8;
+        l_draw_text(lfb, bx, 5, shop_label, 1, 0xFF8000FF);
+    }
+
+    // PLAYER 1 label and health bar
+    {
+        const char *p1 = "PLAYER 1";
+        int scale = 1;
+        int x = 5;
+        int y = LH - 12;
+        l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
+
+        int lx = x + text_width_5x5(p1, scale) + 6;
+        int bar_w = 40;
+        int bar_h = 6;
+        int bar_y = y - 1;
+
+        int max_lives = PLAYER_LIVES;
+        if (g->lives > max_lives) max_lives = g->lives;
+        int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
+
+        uint32_t life_color = 0xFF00FF00; // green >= 50%
+        if (health_pct <= 33) life_color = 0xFFFF0000;
+        else if (health_pct <= 67) life_color = 0xFFFFFF00;
+
+        // White border
+        for (int i = 0; i <= bar_w; i++) {
+            l_putpix(lfb, lx + i, bar_y - 1, 0xFFFFFFFF);
+            l_putpix(lfb, lx + i, bar_y + bar_h, 0xFFFFFFFF);
+        }
+        for (int j = 0; j <= bar_h; j++) {
+            l_putpix(lfb, lx - 1, bar_y + j, 0xFFFFFFFF);
+            l_putpix(lfb, lx + bar_w, bar_y + j, 0xFFFFFFFF);
+        }
+
+        int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
+        for (int i = 0; i < fill_w; i++) {
+            for (int j = 0; j < bar_h; j++) {
+                l_putpix(lfb, lx + i, bar_y + j, life_color);
+            }
+        }
+    }
 }
 
 /// aliens_remaining: Check if any aliens are still alive on the grid
@@ -324,6 +621,14 @@ void game_init(game_t *g) {
     g->start_screen = 1;
     g->start_screen_delay_timer = 0;
     g->lives = PLAYER_LIVES;
+    g->player_speed = 2;
+    g->fire_speed_bonus = 0;
+    g->in_shop = 0;
+    g->shop_count = 0;
+    g->shop_next_level = 1;
+    g->shop_anim_timer = 0;
+    g->shopkeeper_frame = 0;
+    for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
         g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
@@ -344,6 +649,14 @@ void game_reset(game_t *g) {
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
     g->lives = PLAYER_LIVES;
+    g->player_speed = 2;
+    g->fire_speed_bonus = 0;
+    g->in_shop = 0;
+    g->shop_count = 0;
+    g->shop_next_level = 1;
+    g->shop_anim_timer = 0;
+    g->shopkeeper_frame = 0;
+    for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
     for (int i = 0; i < 5; i++) {
         g->powerup_slot_timer[i] = 0;
         g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
@@ -369,7 +682,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->level_complete) {
         if (g->level_complete_timer > 0) g->level_complete_timer--;
         if (g->level_complete_timer == 0) {
-            setup_level(g, g->level + 1, 0);
+            g->level_complete = 0;
+            g->level_complete_timer = 0;
+            if ((g->level % 2) == 0) {
+                enter_shop(g);
+            } else {
+                setup_level(g, g->level + 1, 0);
+            }
         }
         return;
     }
@@ -382,12 +701,25 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->start_screen = 1;
             g->start_screen_delay_timer = 30;
             g->lives = PLAYER_LIVES;
+            g->player_speed = 2;
+            g->fire_speed_bonus = 0;
+            g->in_shop = 0;
+            g->shop_count = 0;
+            g->shop_next_level = 1;
+            g->shop_anim_timer = 0;
+            g->shopkeeper_frame = 0;
+            for (int i = 0; i < MAX_SHOP_ITEMS; i++) g->shop_items[i].active = 0;
             for (int i = 0; i < 5; i++) {
                 g->powerup_slot_timer[i] = 0;
                 g->powerup_type_slot[i] = POWERUP_DOUBLE_SHOT;
             }
             setup_level(g, 1, 1);
         }
+        return;
+    }
+
+    if (g->in_shop) {
+        shop_update(g, buttons, vsync_counter);
         return;
     }
 
@@ -423,8 +755,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->powerup_timer > 0) g->powerup_timer--;
         if (g->powerup_timer == 0) g->powerup_active = 0;
     }
-    if (buttons & BTN_LEFT)  g->player_x -= 2;
-    if (buttons & BTN_RIGHT) g->player_x += 2;
+    if (buttons & BTN_LEFT)  g->player_x -= g->player_speed;
+    if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
 
     if (g->player_x < 0) g->player_x = 0;
     if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
@@ -464,7 +796,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
         }
 
-        g->fire_cooldown = rapid_fire_active(g) ? 10 : 20;
+        int base = 20 - g->fire_speed_bonus * 2;
+        if (base < 5) base = 5;
+        g->fire_cooldown = rapid_fire_active(g) ? (base / 2) : base;
+        if (g->fire_cooldown < 3) g->fire_cooldown = 3;
     }
 
     g->alien_timer++;
@@ -1041,6 +1376,11 @@ void game_render(game_t *g, lfb_t *lfb) {
             int prompt_y = label_y + 25;
             l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
         }
+        return;
+    }
+
+    if (g->in_shop) {
+        shop_render(g, lfb);
         return;
     }
 
