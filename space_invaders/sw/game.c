@@ -103,11 +103,11 @@ static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
         // Draw vertical line (white, center)
         for (int i = -4; i <= 4; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
     } else {
-        // Rapid-fire: red circle with bullet icon
+        // Rapid-fire: orange circle with bullet icon
         int r = 6;
         for (int y = -r; y <= r; y++) {
             for (int x = -r; x <= r; x++) {
-                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFF0000);
+                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFA500);
             }
         }
         // Bullet body (white)
@@ -532,7 +532,7 @@ static void shop_render(game_t *g, lfb_t *lfb) {
             icon_color = 0xFF00FF00;
         } else if (g->shop_items[i].type == SHOP_ITEM_FIRE_SPEED) {
             icon = &g->SHOP_FIRE;
-            icon_color = 0xFFFF0000;
+            icon_color = 0xFFFFA500;
         } else if (g->shop_items[i].type == SHOP_ITEM_MOVE_SPEED) {
             icon = &g->SHOP_MOVE;
             icon_color = 0xFF00FF00;
@@ -566,7 +566,7 @@ static void shop_render(game_t *g, lfb_t *lfb) {
 
     // Player
     uint32_t player_color = 0xFF00FF00;  // Default green
-    if (rapid_fire_active(g)) player_color = 0xFFFF0000;  // Red when rapid-fire active
+    if (rapid_fire_active(g)) player_color = 0xFFFFA500;  // Orange when rapid-fire active
     else if (triple_shot_active(g)) player_color = 0xFF0000FF;  // Blue when triple-shot active
     draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
 
@@ -1315,7 +1315,7 @@ void game_render(game_t *g, lfb_t *lfb) {
                     } else if (g->powerup_type_slot[slot] == POWERUP_TRIPLE_SHOT) {
                         icon_color = 0xFF0000FF;  // Blue
                     } else if (g->powerup_type_slot[slot] == POWERUP_RAPID_FIRE) {
-                        icon_color = 0xFFFF0000;  // Red
+                        icon_color = 0xFFFFA500;  // Orange
                     }
                     
                     // Draw "POWER:" label
@@ -1391,7 +1391,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     uint32_t player_color = 0xFF00FF00;  // Default green
-    if (rapid_fire_active(g)) player_color = 0xFFFF0000;  // Red when rapid-fire active
+    if (rapid_fire_active(g)) player_color = 0xFFFFA500;  // Orange when rapid-fire active
     else if (triple_shot_active(g)) player_color = 0xFF0000FF;  // Blue when triple-shot active
     draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
 
