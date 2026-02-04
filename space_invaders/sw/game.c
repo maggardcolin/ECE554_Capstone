@@ -313,12 +313,15 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             }
         }
         if (!hit && shots[si].alive) {
-            for (int i = 0; i < 4 && shots[si].alive; i++) {
-                sprite1r_t *b = g->bunkers[i];
-                int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, shots[si].x, shots[si].y)) {
-                    bunker_damage(b, shots[si].x - bx, shots[si].y - by, 3);
-                    shots[si].alive = 0;
+            // No bunker collisions on level 0 (tutorial)
+            if (g->level != 0) {
+                for (int i = 0; i < 4 && shots[si].alive; i++) {
+                    sprite1r_t *b = g->bunkers[i];
+                    int bx = g->bunker_x[i], by = g->bunker_y;
+                    if (bullet_hits_sprite(b, bx, by, shots[si].x, shots[si].y)) {
+                        bunker_damage(b, shots[si].x - bx, shots[si].y - by, 3);
+                        shots[si].alive = 0;
+                    }
                 }
             }
         }
@@ -337,12 +340,15 @@ static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
             g->game_over_delay_timer = 120;
         }
     } else {
-        for (int i = 0; i < 4 && shot->alive; i++) {
-            sprite1r_t *b = g->bunkers[i];
-            int bx = g->bunker_x[i], by = g->bunker_y;
-            if (bullet_hits_sprite(b, bx, by, shot->x, shot->y)) {
-                bunker_damage(b, shot->x - bx, shot->y - by, 3);
-                shot->alive = 0;
+        // No bunker collisions on level 0 (tutorial)
+        if (g->level != 0) {
+            for (int i = 0; i < 4 && shot->alive; i++) {
+                sprite1r_t *b = g->bunkers[i];
+                int bx = g->bunker_x[i], by = g->bunker_y;
+                if (bullet_hits_sprite(b, bx, by, shot->x, shot->y)) {
+                    bunker_damage(b, shot->x - bx, shot->y - by, 3);
+                    shot->alive = 0;
+                }
             }
         }
     }
@@ -845,25 +851,28 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->powerup_slot_timer[i] > 0) g->powerup_slot_timer[i]--;
     }
 
-    if (!g->powerup_active) {
-        g->powerup_spawn_timer++;
-        if (g->powerup_spawn_timer >= 900) {
-            int tile = 8;
-            // Constrain spawning to center area and upper half to ensure hittable
-            int cols = (LW - 80) / tile;  // Leave 40px margin on each side
-            int rows = (LH - 100) / tile;  // Leave space at bottom for player
-            int tx = 40/tile + (rand() % cols);  // Start from left margin
-            int ty = 30/tile + (rand() % rows);  // Start from top, avoid bunkers
-            g->powerup_x = tx * tile + tile / 2;
-            g->powerup_y = ty * tile + tile / 2;
-            g->powerup_type = (powerup_type_t)(g->score % POWERUP_COUNT);
-            g->powerup_active = 1;
-            g->powerup_timer = 300;  // 5 seconds at ~60 FPS
-            g->powerup_spawn_timer = 0;
+    // No powerups on level 0 (tutorial)
+    if (g->level != 0) {
+        if (!g->powerup_active) {
+            g->powerup_spawn_timer++;
+            if (g->powerup_spawn_timer >= 900) {
+                int tile = 8;
+                // Constrain spawning to center area and upper half to ensure hittable
+                int cols = (LW - 80) / tile;  // Leave 40px margin on each side
+                int rows = (LH - 100) / tile;  // Leave space at bottom for player
+                int tx = 40/tile + (rand() % cols);  // Start from left margin
+                int ty = 30/tile + (rand() % rows);  // Start from top, avoid bunkers
+                g->powerup_x = tx * tile + tile / 2;
+                g->powerup_y = ty * tile + tile / 2;
+                g->powerup_type = (powerup_type_t)(g->score % POWERUP_COUNT);
+                g->powerup_active = 1;
+                g->powerup_timer = 300;  // 5 seconds at ~60 FPS
+                g->powerup_spawn_timer = 0;
+            }
+        } else {
+            if (g->powerup_timer > 0) g->powerup_timer--;
+            if (g->powerup_timer == 0) g->powerup_active = 0;
         }
-    } else {
-        if (g->powerup_timer > 0) g->powerup_timer--;
-        if (g->powerup_timer == 0) g->powerup_active = 0;
     }
     if (buttons & BTN_LEFT)  g->player_x -= g->player_speed;
     if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
@@ -958,12 +967,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->game_over_delay_timer = 120;
         }
 
-        // Boss destroys bunkers on collision
-        destroy_bunkers_on_overlap(g, g->boss_x, g->boss_y, boss_w, boss_h);
+        // Boss destroys bunkers on collision (not on level 0)
+        if (g->level != 0) {
+            destroy_bunkers_on_overlap(g, g->boss_x, g->boss_y, boss_w, boss_h);
+        }
     }
 
-    // Aliens destroy bunkers on collision
-    {
+    // Aliens destroy bunkers on collision (not on level 0)
+    if (g->level != 0) {
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
         for (int r = 0; r < AROWS; r++) {
