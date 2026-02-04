@@ -654,21 +654,25 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->powerup_spawn_timer = 0;
     for (int i = 0; i < 5; i++) g->powerup_slot_timer[i] = 0;
 
-    // Spawn in middle x on level 1, left side on subsequent levels
-    if (level == 1) {
-        g->player_x = LW / 2 - g->PLAYER.w / 2;
-    } else {
-        g->player_x = 10;  // Spawn on left side
-    }
+    g->player_x = 5;  // Spawn on left side
     g->player_y = LH - 30;
     g->exit_available = 0;
 
-    memset(g->alien_alive, 1, sizeof(g->alien_alive));
-    // Level 1: aliens have 1 HP, Level 2+: aliens have 2 HP (green -> white -> dead)
-    int hp = (level >= 2) ? 2 : 1;
-    for (int r = 0; r < AROWS; r++) {
-        for (int c = 0; c < ACOLS; c++) {
-            g->alien_health[r][c] = (rand() % hp) + 1;
+    // Level 0: tutorial level - only one alien in center
+    if (level == 0) {
+        memset(g->alien_alive, 0, sizeof(g->alien_alive));
+        memset(g->alien_health, 0, sizeof(g->alien_health));
+        // Put one alien in center (row 2, column 5)
+        g->alien_alive[2][5] = 1;
+        g->alien_health[2][5] = 1;
+    } else {
+        memset(g->alien_alive, 1, sizeof(g->alien_alive));
+        // Level 1: aliens have 1 HP, Level 2+: aliens have 2 HP (green -> white -> dead)
+        int hp = (level >= 2) ? 2 : 1;
+        for (int r = 0; r < AROWS; r++) {
+            for (int c = 0; c < ACOLS; c++) {
+                g->alien_health[r][c] = (rand() % hp) + 1;
+            }
         }
     }
 
@@ -683,9 +687,16 @@ static void setup_level(game_t *g, int level, int reset_score) {
     if (g->alien_period < 5) g->alien_period = 5; // Minimum period
 
     // Boss alien setup (separate from regular aliens)
-    g->boss_alive = 1;
-    g->boss_max_health = 20 + (level - 1) * 5; // More HP at higher levels
-    g->boss_health = g->boss_max_health;
+    // No boss on level 0 (tutorial)
+    if (level == 0) {
+        g->boss_alive = 0;
+        g->boss_health = 0;
+        g->boss_max_health = 0;
+    } else {
+        g->boss_alive = 1;
+        g->boss_max_health = 20 + (level - 1) * 5; // More HP at higher levels
+        g->boss_health = g->boss_max_health;
+    }
     g->boss_x = (LW - g->BOSS_A.w) / 2;
     g->boss_y = 15;
     g->boss_dx = 1;
@@ -754,7 +765,7 @@ void game_init(game_t *g) {
     g->start_screen_delay_timer = 0;
     reset_player_progression(g);
 
-    setup_level(g, 1, 1);
+    setup_level(g, 0, 1);
 }
 
 /// game_reset: Reset game to initial state after game-over or level completion
@@ -770,7 +781,7 @@ void game_reset(game_t *g) {
     g->start_screen_delay_timer = 0;
     reset_player_progression(g);
 
-    setup_level(g, 1, 1);
+    setup_level(g, 0, 1);
 }
 
 /// game_update: Main game logic loop - process input, collisions, animations, and state changes
@@ -792,7 +803,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->level_complete_timer == 0) {
             g->level_complete = 0;
             g->level_complete_timer = 0;
-            if ((g->level % 2) == 0) {
+            // Skip shop after level 0 (tutorial)
+            if (g->level == 0) {
+                setup_level(g, g->level + 1, 0);
+            } else if ((g->level % 2) == 0) {
                 enter_shop(g);
             } else {
                 setup_level(g, g->level + 1, 0);
@@ -809,7 +823,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->start_screen = 1;
             g->start_screen_delay_timer = 30;
             reset_player_progression(g);
-            setup_level(g, 1, 1);
+            setup_level(g, 0, 1);
         }
         return;
     }
@@ -870,10 +884,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         g->alien_timer = 0;
         g->alien_frame ^= 1;
 
-        int minc = ACOLS, maxc = -1;
-        for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) {
-            if (g->alien_alive[r][c]) { if (c < minc) minc = c; if (c > maxc) maxc = c; }
-        }
+        // Skip alien movement on level 0 (tutorial)
+        if (g->level != 0) {
+            int minc = ACOLS, maxc = -1;
+            for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) {
+                if (g->alien_alive[r][c]) { if (c < minc) minc = c; if (c > maxc) maxc = c; }
+            }
 
         if (maxc >= 0) {
             const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
@@ -902,6 +918,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 int target = 10 + alive_count / 6;
                 if (target < g->alien_period) g->alien_period = target;
             }
+        }
         }
     }
 
@@ -961,25 +978,28 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     update_player_shots(g);
 
-    if (!g->ashot.alive) {
-        static int col_cursor = 0;
-        col_cursor = (col_cursor + 1) % ACOLS;
-        int c = col_cursor;
-        int r_fire = -1;
-        for (int r = AROWS - 1; r >= 0; r--) if (g->alien_alive[r][c]) { r_fire = r; break; }
+    // No alien shooting on level 0 (tutorial)
+    if (g->level != 0) {
+        if (!g->ashot.alive) {
+            static int col_cursor = 0;
+            col_cursor = (col_cursor + 1) % ACOLS;
+            int c = col_cursor;
+            int r_fire = -1;
+            for (int r = AROWS - 1; r >= 0; r--) if (g->alien_alive[r][c]) { r_fire = r; break; }
 
-        if (r_fire >= 0 && (vsync_counter % 30u) == 0u) {
-            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-            int spacing_x = 6, spacing_y = 5;
-            int ax = g->alien_origin_x + c * (AS->w + spacing_x);
-            int ay = g->alien_origin_y + r_fire * (AS->h + spacing_y);
-            g->ashot.alive = 1;
-            g->ashot.x = ax + AS->w/2;
-            g->ashot.y = ay + AS->h + 1;
+            if (r_fire >= 0 && (vsync_counter % 30u) == 0u) {
+                const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+                int spacing_x = 6, spacing_y = 5;
+                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+                int ay = g->alien_origin_y + r_fire * (AS->h + spacing_y);
+                g->ashot.alive = 1;
+                g->ashot.x = ax + AS->w/2;
+                g->ashot.y = ay + AS->h + 1;
+            }
+        } else {
+            g->ashot.y += 3;
+            if (g->ashot.y > LH) g->ashot.alive = 0;
         }
-    } else {
-        g->ashot.y += 3;
-        if (g->ashot.y > LH) g->ashot.alive = 0;
     }
 
     // Boss shooting logic (rate depends on health)
@@ -1037,7 +1057,17 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     if (!g->game_over && !g->boss_alive && !g->exit_available) {
-        g->exit_available = 1;
+        // On level 0, check if all aliens are dead (tutorial alien)
+        // On other levels, boss must also be dead
+        int all_aliens_dead = 1;
+        for (int r = 0; r < AROWS && all_aliens_dead; r++) {
+            for (int c = 0; c < ACOLS && all_aliens_dead; c++) {
+                if (g->alien_alive[r][c]) all_aliens_dead = 0;
+            }
+        }
+        if (all_aliens_dead) {
+            g->exit_available = 1;
+        }
     }
 }
 
@@ -1122,6 +1152,22 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     l_clear(lfb, 0xFF000000);
+    
+    // Level 0 tutorial text
+    if (g->level == 0) {
+        const char *tutorial1 = "USE A/D OR LEFT/RIGHT TO MOVE";
+        const char *tutorial2 = "AND PRESS SPACE TO SHOOT";
+        int scale = 1;
+        int w1 = text_width_5x5(tutorial1, scale);
+        int w2 = text_width_5x5(tutorial2, scale);
+        int x1 = (LW - w1) / 2;
+        int x2 = (LW - w2) / 2;
+        int y1 = 5;
+        int y2 = y1 + 10;
+        l_draw_text(lfb, x1, y1, tutorial1, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, x2, y2, tutorial2, scale, 0xFFFFFFFF);
+    }
+    
     {
         const char *label = "SCORE:";
         int label_scale = 1;
@@ -1218,12 +1264,14 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
     }
 
-    // bunkers
-    for (int i = 0; i < 4; i++) {
-        // blit sprite bits onto lfb
-        sprite1r_t *b = g->bunkers[i];
-        int x0 = g->bunker_x[i], y0 = g->bunker_y;
-        draw_sprite1r(lfb, b, x0, y0, 0xFF00FF00);
+    // bunkers (not on level 0)
+    if (g->level != 0) {
+        for (int i = 0; i < 4; i++) {
+            // blit sprite bits onto lfb
+            sprite1r_t *b = g->bunkers[i];
+            int x0 = g->bunker_x[i], y0 = g->bunker_y;
+            draw_sprite1r(lfb, b, x0, y0, 0xFF00FF00);
+        }
     }
 
     // boss (drawn behind regular aliens)
