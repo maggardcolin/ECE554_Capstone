@@ -56,6 +56,7 @@ typedef struct {
     // Boss alien state
     int boss_alive;
     int boss_health; // 0-20 HP
+    int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
     int boss_dx;
     int boss_frame;

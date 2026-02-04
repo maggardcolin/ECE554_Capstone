@@ -255,7 +255,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
 
     // Boss alien setup (separate from regular aliens)
     g->boss_alive = 1;
-    g->boss_health = 20 + (level - 1) * 5; // More HP at higher levels
+    g->boss_max_health = 20 + (level - 1) * 5; // More HP at higher levels
+    g->boss_health = g->boss_max_health;
     g->boss_x = (LW - g->BOSS_A.w) / 2;
     g->boss_y = 15;
     g->boss_dx = 1;
@@ -908,7 +909,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    if (!g->game_over && !aliens_remaining(g) && !g->boss_alive) {
+    if (!g->game_over && !g->boss_alive) {
         g->level_complete = 1;
         g->level_complete_timer = 60;
         g->level_just_completed = g->level;
@@ -1024,7 +1025,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     // Boss health bar to the right of the score
     if (g->boss_alive) {
         uint32_t boss_color = 0xFF00FF00; // Green 50-100%
-        int health_pct = (g->boss_health * 100) / 20;
+        int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         if (health_pct <= 10) boss_color = 0xFFFF0000; // Red < 10%
         else if (health_pct <= 50) boss_color = 0xFFFFFF00; // Yellow 10-50%
 
@@ -1052,7 +1053,7 @@ void game_render(game_t *g, lfb_t *lfb) {
             l_putpix(lfb, bar_x + bar_w, bar_y + j, 0xFFFFFFFF);
         }
 
-        int fill_w = (g->boss_health * bar_w) / 20;
+        int fill_w = (g->boss_max_health > 0) ? (g->boss_health * bar_w) / g->boss_max_health : 0;
         for (int i = 0; i < fill_w; i++) {
             for (int j = 0; j < bar_h; j++) {
                 l_putpix(lfb, bar_x + i, bar_y + j, boss_color);
@@ -1117,7 +1118,7 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // boss (drawn behind regular aliens)
     if (g->boss_alive) {
-        int health_pct = (g->boss_health * 100) / 20;
+        int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         uint32_t boss_color = 0xFF00FF00;
         if (health_pct <= 10) boss_color = 0xFFFF0000;
         else if (health_pct <= 50) boss_color = 0xFFFFFF00;
