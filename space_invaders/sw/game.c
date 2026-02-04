@@ -305,7 +305,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                         int remaining = count_aliens_remaining(g);
                         int points;
                         if (remaining == 0) points = double_shot_active(g) ? 200 : 100;
-                        else points = double_shot_active(g) ? 20 : 10;
+                        else points = double_shot_active(g) ? 10 : 5;
                         g->score += points;
                     }
                     shots[si].alive = 0;
@@ -724,6 +724,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_power_active = 0;
     g->boss_power_cooldown = 0;
     g->boss_laser_last_hit_y = -1000;  // Far off screen
+    g->boss_attack_type = 0;  // Current attack being executed
+    g->next_boss_attack_type = 0;  // Next attack to be charged
+    g->boss_green_laser_last_hit_y = -1000;  // Far off screen
 
     bunkers_rebuild(g);
 }
@@ -820,7 +823,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->level_complete_timer = 0;
             // Skip shop after level 0 (tutorial)
             if (g->level == 0) {
-                setup_level(g, g->level + 1, 0);
+                setup_level(g, START_LEVEL, 0); // SET LEVEL
             } else if ((g->level % 2) == 0) {
                 enter_shop(g);
             } else {
@@ -950,16 +953,53 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->boss_power_timer > g->boss_power_max) {
             g->boss_power_timer = g->boss_power_max;
         }
+        
+        // Determine next attack type when charging starts
+        if (g->boss_power_timer == 1) {
+            if (g->level >= 3) {
+                // Count alive aliens to determine if green laser pool should be available
+                int alive_count = 0;
+                for (int r = 0; r < AROWS; r++) {
+                    for (int c = 0; c < ACOLS; c++) {
+                        alive_count += g->alien_alive[r][c] ? 1 : 0;
+                    }
+                }
+                int total_aliens = AROWS * ACOLS;
+                if (alive_count > total_aliens / 2) {
+                    // More than half alive, can choose green laser
+                    g->next_boss_attack_type = (g->next_boss_attack_type + 1) % 2;  // 0 or 1
+                } else {
+                    // Half or fewer alive, choose purple laser only
+                    g->next_boss_attack_type = 0;
+                }
+            } else {
+                g->next_boss_attack_type = 0;  // Default to purple laser
+            }
+        }
 
         // When power reaches max, trigger special attack
         if (g->boss_power_timer >= g->boss_power_max && g->boss_power_active == 0) {
             g->boss_power_active = 1;
-            g->boss_power_cooldown = 30;  // 0.5 seconds at 60 FPS
+            int health_pct = (g->boss_health * 100) / g->boss_max_health;
+            g->boss_power_cooldown = (health_pct <= 33) ? 10 : (health_pct <= 67) ? 20 : 30;
+            
+            // Use the next attack type that was determined during charging
+            g->boss_attack_type = g->next_boss_attack_type;
+            
             g->boss_laser.alive = 1;
             g->boss_laser.x = g->boss_x + boss_w / 2;
             g->boss_laser.y = g->boss_y + boss_h + 1;
             g->boss_laser_last_hit_y = -1000;  // Reset hit tracking
+            g->boss_green_laser_last_hit_y = -1000;  // Reset green laser tracking
             g->boss_power_timer = 0;  // Reset for next charge
+            
+            // Boss recovers 10% health if using green laser
+            if (g->boss_attack_type == 1) {
+                g->boss_health += g->boss_max_health / 10;
+                if (g->boss_health > g->boss_max_health) {
+                    g->boss_health = g->boss_max_health;
+                }
+            }
         }
 
         // Handle stun/frozen state during special attack
@@ -1096,19 +1136,59 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         int player_left = g->player_x;
         int player_right = g->player_x + p->w;
         
-        // Check if laser overlaps with player and we haven't already hit at this position
-        if (laser_left < player_right && laser_right > player_left &&
-            g->boss_laser.y + 1 >= g->player_y && g->boss_laser.y <= g->player_y + p->h &&
-            (g->boss_laser.y - g->boss_laser_last_hit_y) > 5) {  // Only hit once per 5 pixels
-            g->lives--;
-            g->boss_laser_last_hit_y = g->boss_laser.y;  // Track where we hit
-            clear_player_shots(g);
-            if (g->lives <= 0) {
-                g->game_over = 1;
-                g->game_over_score = g->score;
-                g->game_over_delay_timer = 90;
+        // Purple laser hurts player; green laser only heals aliens
+        if (g->boss_attack_type == 0) {
+            // Check if laser overlaps with player and we haven't already hit at this position
+            if (laser_left < player_right && laser_right > player_left &&
+                g->boss_laser.y + 1 >= g->player_y && g->boss_laser.y <= g->player_y + p->h &&
+                (g->boss_laser.y - g->boss_laser_last_hit_y) > 5) {  // Only hit once per 5 pixels
+                g->lives--;
+                g->boss_laser_last_hit_y = g->boss_laser.y;  // Track where we hit
+                clear_player_shots(g);
+                if (g->lives <= 0) {
+                    g->game_over = 1;
+                    g->game_over_score = g->score;
+                    g->game_over_delay_timer = 90;
+                }
+                // Laser continues through player (not destroyed)
             }
-            // Laser continues through player (not destroyed)
+        }
+        
+        // Handle green laser collision with aliens (adds HP)
+        if (g->boss_attack_type == 1) {
+            int laser_w = g->BOSS_A.w;
+            int laser_left = g->boss_laser.x - laser_w / 2;
+            int laser_right = laser_left + laser_w;
+            
+            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+            int spacing_x = 6, spacing_y = 5;
+            
+            // Hit each column that overlaps with the laser
+            for (int c = 0; c < ACOLS; c++) {
+                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+                int a_right = ax + AS->w;
+                
+                // Check if this column overlaps with laser horizontally
+                if (laser_left >= a_right || laser_right <= ax) continue;
+                
+                // Find the first (topmost) alive alien in this column that overlaps vertically
+                for (int r = 0; r < AROWS; r++) {
+                    if (!g->alien_alive[r][c]) continue;
+                    
+                    int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+                    
+                    // Check if laser is at this alien's y position
+                    if (g->boss_laser.y >= ay && g->boss_laser.y < ay + AS->h) {
+                        // Add 1 HP to alien
+                        int max_hp = (g->level >= 5) ? 3 : (g->level >= 3) ? 2 : 1;
+                        g->alien_health[r][c]++;
+                        if (g->alien_health[r][c] > max_hp) {
+                            g->alien_health[r][c] = max_hp;
+                        }
+                        break;  // Only hit one alien per column per frame
+                    }
+                }
+            }
         }
     }
 
@@ -1327,7 +1407,12 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         int power_bar_x = power_bar_x_start + power_label_w + 6;
         int power_bar_h = 6;
-        uint32_t power_color = 0xFF8000FF;  // Purple
+        
+        // Determine power color based on what attack will be used (shows next attack)
+        uint32_t power_color;  // Purple (default for purple laser)
+        if (g->next_boss_attack_type == 0) power_color = 0xFF8000FF;  // Purple
+        else if (g->next_boss_attack_type == 1) power_color = 0xFF00FF00;  // Green (for green laser heal)
+        else power_color = 0xFF808080;  // Gray (unknown)
 
         // White border for power bar
         for (int i = 0; i <= bar_w; i++) {
@@ -1467,8 +1552,12 @@ void game_render(game_t *g, lfb_t *lfb) {
         if (health_pct <= 33) boss_color = 0xFFFF0000;
         else if (health_pct <= 67) boss_color = 0xFFFFFF00;
 
-        // Turn purple when stunned/using special attack
-        if (g->boss_power_cooldown > 0) boss_color = 0xFF8000FF;
+        // Turn purple when stunned/using purple laser attack
+        if (g->boss_power_cooldown > 0) {
+            if (g->boss_attack_type == 0) {
+                boss_color = 0xFF8000FF;  // Purple for purple laser
+            }
+        }
 
         const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
         draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
@@ -1505,13 +1594,14 @@ void game_render(game_t *g, lfb_t *lfb) {
         for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
     }
 
-    // Boss purple laser beam (straight down)
+    // Boss laser beam (straight down) - purple or green depending on attack type
     if (g->boss_laser.alive) {
         int laser_w = g->BOSS_A.w;  // Width matches boss width
         int laser_left = g->boss_laser.x - laser_w / 2;
+        uint32_t laser_color = (g->boss_attack_type == 1) ? 0xFF00FF00 : 0xFF8000FF;  // Green or purple
         for (int px = laser_left; px < laser_left + laser_w; px++) {
             if (px >= 0 && px < LW && g->boss_laser.y >= 0 && g->boss_laser.y < LH) {
-                l_putpix(lfb, px, g->boss_laser.y, 0xFF8000FF);  // Purple
+                l_putpix(lfb, px, g->boss_laser.y, laser_color);
             }
         }
     }

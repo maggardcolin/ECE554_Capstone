@@ -27,6 +27,7 @@ typedef struct { int x,y; int alive; } bullet_t;
 #define MAX_SHOP_ITEMS 3
 #define ACOLS 11
 #define AROWS 5
+#define START_LEVEL 3
 
 typedef struct {
     int score;
@@ -79,6 +80,9 @@ typedef struct {
     int boss_power_active;     // 1 when special attack is happening
     int boss_power_cooldown;   // Duration of purple/frozen state (30 ticks = 0.5 seconds)
     int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
+    int boss_attack_type;      // 0 = purple laser (damage), 1 = green laser (heal aliens)
+    int next_boss_attack_type; // The attack type that will be used for the next charge
+    int boss_green_laser_last_hit_y; // Last y position where green laser hit aliens
 
     bullet_t pshot[MAX_PSHOTS];       // Center shots
     bullet_t pshot_left[MAX_PSHOTS];  // Triple-shot: -15 degree angle
