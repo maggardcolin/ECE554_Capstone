@@ -398,6 +398,29 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
     }
 }
 
+static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
+    if (!shot->alive) return;
+    if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, shot->x, shot->y)) {
+        g->lives--;
+        clear_player_shots(g);
+        shot->alive = 0;
+        if (g->lives <= 0) {
+            g->game_over = 1;
+            g->game_over_score = g->score;
+            g->game_over_delay_timer = 120;
+        }
+    } else {
+        for (int i = 0; i < 4 && shot->alive; i++) {
+            sprite1r_t *b = g->bunkers[i];
+            int bx = g->bunker_x[i], by = g->bunker_y;
+            if (bullet_hits_sprite(b, bx, by, shot->x, shot->y)) {
+                bunker_damage(b, shot->x - bx, shot->y - by, 3);
+                shot->alive = 0;
+            }
+        }
+    }
+}
+
 static void setup_level(game_t *g, int level, int reset_score);
 
 static const char *shop_item_label(shop_item_type_t type) {
@@ -1082,51 +1105,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     handle_player_shot_collisions(g, g->pshot_left, -1, 0);
     handle_player_shot_collisions(g, g->pshot_right, 1, 0);
 
-    // collisions: alien shot
-    if (g->ashot.alive) {
-        if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->ashot.x, g->ashot.y)) {
-            g->lives--;
-            clear_player_shots(g);
-            g->ashot.alive = 0;
-            if (g->lives <= 0) {
-                g->game_over = 1;
-                g->game_over_score = g->score;
-                g->game_over_delay_timer = 120;
-            }
-        } else {
-            for (int i = 0; i < 4 && g->ashot.alive; i++) {
-                sprite1r_t *b = g->bunkers[i];
-                int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, g->ashot.x, g->ashot.y)) {
-                    bunker_damage(b, g->ashot.x - bx, g->ashot.y - by, 3);
-                    g->ashot.alive = 0;
-                }
-            }
-        }
-    }
-
-    // collisions: boss shot
-    if (g->boss_shot.alive) {
-        if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, g->boss_shot.x, g->boss_shot.y)) {
-            g->lives--;
-            clear_player_shots(g);
-            g->boss_shot.alive = 0;
-            if (g->lives <= 0) {
-                g->game_over = 1;
-                g->game_over_score = g->score;
-                g->game_over_delay_timer = 120;
-            }
-        } else {
-            for (int i = 0; i < 4 && g->boss_shot.alive; i++) {
-                sprite1r_t *b = g->bunkers[i];
-                int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, g->boss_shot.x, g->boss_shot.y)) {
-                    bunker_damage(b, g->boss_shot.x - bx, g->boss_shot.y - by, 3);
-                    g->boss_shot.alive = 0;
-                }
-            }
-        }
-    }
+    // collisions: alien and boss shots
+    handle_enemy_shot_collisions(g, &g->ashot);
+    handle_enemy_shot_collisions(g, &g->boss_shot);
 
     // Check if player reached right side to exit level (when exit is available)
     if (g->exit_available && g->player_x >= LW - g->PLAYER.w) {
