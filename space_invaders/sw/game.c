@@ -1039,7 +1039,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, bx, by, boss_label, 1, boss_color);
 
         int bar_x = bx + boss_label_w + 6;
-        int bar_y = by + 1;
+        int bar_y = by - 1;
         int bar_w = 50;
         int bar_h = 6;
 
