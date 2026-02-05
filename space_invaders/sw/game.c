@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 /// draw_sprite1r: Render a 1-bit sprite to the framebuffer with a specified color
 /// Parameters:
@@ -25,6 +26,16 @@ static void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint3
             if ((row[x >> 3] >> (7 - (x & 7))) & 1) lfb->px[yy * LW + xx] = color;
         }
     }
+}
+
+static int digit_count(uint32_t v)
+{
+    int d = 1;
+    while (v >= 10) {
+        v /= 10;
+        d++;
+    }
+    return d;
 }
 
 /// draw_sprite1r_scaled: Render a 1-bit sprite scaled by an integer factor
@@ -1333,27 +1344,42 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->level == 0) {
         const char *tutorial1 = "USE A/D OR LEFT/RIGHT TO MOVE";
         const char *tutorial2 = "AND PRESS SPACE TO SHOOT";
+        const char *tutorial3 = "DESTROY ALL ALIENS TO EXIT";
+        const char *tutorial4 = "THEN PROCEED TO THE EXIT ON THE RIGHT";
         int scale = 1;
         int w1 = text_width_5x5(tutorial1, scale);
         int w2 = text_width_5x5(tutorial2, scale);
+        int w3 = text_width_5x5(tutorial3, scale);
+        int w4 = text_width_5x5(tutorial4, scale);
         int x1 = (LW - w1) / 2;
         int x2 = (LW - w2) / 2;
+        int x3 = (LW - w3) / 2;
+        int x4 = (LW - w4) / 2;
         int y1 = 5;
         int y2 = y1 + 10;
+        int y3 = y2 + 10;
+        int y4 = y3 + 10;
         l_draw_text(lfb, x1, y1, tutorial1, scale, 0xFFFFFFFF);
         l_draw_text(lfb, x2, y2, tutorial2, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, x3, y3, tutorial3, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, x4, y4, tutorial4, scale, 0xFFFFFFFF);
     }
     
     {
         const char *label = "SCORE:";
         int label_scale = 1;
         int label_w = text_width_5x5(label, label_scale);
-        int score_max_w = 8 * 4; // 8 digits max, 4px per digit
-        int x = LW - (label_w + 6 + score_max_w) - 5;
-        int y = LH - 10; // Bottom of screen
-        uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;  // Yellow if double-shot active, white otherwise
-        l_draw_text(lfb, x, y, label, label_scale, score_color);
-        l_draw_score(lfb, x + label_w + 6, y, g->score, score_color);
+        int digit_w = 4;
+        int digits = digit_count(g->score);
+        int score_w = digits * digit_w;
+        int right_edge = LW - 5;              // desired right anchor
+        int score_x = right_edge - score_w;   // LSB stays fixed
+        int label_x = right_edge - label_w - 30;
+
+        int y = LH - 10;
+        uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
+        l_draw_text(lfb, label_x, y, label, label_scale, score_color);
+        l_draw_score(lfb, score_x, y, g->score, score_color);
     }
 
     // Boss health bar on the left side of screen
