@@ -58,6 +58,35 @@ static void draw_sprite1r_scaled(lfb_t *lfb, const sprite1r_t *s, int x0, int y0
     }
 }
 
+static void draw_filled_circle(lfb_t *lfb, int x0, int y0, int r, uint32_t color) {
+    for (int y = -r; y <= r; y++) {
+        for (int x = -r; x <= r; x++) {
+            if (x * x + y * y <= r * r) l_putpix(lfb, x0 + x, y0 + y, color);
+        }
+    }
+}
+
+static void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_color) {
+    if (fill_w < 0) fill_w = 0;
+    if (fill_w > w) fill_w = w;
+
+    // White border
+    for (int i = 0; i <= w; i++) {
+        l_putpix(lfb, x + i, y - 1, 0xFFFFFFFF);
+        l_putpix(lfb, x + i, y + h, 0xFFFFFFFF);
+    }
+    for (int j = 0; j <= h; j++) {
+        l_putpix(lfb, x - 1, y + j, 0xFFFFFFFF);
+        l_putpix(lfb, x + w, y + j, 0xFFFFFFFF);
+    }
+
+    for (int i = 0; i < fill_w; i++) {
+        for (int j = 0; j < h; j++) {
+            l_putpix(lfb, x + i, y + j, fill_color);
+        }
+    }
+}
+
 /// text_width_5x5: Calculate the width in logical pixels of text rendered at given scale
 /// Parameters:
 ///   text  - Null-terminated string to measure
@@ -86,30 +115,18 @@ static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
     if (type == POWERUP_DOUBLE_SHOT) {
         // Yellow circle with "2X" text
         int r = 6;
-        for (int y = -r; y <= r; y++) {
-            for (int x = -r; x <= r; x++) {
-                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFFFF00);
-            }
-        }
+        draw_filled_circle(lfb, x0, y0, r, 0xFFFFFF00);
         l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFF000000);
     } else if (type == POWERUP_TRIPLE_SHOT) {
         // Blue circle with line
         int r = 6;
-        for (int y = -r; y <= r; y++) {
-            for (int x = -r; x <= r; x++) {
-                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFF0000FF);
-            }
-        }
+        draw_filled_circle(lfb, x0, y0, r, 0xFF0000FF);
         // Draw vertical line (white, center)
         for (int i = -4; i <= 4; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
     } else {
         // Rapid-fire: orange circle with bullet icon
         int r = 6;
-        for (int y = -r; y <= r; y++) {
-            for (int x = -r; x <= r; x++) {
-                if (x*x + y*y <= r*r) l_putpix(lfb, x0 + x, y0 + y, 0xFFFA500);
-            }
-        }
+        draw_filled_circle(lfb, x0, y0, r, 0xFFFA500);
         // Bullet body (white)
         for (int i = -3; i <= 3; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
         // Bullet tip (white)
@@ -240,6 +257,8 @@ static int bullet_x_with_spread(const bullet_t *shot, int bi, int spread_dir) {
     return shot->x + (spread_dir * (bi / 2));
 }
 
+static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int damage_radius);
+
 static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread_dir, int can_collect_powerup) {
     for (int si = 0; si < MAX_PSHOTS; si++) {
         if (!shots[si].alive) continue;
@@ -314,17 +333,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             }
         }
         if (!hit && shots[si].alive) {
-            // No bunker collisions on level 0 (tutorial)
-            if (g->level != 0) {
-                for (int i = 0; i < 4 && shots[si].alive; i++) {
-                    sprite1r_t *b = g->bunkers[i];
-                    int bx = g->bunker_x[i], by = g->bunker_y;
-                    if (bullet_hits_sprite(b, bx, by, shots[si].x, shots[si].y)) {
-                        bunker_damage(b, shots[si].x - bx, shots[si].y - by, 3);
-                        shots[si].alive = 0;
-                    }
-                }
-            }
+            handle_bunker_bullet_collisions(g, &shots[si], 3);
         }
     }
 }
@@ -341,16 +350,20 @@ static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
             g->game_over_delay_timer = 90;
         }
     } else {
-        // No bunker collisions on level 0 (tutorial)
-        if (g->level != 0) {
-            for (int i = 0; i < 4 && shot->alive; i++) {
-                sprite1r_t *b = g->bunkers[i];
-                int bx = g->bunker_x[i], by = g->bunker_y;
-                if (bullet_hits_sprite(b, bx, by, shot->x, shot->y)) {
-                    bunker_damage(b, shot->x - bx, shot->y - by, 3);
-                    shot->alive = 0;
-                }
-            }
+        handle_bunker_bullet_collisions(g, shot, 3);
+    }
+}
+
+static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int damage_radius) {
+    if (!shot->alive) return;
+    // No bunker collisions on level 0 (tutorial)
+    if (g->level == 0) return;
+    for (int i = 0; i < 4 && shot->alive; i++) {
+        sprite1r_t *b = g->bunkers[i];
+        int bx = g->bunker_x[i], by = g->bunker_y;
+        if (bullet_hits_sprite(b, bx, by, shot->x, shot->y)) {
+            bunker_damage(b, shot->x - bx, shot->y - by, damage_radius);
+            shot->alive = 0;
         }
     }
 }
@@ -610,22 +623,8 @@ static void shop_render(game_t *g, lfb_t *lfb) {
         if (health_pct <= 33) life_color = 0xFFFF0000;
         else if (health_pct <= 67) life_color = 0xFFFFFF00;
 
-        // White border
-        for (int i = 0; i <= bar_w; i++) {
-            l_putpix(lfb, lx + i, bar_y - 1, 0xFFFFFFFF);
-            l_putpix(lfb, lx + i, bar_y + bar_h, 0xFFFFFFFF);
-        }
-        for (int j = 0; j <= bar_h; j++) {
-            l_putpix(lfb, lx - 1, bar_y + j, 0xFFFFFFFF);
-            l_putpix(lfb, lx + bar_w, bar_y + j, 0xFFFFFFFF);
-        }
-
         int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
-        for (int i = 0; i < fill_w; i++) {
-            for (int j = 0; j < bar_h; j++) {
-                l_putpix(lfb, lx + i, bar_y + j, life_color);
-            }
-        }
+        draw_bar(lfb, lx, bar_y, bar_w, bar_h, fill_w, life_color);
     }
 }
 
@@ -1383,22 +1382,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int bar_w = 50;
         int bar_h = 6;
 
-        // White border
-        for (int i = 0; i <= bar_w; i++) {
-            l_putpix(lfb, bar_x + i, bar_y - 1, 0xFFFFFFFF);
-            l_putpix(lfb, bar_x + i, bar_y + bar_h, 0xFFFFFFFF);
-        }
-        for (int j = 0; j <= bar_h; j++) {
-            l_putpix(lfb, bar_x - 1, bar_y + j, 0xFFFFFFFF);
-            l_putpix(lfb, bar_x + bar_w, bar_y + j, 0xFFFFFFFF);
-        }
-
         int fill_w = (g->boss_max_health > 0) ? (g->boss_health * bar_w) / g->boss_max_health : 0;
-        for (int i = 0; i < fill_w; i++) {
-            for (int j = 0; j < bar_h; j++) {
-                l_putpix(lfb, bar_x + i, bar_y + j, boss_color);
-            }
-        }
+        draw_bar(lfb, bar_x, bar_y, bar_w, bar_h, fill_w, boss_color);
 
         // Boss power bar (to the right of health bar on same line)
         const char *power_label = "POWER:";
@@ -1416,22 +1401,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         else if (g->next_boss_attack_type == 1) power_color = 0xFF00FF00;  // Green (for green laser heal)
         else power_color = 0xFF808080;  // Gray (unknown)
 
-        // White border for power bar
-        for (int i = 0; i <= bar_w; i++) {
-            l_putpix(lfb, power_bar_x + i, power_bar_y - 1, 0xFFFFFFFF);
-            l_putpix(lfb, power_bar_x + i, power_bar_y + power_bar_h, 0xFFFFFFFF);
-        }
-        for (int j = 0; j <= power_bar_h; j++) {
-            l_putpix(lfb, power_bar_x - 1, power_bar_y + j, 0xFFFFFFFF);
-            l_putpix(lfb, power_bar_x + bar_w, power_bar_y + j, 0xFFFFFFFF);
-        }
-
         int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * bar_w) / g->boss_power_max : 0;
-        for (int i = 0; i < power_fill_w; i++) {
-            for (int j = 0; j < power_bar_h; j++) {
-                l_putpix(lfb, power_bar_x + i, power_bar_y + j, power_color);
-            }
-        }
+        draw_bar(lfb, power_bar_x, power_bar_y, bar_w, power_bar_h, power_fill_w, power_color);
     }
 
     {
@@ -1463,22 +1434,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         if (health_pct <= 33) life_color = 0xFFFF0000;
         else if (health_pct <= 67) life_color = 0xFFFFFF00;
 
-        // White border
-        for (int i = 0; i <= bar_w; i++) {
-            l_putpix(lfb, lx + i, bar_y - 1, 0xFFFFFFFF);
-            l_putpix(lfb, lx + i, bar_y + bar_h, 0xFFFFFFFF);
-        }
-        for (int j = 0; j <= bar_h; j++) {
-            l_putpix(lfb, lx - 1, bar_y + j, 0xFFFFFFFF);
-            l_putpix(lfb, lx + bar_w, bar_y + j, 0xFFFFFFFF);
-        }
-
         int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
-        for (int i = 0; i < fill_w; i++) {
-            for (int j = 0; j < bar_h; j++) {
-                l_putpix(lfb, lx + i, bar_y + j, life_color);
-            }
-        }
+        draw_bar(lfb, lx, bar_y, bar_w, bar_h, fill_w, life_color);
         
         // Powerup progress bars
         {
@@ -1510,26 +1467,10 @@ void game_render(game_t *g, lfb_t *lfb) {
                     int bar_x = px + label_w + 3;
                     int bar_y = py - 1;
                     
-                    // White border
-                    for (int i = 0; i <= powerup_bar_w; i++) {
-                        l_putpix(lfb, bar_x + i, bar_y - 1, 0xFFFFFFFF);
-                        l_putpix(lfb, bar_x + i, bar_y + powerup_bar_h, 0xFFFFFFFF);
-                    }
-                    for (int j = 0; j <= powerup_bar_h; j++) {
-                        l_putpix(lfb, bar_x - 1, bar_y + j, 0xFFFFFFFF);
-                        l_putpix(lfb, bar_x + powerup_bar_w, bar_y + j, 0xFFFFFFFF);
-                    }
-                    
                     // Filled portion (proportional to remaining time)
                     int max_timer = 600;  // 600 frames = 10 seconds at 60 FPS
                     int fill_w = (g->powerup_slot_timer[slot] * powerup_bar_w) / max_timer;
-                    if (fill_w > powerup_bar_w) fill_w = powerup_bar_w;
-                    
-                    for (int i = 0; i < fill_w; i++) {
-                        for (int j = 0; j < powerup_bar_h; j++) {
-                            l_putpix(lfb, bar_x + i, bar_y + j, icon_color);
-                        }
-                    }
+                    draw_bar(lfb, bar_x, bar_y, powerup_bar_w, powerup_bar_h, fill_w, icon_color);
                     
                     // Move to next slot position
                     px += spacing;
