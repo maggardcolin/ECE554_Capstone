@@ -24,6 +24,8 @@ typedef struct { int x,y; int alive; } bullet_t;
 
 #define MAX_PSHOTS 8
 #define PLAYER_LIVES 3
+#define PLAYER_BASE_SPEED 2
+#define PLAYER_BASE_DAMAGE 1
 #define MAX_SHOP_ITEMS 3
 #define ACOLS 11
 #define AROWS 5
