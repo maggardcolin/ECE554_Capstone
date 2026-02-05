@@ -820,41 +820,40 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         g->alien_timer = 0;
         g->alien_frame ^= 1;
 
-        // Skip alien movement on level 0 (tutorial)
         if (g->level != 0) {
             int minc = ACOLS, maxc = -1;
             for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) {
                 if (g->alien_alive[r][c]) { if (c < minc) minc = c; if (c > maxc) maxc = c; }
             }
 
-        if (maxc >= 0) {
-            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-            int spacing_x = 6;
-            int grid_w = (maxc - minc + 1) * (AS->w + spacing_x) - spacing_x;
+            if (maxc >= 0) {
+                const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+                int spacing_x = 6;
+                int grid_w = (maxc - minc + 1) * (AS->w + spacing_x) - spacing_x;
 
-            int next_origin_x = g->alien_origin_x + g->alien_dx * g->alien_step_px;
-            int next_left  = next_origin_x + minc * (AS->w + spacing_x);
-            int next_right = next_left + grid_w;
+                int next_origin_x = g->alien_origin_x + g->alien_dx * g->alien_step_px;
+                int next_left  = next_origin_x + minc * (AS->w + spacing_x);
+                int next_right = next_left + grid_w;
 
-            if (next_left < 5 || next_right > LW - 5) {
-                g->alien_dx = -g->alien_dx;
-                g->alien_origin_y += g->alien_drop_px;
-                // After boss is killed, speed up aliens on each wall hit
-                if (!g->boss_alive && g->boss_health == 0) {
-                    g->alien_period -= 2;
-                    if (g->alien_period < 5) g->alien_period = 5;
+                if (next_left < 5 || next_right > LW - 5) {
+                    g->alien_dx = -g->alien_dx;
+                    g->alien_origin_y += g->alien_drop_px;
+                    // After boss is killed, speed up aliens on each wall hit
+                    if (!g->boss_alive && g->boss_health == 0) {
+                        g->alien_period -= 2;
+                        if (g->alien_period < 5) g->alien_period = 5;
+                    }
+                } else {
+                    g->alien_origin_x = next_origin_x;
                 }
-            } else {
-                g->alien_origin_x = next_origin_x;
-            }
 
-            int alive_count = 0;
-            for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) alive_count += g->alien_alive[r][c] ? 1 : 0;
-            if (alive_count > 0) {
-                int target = 10 + alive_count / 6;
-                if (target < g->alien_period) g->alien_period = target;
+                int alive_count = 0;
+                for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) alive_count += g->alien_alive[r][c] ? 1 : 0;
+                if (alive_count > 0) {
+                    int target = 10 + alive_count / 6;
+                    if (target < g->alien_period) g->alien_period = target;
+                }
             }
-        }
         }
     }
 
