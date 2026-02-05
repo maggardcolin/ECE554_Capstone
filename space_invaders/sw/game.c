@@ -958,22 +958,15 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         
         // Determine next attack type when charging starts
         if (g->boss_power_timer == 1) {
-            if (g->level >= 3) {
-                // Count alive aliens to determine if green laser pool should be available
-                int alive_count = 0;
-                for (int r = 0; r < AROWS; r++) {
-                    for (int c = 0; c < ACOLS; c++) {
-                        alive_count += g->alien_alive[r][c] ? 1 : 0;
-                    }
+            int alive_count = 0;
+            for (int r = 0; r < AROWS; r++) {
+                for (int c = 0; c < ACOLS; c++) {
+                    alive_count += g->alien_alive[r][c] ? 1 : 0;
                 }
-                int total_aliens = AROWS * ACOLS;
-                if (alive_count > total_aliens / 2) {
-                    // More than half alive, can choose green laser
-                    g->next_boss_attack_type = (g->next_boss_attack_type + 1) % 2;  // 0 or 1
-                } else {
-                    // Half or fewer alive, choose purple laser only
-                    g->next_boss_attack_type = 0;
-                }
+            }
+            int total_aliens = AROWS * ACOLS;
+            if ((g->level >= 3) && (alive_count > total_aliens / 2)) {
+                g->next_boss_attack_type = (g->next_boss_attack_type == 0) ? 1 : 0;
             } else {
                 g->next_boss_attack_type = 0;  // Default to purple laser
             }
