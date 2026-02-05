@@ -602,13 +602,20 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     render_player_shots(g, lfb);
 
     // Score (bottom-right)
-    const char *score_label = "SCORE:";
-    int score_label_w = text_width_5x5(score_label, 1);
-    int score_max_w = 8 * 4; // 8 digits max, 4px per digit
-    int score_x = LW - (score_label_w + 6 + score_max_w) - 5;
-    int score_y = LH - 10;
-    l_draw_text(lfb, score_x, score_y, score_label, 1, 0xFFFFFFFF);
-    l_draw_score(lfb, score_x + score_label_w + 6, score_y, g->score, 0xFFFFFFFF);
+    const char *label = "SCORE:";
+    int label_scale = 1;
+    int label_w = text_width_5x5(label, label_scale);
+    int digit_w = 4;
+    int digits = digit_count(g->score);
+    int score_w = digits * digit_w;
+    int right_edge = LW - 5;              // desired right anchor
+    int score_x = right_edge - score_w;   // LSB stays fixed
+    int label_x = right_edge - label_w - 30;
+
+    int y = LH - 12;
+    uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
+    l_draw_text(lfb, label_x, y, label, label_scale, score_color);
+    l_draw_score(lfb, score_x, y, g->score, score_color);
 
     // SHOP sign on top-left
     {
@@ -1266,7 +1273,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
         l_clear(lfb, 0xFF000000);
-        const char *title = "SPACE INVADERS";
+        const char *title = "ALIENS";
         const char *prompt = "PRESS SPACE TO START";
 
         int title_scale = 3;
@@ -1404,7 +1411,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int score_x = right_edge - score_w;   // LSB stays fixed
         int label_x = right_edge - label_w - 30;
 
-        int y = LH - 10;
+        int y = LH - 12;
         uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
         l_draw_text(lfb, label_x, y, label, label_scale, score_color);
         l_draw_score(lfb, score_x, y, g->score, score_color);
@@ -1422,7 +1429,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int bx = 5;
         int by = 5;
 
-        l_draw_text(lfb, bx, by, boss_label, 1, boss_color);
+        l_draw_text(lfb, bx, by, boss_label, 1, 0xFFFFFFFF);
 
         int bar_x = bx + boss_label_w + 6;
         int bar_y = by - 1;
@@ -1435,12 +1442,13 @@ void game_render(game_t *g, lfb_t *lfb) {
         // Boss power bar (to the right of health bar on same line)
         const char *power_label = "POWER:";
         int power_label_w = text_width_5x5(power_label, 1);
-        int power_bar_y = by - 1;
+        int power_bar_y = by;
         int power_bar_x_start = bar_x + bar_w + 15;  // 15 pixels to the right of health bar
         l_draw_text(lfb, power_bar_x_start, power_bar_y, power_label, 1, 0xFFFFFFFF);
 
         int power_bar_x = power_bar_x_start + power_label_w + 6;
         int power_bar_h = 6;
+        int power_bar_w = 30;
         
         // Determine power color based on what attack will be used (shows next attack)
         uint32_t power_color;  // Purple (default for purple laser)
@@ -1448,8 +1456,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         else if (g->next_boss_attack_type == 1) power_color = 0xFF00FF00;  // Green (for green laser heal)
         else power_color = 0xFF808080;  // Gray (unknown)
 
-        int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * bar_w) / g->boss_power_max : 0;
-        draw_bar(lfb, power_bar_x, power_bar_y, bar_w, power_bar_h, power_fill_w, power_color);
+        int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * power_bar_w) / g->boss_power_max : 0;
+        draw_bar(lfb, power_bar_x, power_bar_y, power_bar_w, power_bar_h, power_fill_w, power_color);
     }
 
     {
@@ -1459,6 +1467,20 @@ void game_render(game_t *g, lfb_t *lfb) {
         int x = LW - (label_w + 6 + 3) - 5;
         l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, x + label_w + 6, 5, g->level, 0xFFFFFFFF);
+
+        const char *remaining_label = "REMAINING:";
+        int remaining_label_scale = 1;
+        int remaining_label_w = text_width_5x5(remaining_label, remaining_label_scale);
+        int remaining_x = x - remaining_label_w - 20;
+        int remaining_count = 0;
+        for (int r = 0; r < AROWS; r++) {
+            for (int c = 0; c < ACOLS; c++) {
+                if (g->alien_alive[r][c]) remaining_count++;
+            }
+        }
+        l_draw_text(lfb, remaining_x, 5, remaining_label, remaining_label_scale, 0xFFFFFFFF);
+        l_draw_score(lfb, remaining_x + remaining_label_w + 6, 5, remaining_count, 0xFFFFFFFF);
+
     }
 
     {
