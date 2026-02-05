@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "gfx.h"
 
 // Sprite ASCII art definitions (row-packed)
 static const char *player_rows[] = {
@@ -127,3 +128,7 @@ void sprite_clear_bit(sprite1r_t *s, int x, int y);
 
 int  bullet_hits_sprite(const sprite1r_t *s, int sx, int sy, int bx, int by);
 void bunker_damage(sprite1r_t *b, int hitx, int hity, int radius);
+
+// Drawing functions
+void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color);
+void draw_sprite1r_scaled(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color, int scale);

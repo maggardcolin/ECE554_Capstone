@@ -6,19 +6,6 @@
 #include <stdio.h>
 #include <math.h>
 
-static void draw_sprite1r(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color) {
-    for (int y = 0; y < s->h; y++) {
-        int yy = y0 + y;
-        if ((unsigned)yy >= (unsigned)LH) continue;
-        const uint8_t *row = s->bits + y * s->stride;
-        for (int x = 0; x < s->w; x++) {
-            int xx = x0 + x;
-            if ((unsigned)xx >= (unsigned)LW) continue;
-            if ((row[x >> 3] >> (7 - (x & 7))) & 1) lfb->px[yy * LW + xx] = color;
-        }
-    }
-}
-
 static int digit_count(uint32_t v)
 {
     int d = 1;
@@ -27,29 +14,6 @@ static int digit_count(uint32_t v)
         d++;
     }
     return d;
-}
-
-static void draw_sprite1r_scaled(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint32_t color, int scale) {
-    if (scale < 1) scale = 1;
-    for (int y = 0; y < s->h; y++) {
-        int yy = y0 + y * scale;
-        if ((unsigned)yy >= (unsigned)LH) continue;
-        const uint8_t *row = s->bits + y * s->stride;
-        for (int x = 0; x < s->w; x++) {
-            if (!((row[x >> 3] >> (7 - (x & 7))) & 1)) continue;
-            int xx = x0 + x * scale;
-            if ((unsigned)xx >= (unsigned)LW) continue;
-            for (int dy = 0; dy < scale; dy++) {
-                int yyy = yy + dy;
-                if ((unsigned)yyy >= (unsigned)LH) continue;
-                for (int dx = 0; dx < scale; dx++) {
-                    int xxx = xx + dx;
-                    if ((unsigned)xxx >= (unsigned)LW) continue;
-                    lfb->px[yyy * LW + xxx] = color;
-                }
-            }
-        }
-    }
 }
 
 static void draw_filled_circle(lfb_t *lfb, int x0, int y0, int r, uint32_t color) {
