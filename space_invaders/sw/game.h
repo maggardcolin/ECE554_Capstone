@@ -31,6 +31,15 @@ typedef struct { int x,y; int alive; } bullet_t;
 #define AROWS 5
 #define START_LEVEL 1
 
+#define BOSS_MAX_HEALTH(level) (\
+    level == 0 ? 0 : \
+    (20 + (level - 1) * 5) \
+)
+#define BOSS_PERIOD(level) (\
+    ((15 - (level - 1) * 2) > 5 ? (15 - (level - 1) * 2) \
+    : 5) \
+)
+
 typedef struct {
     int score;
     int level;

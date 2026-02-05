@@ -612,22 +612,15 @@ static void setup_level(game_t *g, int level, int reset_score) {
 
     // Boss alien setup (separate from regular aliens)
     // No boss on level 0 (tutorial)
-    if (level == 0) {
-        g->boss_alive = 0;
-        g->boss_health = 0;
-        g->boss_max_health = 0;
-    } else {
-        g->boss_alive = 1;
-        g->boss_max_health = 20 + (level - 1) * 5; // More HP at higher levels
-        g->boss_health = g->boss_max_health;
-    }
+    g->boss_alive = (level > 0) ? 1 : 0;
+    g->boss_max_health = BOSS_MAX_HEALTH(level);
+    g->boss_health = g->boss_max_health;
     g->boss_x = (LW - g->BOSS_A.w) / 2;
     g->boss_y = 15;
     g->boss_dx = 1;
     g->boss_frame = 0;
     g->boss_timer = 0;
-    g->boss_period = 15 - (level - 1) * 2; // Faster boss at higher levels
-    if (g->boss_period < 5) g->boss_period = 5; // Minimum period
+    g->boss_period = BOSS_PERIOD(level); // Faster boss at higher levels
 
     clear_player_shots(g);
     g->ashot.alive = 0;
