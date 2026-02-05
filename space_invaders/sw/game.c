@@ -807,6 +807,7 @@ void game_reset(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
+    g->paused = 0;
     reset_player_progression(g);
 
     setup_level(g, 0, 1);
@@ -821,6 +822,20 @@ void game_reset(game_t *g) {
 /// Notes: Called every frame. Handles startup screen, level completion, game-over delays,
 ///        player movement, firing, alien movement, collision detection, powerup spawning.
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
+    // Handle pause toggle (only in active gameplay)
+    static uint32_t prev_buttons = 0;
+    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop) {
+        if ((buttons & BTN_PAUSE) && !(prev_buttons & BTN_PAUSE)) {
+            g->paused = !g->paused;
+        }
+    }
+    prev_buttons = buttons;
+
+    // If paused, skip all game logic
+    if (g->paused) {
+        return;
+    }
+
     if (g->start_screen) {
         if (g->start_screen_delay_timer > 0) g->start_screen_delay_timer--;
         if (g->start_screen_delay_timer == 0 && (buttons & BTN_FIRE)) game_reset(g);
@@ -1319,6 +1334,16 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     l_clear(lfb, 0xFF000000);
+
+    // Draw "PAUSED" text if game is paused
+    if (g->paused) {
+        const char *paused_text = "PAUSED";
+        int scale = 2;
+        int text_w = text_width_5x5(paused_text, scale);
+        int text_x = (LW - text_w) / 2;
+        int text_y = (LH - scale * 5) / 2;
+        l_draw_text(lfb, text_x, text_y, paused_text, scale, 0xFFFFFFFF);
+    }
     
     // Starfield background (static tiling pattern)
     {

@@ -77,6 +77,7 @@ int main(void) {
         if (k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_D]) regs->buttons |= BTN_RIGHT;
         if (k[SDL_SCANCODE_SPACE]) regs->buttons |= BTN_FIRE;
         if (k[SDL_SCANCODE_ESCAPE]) regs->buttons |= BTN_QUIT;
+        if (k[SDL_SCANCODE_P]) regs->buttons |= BTN_PAUSE;
 
         if (regs->buttons & BTN_QUIT) running = false;
 

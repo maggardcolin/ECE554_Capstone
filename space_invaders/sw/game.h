@@ -99,6 +99,8 @@ typedef struct {
     int game_over_score;
     int game_over_delay_timer;
 
+    int paused;
+
     // Player upgrades (shop)
     int player_speed;          // Base 2, increased by shop item
     int fire_speed_bonus;      // Each point reduces cooldown

@@ -16,6 +16,7 @@
 #define BTN_RIGHT (1u << 1)
 #define BTN_FIRE  (1u << 2)
 #define BTN_QUIT  (1u << 3)
+#define BTN_PAUSE (1u << 4)
 
 /// mmio_regs_t: Memory-mapped I/O register structure shared via mmap
 /// Memory layout: software and hardware share this via /pynq_fbmmio shared memory
