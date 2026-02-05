@@ -832,8 +832,14 @@ void game_reset(game_t *g) {
 /// Notes: Called every frame. Handles startup screen, level completion, game-over delays,
 ///        player movement, firing, alien movement, collision detection, powerup spawning.
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
-    // Handle pause toggle (only in active gameplay)
+    // Handle reset button (anytime during gameplay)
     static uint32_t prev_buttons = 0;
+    if ((buttons & BTN_RESET) && !(prev_buttons & BTN_RESET)) {
+        g->start_screen = 1;
+        g->start_screen_delay_timer = 30;
+    }
+    
+    // Handle pause toggle (only in active gameplay)
     if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop) {
         if ((buttons & BTN_PAUSE) && !(prev_buttons & BTN_PAUSE)) {
             g->paused = !g->paused;
