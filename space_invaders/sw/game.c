@@ -1351,7 +1351,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         for (int y = 0; y < LH; y += star_spacing) {
             for (int x = 0; x < LW; x += star_spacing) {
                 // Pseudo-random star pattern based on position
-                int seed = (x ^ y) * 73856093;
+                int seed = (x ^ y) * 73856093 + (g->powerup_spawn_timer / 10);
                 if ((seed % 7) == 0) {  // ~14% of positions have stars
                     uint32_t star_color = 0xFF333333;  // Dark gray
                     l_putpix(lfb, x, y, star_color);
