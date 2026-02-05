@@ -689,9 +689,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
     if (level == 0) {
         memset(g->alien_alive, 0, sizeof(g->alien_alive));
         memset(g->alien_health, 0, sizeof(g->alien_health));
-        // Put one alien in center (row 2, column 5)
-        g->alien_alive[2][5] = 1;
-        g->alien_health[2][5] = 1;
+        // Put one alien in center (row 4, column 5)
+        g->alien_alive[4][5] = 1;
+        g->alien_health[4][5] = 1;
     } else {
         memset(g->alien_alive, 1, sizeof(g->alien_alive));
         // Level 1: aliens have 1 HP, Level 3+: aliens have 2 HP (green -> white -> dead)
@@ -1325,13 +1325,13 @@ void game_render(game_t *g, lfb_t *lfb) {
             draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
         }
 
-        const char *score_label = "SCORE:";
-        int label_scale = 2;
+        const char *score_label = "FINAL SCORE:";
+        int label_scale = 1;
         int label_w = text_width_5x5(score_label, label_scale);
         int label_x = (LW - label_w) / 2 - 12;
         int label_y = cy + r + 15;
         l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
-        l_draw_score(lfb, label_x + label_w + 6, label_y + 2, g->game_over_score, 0xFFFFFFFF);
+        l_draw_score(lfb, label_x + label_w + 6, label_y, g->game_over_score, 0xFFFFFFFF);
 
         if (g->game_over_delay_timer == 0) {
             const char *prompt = "PRESS SPACE TO CONTINUE";
@@ -1385,7 +1385,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->level == 0) {
         const char *tutorial1 = "USE A/D OR LEFT/RIGHT TO MOVE";
         const char *tutorial2 = "AND PRESS SPACE TO SHOOT";
-        const char *tutorial3 = "DESTROY ALL ALIENS TO EXIT";
+        const char *tutorial3 = "DESTROY THE BOSS ON EACH LEVEL TO EXIT";
         const char *tutorial4 = "THEN PROCEED TO THE EXIT ON THE RIGHT";
         int scale = 1;
         int w1 = text_width_5x5(tutorial1, scale);
@@ -1396,7 +1396,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int x2 = (LW - w2) / 2;
         int x3 = (LW - w3) / 2;
         int x4 = (LW - w4) / 2;
-        int y1 = 5;
+        int y1 = 20;
         int y2 = y1 + 10;
         int y3 = y2 + 10;
         int y4 = y3 + 10;
