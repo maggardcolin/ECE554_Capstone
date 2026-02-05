@@ -152,6 +152,76 @@ static void update_player_shots(game_t *g) {
     }
 }
 
+static void update_player_movement(game_t *g, uint32_t buttons) {
+    if (buttons & BTN_LEFT)  g->player_x -= g->player_speed;
+    if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
+
+    if (g->player_x < 0) g->player_x = 0;
+    if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
+}
+
+static void update_player_firing(game_t *g, uint32_t buttons) {
+    if (g->fire_cooldown > 0) g->fire_cooldown--;
+    if ((buttons & BTN_FIRE) && g->fire_cooldown == 0) {
+        int center_x = g->player_x + g->PLAYER.w/2;
+        int center_y = g->player_y - 1;
+        fire_player_shots(g, center_x, center_y);
+        g->fire_cooldown = compute_fire_cooldown(g);
+    }
+}
+
+static uint32_t get_player_color(const game_t *g) {
+    if (rapid_fire_active(g)) return 0xFFFFA500;  // Orange when rapid-fire active
+    if (triple_shot_active(g)) return 0xFF0000FF;  // Blue when triple-shot active
+    return 0xFF00FF00;  // Default green
+}
+
+static void render_player(const game_t *g, lfb_t *lfb) {
+    uint32_t player_color = get_player_color(g);
+    draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
+}
+
+static void render_score_display(const game_t *g, lfb_t *lfb) {
+    const char *label = "SCORE:";
+    int label_scale = 1;
+    int label_w = text_width_5x5(label, label_scale);
+    int digit_w = 4;
+    int digits = digit_count(g->score);
+    int score_w = digits * digit_w;
+    int right_edge = LW - 5;
+    int score_x = right_edge - score_w;
+    int label_x = right_edge - label_w - 30;
+
+    int y = LH - 12;
+    uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
+    l_draw_text(lfb, label_x, y, label, label_scale, score_color);
+    l_draw_score(lfb, score_x, y, g->score, score_color);
+}
+
+static void render_player_health_bar(const game_t *g, lfb_t *lfb) {
+    const char *p1 = "PLAYER 1";
+    int scale = 1;
+    int x = 5;
+    int y = LH - 12;
+    l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
+
+    int lx = x + text_width_5x5(p1, scale) + 6;
+    int bar_w = 40;
+    int bar_h = 6;
+    int bar_y = y - 1;
+
+    int max_lives = PLAYER_LIVES;
+    if (g->lives > max_lives) max_lives = g->lives;
+    int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
+
+    uint32_t life_color = 0xFF00FF00; // green >= 50%
+    if (health_pct <= 33) life_color = 0xFFFF0000;
+    else if (health_pct <= 67) life_color = 0xFFFFFF00;
+
+    int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
+    draw_bar(lfb, lx, bar_y, bar_w, bar_h, fill_w, life_color);
+}
+
 static void render_player_shots(const game_t *g, lfb_t *lfb) {
     for (int s = 0; s < MAX_PSHOTS; s++) {
         if (g->pshot[s].alive) {
@@ -381,20 +451,8 @@ static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         g->shopkeeper_frame ^= 1;
     }
 
-    if (buttons & BTN_LEFT)  g->player_x -= g->player_speed;
-    if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
-
-    if (g->player_x < 0) g->player_x = 0;
-    if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
-
-    if (g->fire_cooldown > 0) g->fire_cooldown--;
-    if ((buttons & BTN_FIRE) && g->fire_cooldown == 0) {
-        int center_x = g->player_x + g->PLAYER.w/2;
-        int center_y = g->player_y - 1;
-        fire_player_shots(g, center_x, center_y);
-        g->fire_cooldown = compute_fire_cooldown(g);
-    }
-
+    update_player_movement(g, buttons);
+    update_player_firing(g, buttons);
     update_player_shots(g);
 
     int item_w = 18;
@@ -503,29 +561,13 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
 
     // Player
-    uint32_t player_color = 0xFF00FF00;  // Default green
-    if (rapid_fire_active(g)) player_color = 0xFFFFA500;  // Orange when rapid-fire active
-    else if (triple_shot_active(g)) player_color = 0xFF0000FF;  // Blue when triple-shot active
-    draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
+    render_player(g, lfb);
 
     // Bullets
     render_player_shots(g, lfb);
 
     // Score (bottom-right)
-    const char *label = "SCORE:";
-    int label_scale = 1;
-    int label_w = text_width_5x5(label, label_scale);
-    int digit_w = 4;
-    int digits = digit_count(g->score);
-    int score_w = digits * digit_w;
-    int right_edge = LW - 5;              // desired right anchor
-    int score_x = right_edge - score_w;   // LSB stays fixed
-    int label_x = right_edge - label_w - 30;
-
-    int y = LH - 12;
-    uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
-    l_draw_text(lfb, label_x, y, label, label_scale, score_color);
-    l_draw_score(lfb, score_x, y, g->score, score_color);
+    render_score_display(g, lfb);
 
     // SHOP sign on top-left
     {
@@ -534,29 +576,7 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     }
 
     // PLAYER 1 label and health bar
-    {
-        const char *p1 = "PLAYER 1";
-        int scale = 1;
-        int x = 5;
-        int y = LH - 12;
-        l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
-
-        int lx = x + text_width_5x5(p1, scale) + 6;
-        int bar_w = 40;
-        int bar_h = 6;
-        int bar_y = y - 1;
-
-        int max_lives = PLAYER_LIVES;
-        if (g->lives > max_lives) max_lives = g->lives;
-        int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
-
-        uint32_t life_color = 0xFF00FF00; // green >= 50%
-        if (health_pct <= 33) life_color = 0xFFFF0000;
-        else if (health_pct <= 67) life_color = 0xFFFFFF00;
-
-        int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
-        draw_bar(lfb, lx, bar_y, bar_w, bar_h, fill_w, life_color);
-    }
+    render_player_health_bar(g, lfb);
 }
 
 static int aliens_remaining(const game_t *g) {
@@ -791,19 +811,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (g->powerup_timer == 0) g->powerup_active = 0;
         }
     }
-    if (buttons & BTN_LEFT)  g->player_x -= g->player_speed;
-    if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
-
-    if (g->player_x < 0) g->player_x = 0;
-    if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
-
-    if (g->fire_cooldown > 0) g->fire_cooldown--;
-    if ((buttons & BTN_FIRE) && g->fire_cooldown == 0) {
-        int center_x = g->player_x + g->PLAYER.w/2;
-        int center_y = g->player_y - 1;
-        fire_player_shots(g, center_x, center_y);
-        g->fire_cooldown = compute_fire_cooldown(g);
-    }
+    
+    update_player_movement(g, buttons);
+    update_player_firing(g, buttons);
 
     g->alien_timer++;
     if (g->alien_timer >= g->alien_period) {
@@ -1263,22 +1273,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, x4, y4, tutorial4, scale, 0xFFFFFFFF);
     }
     
-    {
-        const char *label = "SCORE:";
-        int label_scale = 1;
-        int label_w = text_width_5x5(label, label_scale);
-        int digit_w = 4;
-        int digits = digit_count(g->score);
-        int score_w = digits * digit_w;
-        int right_edge = LW - 5;              // desired right anchor
-        int score_x = right_edge - score_w;   // LSB stays fixed
-        int label_x = right_edge - label_w - 30;
-
-        int y = LH - 12;
-        uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
-        l_draw_text(lfb, label_x, y, label, label_scale, score_color);
-        l_draw_score(lfb, score_x, y, g->score, score_color);
-    }
+    render_score_display(g, lfb);
 
     // Boss health bar on the left side of screen
     if (g->boss_alive) {
@@ -1346,30 +1341,16 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     }
 
+    render_player_health_bar(g, lfb);
+        
+    // Powerup progress bars
     {
         const char *p1 = "PLAYER 1";
         int scale = 1;
         int x = 5;
         int y = LH - 12;
-        l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
-
         int lx = x + text_width_5x5(p1, scale) + 6;
         int bar_w = 40;
-        int bar_h = 6;
-        int bar_y = y - 1;
-
-        int max_lives = PLAYER_LIVES;
-        if (g->lives > max_lives) max_lives = g->lives;
-        int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
-
-        uint32_t life_color = 0xFF00FF00; // green >= 50%
-        if (health_pct <= 33) life_color = 0xFFFF0000;
-        else if (health_pct <= 67) life_color = 0xFFFFFF00;
-
-        int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
-        draw_bar(lfb, lx, bar_y, bar_w, bar_h, fill_w, life_color);
-        
-        // Powerup progress bars
         {
             int px = lx + bar_w + 10;  // Start after health bar
             int py = y;
@@ -1453,10 +1434,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
     }
 
-    uint32_t player_color = 0xFF00FF00;  // Default green
-    if (rapid_fire_active(g)) player_color = 0xFFFFA500;  // Orange when rapid-fire active
-    else if (triple_shot_active(g)) player_color = 0xFF0000FF;  // Blue when triple-shot active
-    draw_sprite1r(lfb, &g->PLAYER, g->player_x, g->player_y, player_color);
+    render_player(g, lfb);
 
     if (g->powerup_active) {
         draw_powerup_icon(lfb, g->powerup_x, g->powerup_y, g->powerup_type);
