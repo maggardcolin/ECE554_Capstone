@@ -90,6 +90,9 @@ static void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_
         l_putpix(lfb, x - 1, y + j, 0xFFFFFFFF);
         l_putpix(lfb, x + w, y + j, 0xFFFFFFFF);
     }
+    
+    // Top-left corner pixel
+    l_putpix(lfb, x - 1, y - 1, 0xFFFFFFFF);
 
     for (int i = 0; i < fill_w; i++) {
         for (int j = 0; j < h; j++) {
