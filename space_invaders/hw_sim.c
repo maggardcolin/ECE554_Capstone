@@ -3,7 +3,6 @@
 // handles SDL2 window/rendering, keyboard input, and double-buffered framebuffer swap
 // USAGE: Run hw_sim first, then run sw_game in another terminal
 #include "hw_contract.h"
-#include <SDL2/SDL.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -11,6 +10,15 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <errno.h>
+
+// OSX includes the all SDL2 libraries by default in the sdl2-config
+#ifdef __LINUX__
+  #include <SDL2/SDL.h>
+#elif __APPLE__
+  #include <SDL.h>
+#endif
+
 
 #define SHM_NAME "/pynq_fbmmio"
 
@@ -32,9 +40,9 @@ static size_t shm_total_size(void) {
 int main(void) {
     size_t total = shm_total_size();
 
-    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-    if (fd < 0) { perror("shm_open"); return 1; }
-    if (ftruncate(fd, (off_t)total) != 0) { perror("ftruncate"); return 1; }
+    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR | O_EXCL, 0666);
+    if (fd < 0) { perror("shm_open"); return errno; }
+    if (ftruncate(fd, (off_t)total) != 0) { perror("ftruncate"); return errno; }
 
     uint8_t *base = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (base == MAP_FAILED) { perror("mmap"); return 1; }
@@ -111,5 +119,6 @@ int main(void) {
 
     munmap(base, total);
     close(fd);
+    shm_unlink(SHM_NAME);
     return 0;
 }
