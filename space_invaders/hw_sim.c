@@ -13,10 +13,10 @@
 #include <errno.h>
 
 // OSX includes the all SDL2 libraries by default in the sdl2-config
-#ifdef __linux__
-  #include <SDL2/SDL.h>
-#elif __APPLE__
+#ifdef __APPLE__
   #include <SDL.h>
+#else
+  #include <SDL2/SDL.h>
 #endif
 
 
