@@ -18,10 +18,10 @@ run: hardware software
 	./sw_game
 
 hardware:
-	gcc $(GCCFLAGS) hw_sim.c -o hw_sim
+	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
 
 software:
-	gcc $(GCCFLAGS) sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c -o sw_game
+	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c -o sw_game $(GCCFLAGS)
 
 clean:
 	rm -f hw_sim sw_game
