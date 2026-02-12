@@ -38,6 +38,7 @@ static size_t shm_total_size(void) {
 /// and displays framebuffer at ~60 Hz (16ms per frame)
 /// Returns: 0 on normal exit (window closed), 1 on initialization error
 int main(void) {
+    shm_unlink(SHM_NAME);
     size_t total = shm_total_size();
 
     int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR | O_EXCL, 0666);
@@ -72,7 +73,16 @@ int main(void) {
     if (!tex) { fprintf(stderr, "SDL_CreateTexture failed\n"); return 1; }
 
     bool running = true;
+
+    Uint64 now = SDL_GetPerformanceCounter();
+    Uint64 last = 0;
+    const double targetFrameTime = 1.0 / 30.0;
+    
+    double deltaTime = 0;
+
     while (running) {
+        last = now;
+        
         regs->buttons = 0;
 
         SDL_Event e;
@@ -109,7 +119,15 @@ int main(void) {
         SDL_RenderCopy(ren, tex, NULL, NULL);
         SDL_RenderPresent(ren);
 
-        SDL_Delay(16);
+        now = SDL_GetPerformanceCounter();
+
+        deltaTime = (double)((now - last) * 1000) / (double)SDL_GetPerformanceFrequency();
+        deltaTime /= 1000.0;
+
+        
+        if (deltaTime < targetFrameTime) {
+          SDL_Delay((Uint32)((targetFrameTime - deltaTime) * 1000.0));
+        }
     }
 
     SDL_DestroyTexture(tex);
