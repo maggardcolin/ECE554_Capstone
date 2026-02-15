@@ -49,3 +49,5 @@ clean-sim:
 endif
 
 clean: clean-sim
+	$(MAKE) -C space_invaders clean
+	$(MAKE) -C console_menu clean
