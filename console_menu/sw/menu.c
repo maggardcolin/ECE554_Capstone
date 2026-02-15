@@ -14,7 +14,7 @@
 	#define MOUNTVOLS "/Volumes"
 #else
   #define LABELPATH "/dev/disk/by-label"
-	#define MOUNTVOLS "/game-mnt"
+	#define MOUNTVOLS "/mnt"
 #endif
 
 #define GAMELABEL "GAMESIM"

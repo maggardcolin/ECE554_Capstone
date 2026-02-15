@@ -35,16 +35,15 @@ run-sim:
 	$(MAKE) -C space_invaders software
 	dd if=/dev/zero of=usb_sim.raw bs=512M count=1
 	mkfs.ext4 -L GAMESIM usb_sim.raw
-	sudo mkdir /game-mnt
-	sudo mount -o loop,rw -t ext4 usb_sim.raw /game-mnt
-	sudo chown -R $(USER):$(USER) /game-mnt
-	mkdir /game-mnt/GAMESIM
-	cp space_invaders/sw_game /game-mnt/GAMESIM
-	echo "Space Invaders" > /game-mnt/GAMESIM/title
+	sudo mkdir /mnt/GAMESIM
+	sudo mount -o loop,rw -t ext4 usb_sim.raw /mnt/GAMESIM
+	sudo chown -R $(USER):$(USER) /mnt/GAMESIM
+	cp space_invaders/sw_game /mnt/GAMESIM
+	echo "Space Invaders" > /mnt/GAMESIM/title
 
 clean-sim:
-	-sudo umount /game-mnt
-	-sudo rm -rf usb_sim.raw /game-mnt
+	-sudo umount /mnt/GAMESIM
+	-sudo rm -rf usb_sim.raw /mnt/GAMESIM
 
 endif
 
