@@ -6,12 +6,15 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 // OSX and linux define their label points differently
 #ifdef __APPLE__
-  #define MOUNTVOLS "/Volumes"
+  #define LABELPATH "/Volumes"
+	#define MOUNTVOLS "/Volumes"
 #else
-  #define MOUNTVOLS "/dev/disk/by-label"
+  #define LABELPATH "/dev/disk/by-label"
+	#define MOUNTVOLS "/game-mnt"
 #endif
 
 #define GAMELABEL "GAMESIM"
@@ -33,7 +36,7 @@ static int text_width_5x5(const char *text, int scale) {
 int check_for_game() {
   char path[256];
   
-  snprintf(path, sizeof(path), "%s/%s", MOUNTVOLS, GAMELABEL);
+  snprintf(path, sizeof(path), "%s/%s", LABELPATH, GAMELABEL);
 
   struct stat st;
   return stat(path, &st) == 0;
@@ -42,8 +45,6 @@ int check_for_game() {
 /**
  * Starts the game in a new process. The main menu process waits for game to quit, then
  * continues running as normal.
- *
- * TODO: currently hard coded executable. next steps: detect udev
  */
 void exec_game(char *game) {
   if (game == NULL) return;
@@ -81,7 +82,7 @@ void menu_init(menu_t *m) {
 }
 
 /**
- * Currently does nothing and is not active. Here for the future
+ * Currently does nothing and is not called. Here for the future
  */
 void menu_reset(menu_t *m) {
   m->selectedItem = 0;
@@ -103,6 +104,7 @@ int menu_update(menu_t *m, uint32_t buttons, uint32_t vsync_counter) {
 
   if (buttons & BTN_SEL) {
     switch (m->selectedItem) {
+			// Executes the game cartridge
       case 0:
         exec_game(m->game_exec);
         break;
@@ -111,6 +113,7 @@ int menu_update(menu_t *m, uint32_t buttons, uint32_t vsync_counter) {
         // Currently unused, for future settings menu (mostly just sound)
         break;
 
+			// Exits the simulator (to be determined what it does on the physical console)
       case 2:
         return 1;
         break;
