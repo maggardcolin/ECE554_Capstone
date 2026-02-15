@@ -18,6 +18,9 @@
 #define BTN_QUIT  (1u << 3)
 #define BTN_PAUSE (1u << 4)
 #define BTN_RESET (1u << 5)
+#define BTN_DOWN  (1u << 6)
+#define BTN_UP    (1u << 7)
+#define BTN_SEL   (1u << 8)
 
 /// mmio_regs_t: Memory-mapped I/O register structure shared via mmap
 /// Memory layout: software and hardware share this via /pynq_fbmmio shared memory
@@ -36,5 +39,6 @@ typedef struct {
     volatile uint32_t back_idx;       // selected by game
     volatile uint32_t swap_request;   // game sets to 1
     volatile uint32_t swap_ack;       // hw_sim sets = vsync_counter after swap
+    volatile uint32_t prop_quit;      // allows sw to kill hw for simulation
     volatile uint32_t reserved[10];
 } mmio_regs_t;

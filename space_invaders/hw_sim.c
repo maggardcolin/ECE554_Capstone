@@ -55,6 +55,7 @@ int main(void) {
     memset((void*)regs, 0, sizeof(*regs));
     regs->front_idx = 0;
     regs->back_idx  = 1;
+    regs->prop_quit = 0;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "SDL_Init failed\n");
@@ -80,7 +81,7 @@ int main(void) {
     
     double deltaTime = 0;
 
-    while (running) {
+    while (!regs->prop_quit) {
         last = now;
         
         regs->buttons = 0;
@@ -93,10 +94,13 @@ int main(void) {
         const Uint8 *k = SDL_GetKeyboardState(NULL);
         if (k[SDL_SCANCODE_LEFT]  || k[SDL_SCANCODE_A]) regs->buttons |= BTN_LEFT;
         if (k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_D]) regs->buttons |= BTN_RIGHT;
+        if (k[SDL_SCANCODE_UP]    || k[SDL_SCANCODE_W]) regs->buttons |= BTN_UP;
+        if (k[SDL_SCANCODE_DOWN]  || k[SDL_SCANCODE_S]) regs->buttons |= BTN_DOWN;
         if (k[SDL_SCANCODE_SPACE]) regs->buttons |= BTN_FIRE;
         if (k[SDL_SCANCODE_ESCAPE]) regs->buttons |= BTN_QUIT;
         if (k[SDL_SCANCODE_P]) regs->buttons |= BTN_PAUSE;
         if (k[SDL_SCANCODE_R]) regs->buttons |= BTN_RESET;
+        if (k[SDL_SCANCODE_RETURN]) regs->buttons |= BTN_SEL;
 
         if (regs->buttons & BTN_QUIT) running = false;
 
