@@ -1,0 +1,3 @@
+[submodule "AUP-ZU3-Petalinux-Backup"]
+	path = AUP-ZU3-Petalinux-Backup
+	url = https://github.com/JMlaker/AUP-ZU3-Petalinux-Backup.git
