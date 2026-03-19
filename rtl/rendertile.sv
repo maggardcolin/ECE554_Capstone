@@ -105,6 +105,11 @@ always_comb begin
 				set_error = 1'b1;
 				next_state = STATE_READY;
 			end
+			default: begin
+				set_error_code = E_IINST;
+				set_error = 1'b1;
+				next_state = STATE_READY;
+			end
 		endcase
 	end
 
