@@ -27,6 +27,7 @@ logic[3:0] next_state;
 localparam STATE_READY = 0;
 localparam STATE_PREPARE = 1;
 localparam STATE_FILLCOLOR = 2;
+localparam STATE_PUTPIXEL = 3;
 
 localparam E_NOERR = 4'h0;
 localparam E_UNIMP = 4'h1;
@@ -83,6 +84,19 @@ always @(posedge clk, negedge rst_n) begin
 	end
 end
 
+// Instruction data for putpixel
+// Calculated automatically
+wire[5:0] PUTPIXEL_xcoord;
+wire[5:0] PUTPIXEL_ycoord;
+wire PUTPIXEL_inrange;
+// X and Y coordinates from arg1 and arg2. Pull lowest 6 bits (since 64x64)
+// to get local coordinates
+assign PUTPIXEL_xcoord = arg1[5:0];
+assign PUTPIXEL_ycoord = arg2[5:0];
+// Use upper bits to determine if we are in range. If we're not the target,
+// no need.
+assign PUTPIXEL_inrange = (arg1[10:6]==X_INDEX)&(arg2[10:6]==Y_INDEX);
+
 always_comb begin
 	capture_instruction = 1'b0;
 	next_state = state;
@@ -136,6 +150,17 @@ always_comb begin
 				go_fillcolor = 1'b1;
 				next_state = STATE_FILLCOLOR;
 			end
+			INSTR_PUTPIXEL: begin
+				// PUTPIXEL(XCOORDINATE, YCOORDINATE, PIXELCOLOR)
+				// This one needs to write to memory. Only enter state
+				// if we need to
+				// Don't know if we need a state or not actually
+				if(PUTPIXEL_inrange) begin
+					//TODO putpixel
+				end else begin
+					next_state = STATE_READY;
+				end
+			end
 			default: begin
 				set_error_code = E_IINST;
 				set_error = 1'b1;
@@ -151,6 +176,9 @@ always_comb begin
 			next_state = STATE_READY;
 			clear_done_fillcolor = 1'b1; // Tell color fill unit we're finished here
 		end
+	end
+	STATE_PUTPIXEL: begin
+		
 	end
 
 	endcase
