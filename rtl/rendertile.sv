@@ -26,6 +26,7 @@ reg[3:0] state;
 logic[3:0] next_state;
 localparam STATE_READY = 0;
 localparam STATE_PREPARE = 1;
+localparam STATE_FILLCOLOR = 2;
 
 localparam E_NOERR = 4'h0;
 localparam E_UNIMP = 4'h1;
@@ -48,12 +49,30 @@ always @(posedge clk, negedge rst_n) begin
 	state <= next_state;
 end
 
+// Control signals for fill color unit
+// Input from color fill block. Used to indicate
+// Render Tile has placed all pixels into backing
+// memory.
+logic done_fillcolor;
+// Hold high for one clock cycle and deassert
+// Indicates to color fill to start filling pixels
+// in serial/parallel/whatever
+logic go_fillcolor;
+// Brings color fill fsm back to IDLE state
+logic clear_done_fillcolor;
+
+// Control signals for error reporting
+// Standard set/clear/code
 logic set_error;
 logic[3:0] set_error_code;
 logic clear_error;
+
+// Logic 1 when should capture instruction_in
 logic capture_instruction;
 logic SETCOORD_capture_coordinates;
 
+// If instruction is SETCOORD, capture arg1 and arg2
+// into X_INDEX and Y_INDEX
 always @(posedge clk, negedge rst_n) begin
 	if(~rst_n) begin
 		X_INDEX <= '0;
@@ -71,6 +90,7 @@ always_comb begin
 	set_error = 1'b0;
 	set_error_code = 4'b0;
 	busy = 1'b1;
+	go_fillcolor = 1'b0;
 	SETCOORD_capture_coordinates = 1'b0;
 	case (state)
 	STATE_READY: begin
@@ -85,8 +105,14 @@ always_comb begin
 		end
 	end
 	STATE_PREPARE: begin
+		// Dispatch instruction.
+		// If the instruction can resolve in one cycle, resolve it here
+		// without a separate state.
 		case(instruction)
 			INSTR_BLIT: begin
+				// Send line data to screen. Unimplemented as no backing
+				// memory yet
+				// TODO
 				set_error_code = E_UNIMP;
 				set_error = 1'b1;
 				next_state = STATE_READY;
@@ -96,14 +122,19 @@ always_comb begin
 				// This one is fine. We can just do this now
 				// no need for a separate state for it
 				// since it's guaranteed to take one clock
+				// Capture coordinates into X_INDEX and Y_INDEX
+				// These will be used for future coordinate
+				// computations
 				SETCOORD_capture_coordinates = 1'b1;
 				next_state = STATE_READY;
 			end
 			INSTR_FILLCOLOR: begin
 				// FILLCOLOR(COLOR_INDEX);
-				set_error_code = E_UNIMP;
-				set_error = 1'b1;
-				next_state = STATE_READY;
+				// write COLOR_INDEX into all pixels in screen.
+				// Actual details will depend on backing memory.
+				// (e.g. word size to write, how many, etc)
+				go_fillcolor = 1'b1;
+				next_state = STATE_FILLCOLOR;
 			end
 			default: begin
 				set_error_code = E_IINST;
@@ -111,6 +142,15 @@ always_comb begin
 				next_state = STATE_READY;
 			end
 		endcase
+	end
+	STATE_FILLCOLOR: begin
+		// Here, we're filling the color
+		// go_fillcolor was high for 1 clock, now we wait until done_fillcolor
+		// asserted
+		if(done_fillcolor) begin
+			next_state = STATE_READY;
+			clear_done_fillcolor = 1'b1; // Tell color fill unit we're finished here
+		end
 	end
 
 	endcase
