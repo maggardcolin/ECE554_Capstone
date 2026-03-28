@@ -1,0 +1,4 @@
+# Build artifacts
+hw_sim
+sw_game
+*.o
