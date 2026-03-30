@@ -1,5 +1,5 @@
-#include "../space_invaders/hw_contract.h"
-#include "../space_invaders/sw/shm_map.h"
+#include "hw_contract.h"
+#include "shm_map.h"
 
 #include <stdint.h>
 #include <stdio.h>
