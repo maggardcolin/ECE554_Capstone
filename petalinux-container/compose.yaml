@@ -2,7 +2,7 @@ services:
   app:
     # Build the image if necessary
     build:
-      context: .
+      context: ./container
       dockerfile: Containerfile
 
     # Keep the thing open

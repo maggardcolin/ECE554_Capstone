@@ -23,7 +23,23 @@ RUN apt-get update && \
 				vim \
 				locales \
 				sudo \
-				dnsutils
+				dnsutils \
+				iputils-ping \
+				curl \
+				wget \
+				chrpath \
+				gawk \
+				diffstat \
+				make \
+				xz-utils \
+				file \
+				cpio \
+				python3-pexpect \
+				git \
+				libssl-dev \
+				libselinux1 \
+				net-tools \
+				ca-certificates
 
 
 COPY petalinux*.run /
@@ -35,6 +51,8 @@ RUN apt install /ext-libs/libtinfo5_6.3-2ubuntu0.1_amd64.deb
 RUN chmod 755 /petalinux*.run
 
 RUN echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen
+
+RUN update-ca-certificates
 
 RUN adduser petalinux
 
