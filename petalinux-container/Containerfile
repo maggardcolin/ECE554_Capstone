@@ -39,7 +39,8 @@ RUN apt-get update && \
 				libssl-dev \
 				libselinux1 \
 				net-tools \
-				ca-certificates
+				ca-certificates \
+				tmux
 
 
 COPY petalinux*.run /
