@@ -3,13 +3,15 @@
 **/hw_sim
 usb_sim.raw
 
-# Always include readme's (because duh)
+# Always included files
 !**/README.md
+!**/Makefile
 
 # Petalinux container directory tracking
 petalinux-container/*
 !petalinux-container/Containerfile
 !petalinux-container/libs
+!petalinux-container/compose.yaml
 
 # Vivado projects directory tracking
 Vivado_projects/*
