@@ -1,15 +1,18 @@
+# Stop tracking of binary files
 **/sw_*
 **/hw_sim
 usb_sim.raw
 
-# 
+# Always include readme's (because duh)
+!**/README.md
+
+# Petalinux container directory tracking
 petalinux-container/*
 !petalinux-container/Containerfile
 !petalinux-container/libs
-!petalinux-container/README.md
 
-#
+# Vivado projects directory tracking
 Vivado_projects/*
 !Vivado_projects/*.tcl
 !Vivado_projects/*.xdc
-!Vivado_projects/README.md
+!Vivado_projects/create_project.sh
