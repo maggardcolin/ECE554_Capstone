@@ -1,3 +1,15 @@
 **/sw_*
 **/hw_sim
 usb_sim.raw
+
+# 
+petalinux-container/*
+!petalinux-container/Containerfile
+!petalinux-container/libs
+!petalinux-container/README.md
+
+#
+Vivado_projects/*
+!Vivado_projects/*.tcl
+!Vivado_projects/*.xdc
+!Vivado_projects/README.md
