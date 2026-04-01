@@ -1,0 +1,32 @@
+services:
+  app:
+    # Build the image if necessary
+    build:
+      context: ./container
+      dockerfile: Containerfile
+
+    # Keep the thing open
+    stdin_open: true
+    tty: true
+
+    # Default shell is bash
+    command: /bin/bash
+
+    # Here to disable the warning from older docker versions
+    platform: linux/amd64
+
+    # Setup the container from image with name
+    image: petalinux
+    container_name: petalinux
+
+    # Setup google and cloudflare DNS for petalinux mirrors
+    network_mode: host
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
+    # Mount the folders for ease of transport
+    volumes:
+      - ./petalinux-build:/petalinux-build:Z,U
+      - ./petalinux:/petalinux:Z,U
+

@@ -4,43 +4,65 @@
 #include <linux/sysfs.h>
 #include <linux/kobject.h>
 #include <linux/io.h>
+#include <linux/mm.h>
 
-static u32 target_addr = 0;
+/* Use u64 to support 36-bit and 40-bit ZynqMP physical addresses */
+static u64 target_addr = 0;
 static struct kobject *mem_kobj;
 
 /* Helper to safely read/write physical memory */
-static u32 access_phys(u32 phys_addr, u32 val, bool write) {
-    void __iomem *virt_addr;
+static u32 access_phys(u64 phys_addr, u32 val, bool write) {
+    void *virt_addr;
     u32 ret = 0;
 
-    /* Map the physical page (handles 4KB chunks) */
-    virt_addr = ioremap(phys_addr, 4);
+    /* * Attempt to map with Write-Combine (ideal for DMA buffers).
+     * This ensures the CPU doesn't sit on cached data that the 
+     * DMA engine might have updated in RAM.
+     */
+    virt_addr = memremap(phys_addr, 4, MEMREMAP_WC);
+    
+    /* Fallback to ioremap for non-RAM (FPGA IP) regions */
     if (!virt_addr) {
-        pr_err("phys_mem: Failed to map 0x%08x\n", phys_addr);
+        virt_addr = ioremap(phys_addr, 4);
+    }
+
+    if (!virt_addr) {
+        pr_err("phys_mem: Failed to map 0x%llx\n", phys_addr);
         return 0;
     }
 
     if (write) {
-        iowrite32(val, virt_addr);
+        *(volatile u32 *)virt_addr = val;
         ret = val;
     } else {
-        ret = ioread32(virt_addr);
+        ret = *(volatile u32 *)virt_addr;
     }
 
-    iounmap(virt_addr);
+    /* Clean up the mapping based on how it was created */
+    if (unlikely(((unsigned long)virt_addr >= VMALLOC_START && 
+                  (unsigned long)virt_addr < VMALLOC_END))) {
+        iounmap(virt_addr);
+    } else {
+        memunmap(virt_addr);
+    }
+
     return ret;
 }
 
-/* Sysfs: Address Input */
+/* Sysfs: Address Input (Supports 64-bit hex/decimal) */
 static ssize_t addr_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
-    kstrtouint(buf, 0, &target_addr);
+    /* kstrtoull handles up to 64-bit values */
+    if (kstrtoull(buf, 0, &target_addr) < 0)
+        return -EINVAL;
     return count;
 }
 
-/* Sysfs: Write Value */
+/* Sysfs: Write Value (32-bit Word) */
 static ssize_t val_write_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
     u32 val;
-    kstrtouint(buf, 0, &val);
+    if (kstrtouint(buf, 0, &val) < 0)
+        return -EINVAL;
+    
     access_phys(target_addr, val, true);
     return count;
 }
@@ -51,6 +73,7 @@ static ssize_t val_read_show(struct kobject *kobj, struct kobj_attribute *attr, 
     return sprintf(buf, "0x%08x\n", val);
 }
 
+/* Define attributes with appropriate permissions */
 static struct kobj_attribute addr_attr = __ATTR(addr_input, 0660, NULL, addr_store);
 static struct kobj_attribute write_attr = __ATTR(val_input, 0220, NULL, val_write_store);
 static struct kobj_attribute read_attr = __ATTR(val_output, 0440, val_read_show, NULL);

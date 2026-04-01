@@ -1,0 +1,60 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+		apt install -y --no-install-recommends \
+				gcc \
+				xterm \
+				autoconf \
+				libtool \
+				texinfo \
+				zlib1g-dev \
+				gcc-multilib \
+				build-essential \
+				libncurses-dev \
+				tftpd-hpa \
+				python3 \
+				libncursesw5-dev \
+				less \
+				rsync \
+				lsb-release \
+				bc \
+				vim \
+				locales \
+				sudo \
+				dnsutils \
+				iputils-ping \
+				curl \
+				wget \
+				chrpath \
+				gawk \
+				diffstat \
+				make \
+				xz-utils \
+				file \
+				cpio \
+				python3-pexpect \
+				git \
+				libssl-dev \
+				libselinux1 \
+				net-tools \
+				ca-certificates \
+				tmux
+
+
+COPY petalinux*.run /
+
+RUN mkdir ext-libs
+COPY libs/libtinfo5_6.3-2ubuntu0.1_amd64.deb /ext-libs/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+RUN apt install /ext-libs/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+
+RUN chmod 755 /petalinux*.run
+
+RUN echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen
+
+RUN update-ca-certificates
+
+RUN adduser petalinux
+
+USER petalinux
