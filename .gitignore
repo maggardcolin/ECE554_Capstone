@@ -18,3 +18,5 @@ Vivado_projects/*
 !Vivado_projects/*.tcl
 !Vivado_projects/*.xdc
 !Vivado_projects/create_project.sh
+
+bucky_kart/
