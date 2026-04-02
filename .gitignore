@@ -12,6 +12,7 @@ petalinux-container/*
 !petalinux-container/Containerfile
 !petalinux-container/libs
 !petalinux-container/compose.yaml
+!petalinux-container/axi-test
 
 # Vivado projects directory tracking
 Vivado_projects/*

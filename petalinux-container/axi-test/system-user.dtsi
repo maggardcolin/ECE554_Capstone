@@ -1,0 +1,17 @@
+/include/ "system-conf.dtsi"
+/ {
+	chosen {
+		bootargs = "uio_pdrv_genirq.of_id=generic-uio
+		clk_ignore_unused";
+	};
+};
+&amba {
+	axi4_half_adder_0: axi4_half_adder@A0000000 {
+		compatible = "generic-uio";
+		/* Base Address: 0xA0000000 (from Vivado)
+		* Size: 0x10000 (64KB)
+		*/
+		reg = <0x0 0xA0000000 0x0 0x10000>;
+		dma-coherent;
+	};
+};
