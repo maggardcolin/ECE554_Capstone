@@ -212,5 +212,32 @@ always @(posedge clk, negedge rst_n) begin
 	end
 end
 
+// Fill color code
+// Write address - Write port is port A, read port is port B.
+// URAM is implemented as a pseudo dual port (double pumped) SRAM
+// so this will ensure that it appears to have an internal bypass
+reg[11:0] fillcolor_w_address;
+reg fillcolor_portA_WE;
+always @(posedge clk, negedge rst_n) begin
+  if(~rst_n) begin
+    fillcolor_w_address <= '0;
+  end else if(state != STATE_FILLCOLOR) begin
+    fillcolor_w_address <= '0;
+  end else if(fillcolor_w_address < 256) begin
+    fillcolor_w_address <= fillcolor_w_address + 1;
+  end
+end
+always @(posedge clk, negedge rst_n) begin
+  if(~rst_n) begin
+    done_fillcolor <= 1'b0;
+  end else if(clear_done_fillcolor) begin
+    done_fillcolor <= 1'b0;
+  end else if(fillcolor_w_address == 256 && state==STATE_FILLCOLOR) begin
+    done_fillcolor <= 1'b1;
+  end
+end
+
+
+
 endmodule
 `default_nettype wire
