@@ -1,0 +1,276 @@
+// hw_sim.c: Hardware simulator - SDL2-based framebuffer display, input handler, and vsync generator
+// Simulates PYNQ hardware: creates shared memory MMIO for game software,
+// handles SDL2 window/rendering, keyboard input, and double-buffered framebuffer swap
+// USAGE: Run hw_sim first, then run sw_game in another terminal
+#include "hw_contract.h"
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <linux/fb.h>
+#include <linux/kd.h>
+#include <linux/input-event-codes.h>
+#include <libevdev-1.0/libevdev/libevdev.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+
+// OSX includes the all SDL2 libraries by default in the sdl2-config
+#ifdef __APPLE__
+  #include <SDL.h>
+#else
+  #include <SDL2/SDL.h>
+#endif
+
+
+#define SHM_NAME "/pynq_fbmmio"
+
+/// shm_total_size: Calculate total shared memory size needed
+/// Returns: Bytes needed = page-aligned registers + 2 framebuffers (double-buffered)
+static size_t shm_total_size(void) {
+    size_t regs = sizeof(mmio_regs_t);
+    size_t fbs  = (size_t)FB_COUNT * (size_t)FB_SIZE;
+    size_t page = 4096;
+    size_t regs_pages = (regs + page - 1) / page;
+    return regs_pages * page + fbs;
+}
+
+static int tty_fd = -1;
+
+void restore_tty(void) {
+    if (tty_fd >= 0) {
+    	ioctl(tty_fd, KDSKBMODE, K_XLATE);
+    	ioctl(tty_fd, KDSETMODE, KD_TEXT);
+	close(tty_fd);
+	tty_fd = -1;
+    }
+}
+
+void setup_handlers();
+
+void setup_tty(void) {
+    tty_fd = open("/dev/tty", O_RDWR | O_NOCTTY);
+    if (tty_fd < 0) return;
+
+    setup_handlers();
+
+    ioctl(tty_fd, KDSETMODE, KD_GRAPHICS);
+    ioctl(tty_fd, KDSKBMODE, K_OFF);
+}
+
+void handle_signal(int sig) {
+    restore_tty();
+    _exit(1);
+}
+
+void setup_handlers(void) {
+    atexit(restore_tty);
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
+    signal(SIGSEGV, handle_signal);
+}
+
+/// main: Hardware simulator main loop
+/// Creates shared memory and MMIO registers, initializes SDL2 window/renderer,
+/// polls keyboard input, increments vsync counter, handles buffer swaps,
+/// and displays framebuffer at ~30 Hz (16ms per frame)
+/// Returns: 0 on normal exit (window closed), 1 on initialization error
+int main(void) {
+    shm_unlink(SHM_NAME);
+    size_t total = shm_total_size();
+
+    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR | O_EXCL, 0666);
+    if (fd < 0) { perror("shm_open"); return errno; }
+    if (ftruncate(fd, (off_t)total) != 0) { perror("ftruncate"); return errno; }
+
+    uint8_t *base = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (base == MAP_FAILED) { perror("mmap"); return 1; }
+
+    size_t page = 4096;
+    mmio_regs_t *regs = (mmio_regs_t *)(base + 0);
+    uint8_t *fb_base  = base + page;
+
+    memset((void*)regs, 0, sizeof(*regs));
+    regs->front_idx = 0;
+    regs->back_idx  = 1;
+    regs->prop_quit = 0;
+
+    int fb = open("/dev/fb0", O_RDWR);
+    if (fb < 0) { perror("open"); return 1; }
+
+    struct fb_var_screeninfo vinfo;
+    struct fb_fix_screeninfo finfo;
+
+    ioctl(fb, FBIOGET_FSCREENINFO, &finfo);
+    ioctl(fb, FBIOGET_VSCREENINFO, &vinfo);
+
+    long screensize = finfo.line_length * vinfo.yres;
+
+    uint8_t *fbp = mmap(NULL, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fb, 0);
+    if (fbp == MAP_FAILED) { perror("mmap"); return 1; }
+
+    // SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
+    // SDL_setenv("SDL_INPUT_LINUX_EVDEV", "1", 1);
+    // SDL_setenv("SDL_EVDEV_KBD", "/dev/input/event1", 1);
+
+    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_TIMER) != 0) {
+        fprintf(stderr, "SDL_Init failed\n");
+        return 1;
+    }
+
+    struct libevdev *dev = NULL;
+    int input_fd = open("/dev/input/event1", O_RDONLY|O_NONBLOCK);
+    libevdev_new_from_fd(input_fd, &dev);
+
+    setup_tty();
+
+    // SDL_Window *win = SDL_CreateWindow("hw_sim 720p",
+    //     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, W, H, 0);
+    // if (!win) { fprintf(stderr, "SDL_CreateWindow failed\n"); return 1; }
+
+    // SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+    // if (!ren) { fprintf(stderr, "SDL_CreateRenderer failed\n"); return 1; }
+
+    // SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888,
+    //     SDL_TEXTUREACCESS_STREAMING, W, H);
+    // if (!tex) { fprintf(stderr, "SDL_CreateTexture failed\n"); return 1; }
+    
+    bool running = true;
+
+    Uint64 now = SDL_GetPerformanceCounter();
+    Uint64 last = 0;
+    const double targetFrameTime = 1.0 / 30.0;
+    
+    double deltaTime = 0;
+
+    while (!regs->prop_quit) {
+        last = now;
+        
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) regs->buttons |= BTN_QUIT;
+        }	
+
+        // const Uint8 *k = SDL_GetKeyboardState(NULL);
+        // if (k[SDL_SCANCODE_LEFT]  || k[SDL_SCANCODE_A]) regs->buttons |= BTN_LEFT;
+        // if (k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_D]) regs->buttons |= BTN_RIGHT;
+        // if (k[SDL_SCANCODE_UP]    || k[SDL_SCANCODE_W]) regs->buttons |= BTN_UP;
+        // if (k[SDL_SCANCODE_DOWN]  || k[SDL_SCANCODE_S]) regs->buttons |= BTN_DOWN;
+        // if (k[SDL_SCANCODE_SPACE]) regs->buttons |= BTN_FIRE;
+        // if (k[SDL_SCANCODE_ESCAPE]) regs->buttons |= BTN_QUIT;
+        // if (k[SDL_SCANCODE_P]) regs->buttons |= BTN_PAUSE;
+        // if (k[SDL_SCANCODE_R]) regs->buttons |= BTN_RESET;
+        // if (k[SDL_SCANCODE_RETURN] || k[SDL_SCANCODE_SPACE]) regs->buttons |= BTN_SEL;
+	
+	struct input_event ev;
+	int rc;
+
+	while ((rc = libevdev_next_event(dev, LIBEVDEV_READ_FLAG_NORMAL, &ev)) == 0) {
+		uint32_t ev_btn = 0;
+
+		switch (ev.code) {
+			case KEY_LEFT:
+			case KEY_A:            
+				ev_btn |= BTN_LEFT; 
+				break;
+			case KEY_RIGHT:
+			case KEY_D:            
+				ev_btn |= BTN_RIGHT; 
+				break;
+			case KEY_UP:
+			case KEY_W:            
+				ev_btn |= BTN_UP; 
+				break;
+			case KEY_DOWN:
+			case KEY_S:            
+				ev_btn |= BTN_DOWN; 
+				break;
+			case KEY_SPACE:        
+				ev_btn |= (BTN_FIRE | BTN_SEL); 
+				break;
+			case KEY_ESC:
+				ev_btn |= BTN_QUIT;
+				break;
+	        	case KEY_P:
+				ev_btn |= BTN_PAUSE;
+				break;
+			case KEY_R:
+				ev_btn |= BTN_RESET;
+				break;
+			case KEY_ENTER:
+				ev_btn |= BTN_SEL;
+				break;
+			default:
+				break;
+		}
+
+		if (ev.value == 1) regs->buttons |= ev_btn;
+		else if (ev.value == 0) regs->buttons &= ~ev_btn;
+	}
+
+        if (regs->buttons & BTN_QUIT) running = false;
+
+        regs->vsync_counter++;
+
+        if (regs->swap_request) {
+            uint32_t new_front = regs->back_idx % FB_COUNT;
+            uint32_t new_back  = regs->front_idx % FB_COUNT;
+            regs->front_idx = new_front;
+            regs->back_idx  = new_back;
+            regs->swap_request = 0;
+            regs->swap_ack = regs->vsync_counter;
+        }
+
+        uint32_t fi = regs->front_idx % FB_COUNT;
+        uint8_t *front = fb_base + (size_t)fi * (size_t)FB_SIZE;
+
+        // SDL_UpdateTexture(tex, NULL, front, W * 4);
+        // SDL_RenderClear(ren);
+        // SDL_RenderCopy(ren, tex, NULL, NULL);
+        // SDL_RenderPresent(ren);
+	
+	int cw = (W < (int)vinfo.xres) ? W : (int)vinfo.xres;
+	int ch = (H < (int)vinfo.yres) ? H : (int)vinfo.yres;
+
+	for (int y = 0; y < ch; y++) {
+		uint8_t *src = front + y * W * 4;
+		uint8_t *dst = fbp + y * finfo.line_length;
+
+		for (int x = 0; x < cw; x++) {
+			uint8_t r = src[4*x + 0];
+			uint8_t g = src[4*x + 1];
+			uint8_t b = src[4*x + 2];
+			uint8_t a = src[4*x + 3];
+
+			dst[3*x + 0] = (b * a) / 255;
+			dst[3*x + 1] = (g * a) / 255;
+			dst[3*x + 2] = (r * a) / 255;
+		}
+	}
+
+        now = SDL_GetPerformanceCounter();
+
+        deltaTime = (double)((now - last) * 1000) / (double)SDL_GetPerformanceFrequency();
+        deltaTime /= 1000.0;
+
+        
+        if (deltaTime < targetFrameTime) {
+          SDL_Delay((Uint32)((targetFrameTime - deltaTime) * 1000.0));
+        }
+    }
+
+    restore_tty();
+
+    // SDL_DestroyTexture(tex);
+    // SDL_DestroyRenderer(ren);
+    // SDL_DestroyWindow(win);
+    SDL_Quit();
+
+    munmap(base, total); munmap(fbp, screensize);
+    close(fd); close(fb);
+    shm_unlink(SHM_NAME);
+    return 0;
+}
+

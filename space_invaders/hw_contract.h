@@ -12,11 +12,11 @@
 #define FB_COUNT 2
 
 // Button bits
-#define BTN_LEFT  (1u << 0)
-#define BTN_RIGHT (1u << 1)
+#define BTN_LEFT  (1u << 10)
+#define BTN_RIGHT (1u << 15)
 #define BTN_FIRE  (1u << 2)
 #define BTN_QUIT  (1u << 3)
-#define BTN_PAUSE (1u << 4)
+#define BTN_PAUSE (1u << 12)
 #define BTN_RESET (1u << 5)
 #define BTN_DOWN  (1u << 6)
 #define BTN_UP    (1u << 7)
