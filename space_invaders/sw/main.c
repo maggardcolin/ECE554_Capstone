@@ -12,7 +12,7 @@
 /// Notes: Creates logical framebuffer, initializes game, runs update/render loop,
 ///        waits for hardware buffer swaps via shared memory MMIO,
 ///        exits on BTN_QUIT input.
-int main(void) {
+int sw_sim_main(void) {
     shm_ctx_t shm;
     if (shm_open_map(&shm, SHM_NAME) != 0) return 1;
 

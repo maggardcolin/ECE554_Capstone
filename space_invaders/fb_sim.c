@@ -3,10 +3,12 @@
 // handles SDL2 window/rendering, keyboard input, and double-buffered framebuffer swap
 // USAGE: Run hw_sim first, then run sw_game in another terminal
 #include "hw_contract.h"
+#include <dirent.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -16,14 +18,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-
-// OSX includes the all SDL2 libraries by default in the sdl2-config
-#ifdef __APPLE__
-  #include <SDL.h>
-#else
-  #include <SDL2/SDL.h>
-#endif
-
+#include <SDL/SDL.h>
 
 #define SHM_NAME "/pynq_fbmmio"
 
@@ -72,12 +67,48 @@ void setup_handlers(void) {
     signal(SIGSEGV, handle_signal);
 }
 
+int find_keyboard_event(char *out_path, size_t out_size) {
+	DIR *dir = opendir("/dev/input");
+	if (!dir) return -1;
+
+	struct dirent *ent;
+	while ((ent = readdir(dir)) != NULL) {
+		if (strncmp(ent->d_name, "event", 5) != 0) continue;
+
+		char path[256];
+		snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
+
+		int fd = open(path, O_RDONLY | O_NONBLOCK);
+		if (fd < 0) continue;
+
+		struct libevdev *dev = NULL;
+		if (libevdev_new_from_fd(fd, &dev) < 0) {
+			close(fd);
+			continue;
+		}
+
+		if (libevdev_has_event_type(dev, EV_KEY) &&
+		    libevdev_has_event_code(dev, EV_KEY, KEY_A)) {
+			strncpy(out_path, path, out_size);
+			libevdev_free(dev);
+			closedir(dir);
+			return fd;
+		}
+
+		libevdev_free(dev);
+		close(fd);
+	}
+
+	closedir(dir);
+	return -1;
+}
+
 /// main: Hardware simulator main loop
 /// Creates shared memory and MMIO registers, initializes SDL2 window/renderer,
 /// polls keyboard input, increments vsync counter, handles buffer swaps,
 /// and displays framebuffer at ~30 Hz (16ms per frame)
 /// Returns: 0 on normal exit (window closed), 1 on initialization error
-int main(void) {
+int fb_sim_main(void) {
     shm_unlink(SHM_NAME);
     size_t total = shm_total_size();
 
@@ -115,13 +146,16 @@ int main(void) {
     // SDL_setenv("SDL_INPUT_LINUX_EVDEV", "1", 1);
     // SDL_setenv("SDL_EVDEV_KBD", "/dev/input/event1", 1);
 
-    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_TIMER) != 0) {
-        fprintf(stderr, "SDL_Init failed\n");
-        return 1;
+    struct libevdev *dev = NULL;
+    // char kb_path[256];
+    //int input_fd = find_keyboard_event(kb_path, sizeof(kb_path));
+    int input_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK);
+
+    if (input_fd < 0) {
+    	printf("No keyboard found\n");
+	return 1;
     }
 
-    struct libevdev *dev = NULL;
-    int input_fd = open("/dev/input/event1", O_RDONLY|O_NONBLOCK);
     libevdev_new_from_fd(input_fd, &dev);
 
     setup_tty();
@@ -139,20 +173,7 @@ int main(void) {
     
     bool running = true;
 
-    Uint64 now = SDL_GetPerformanceCounter();
-    Uint64 last = 0;
-    const double targetFrameTime = 1.0 / 30.0;
-    
-    double deltaTime = 0;
-
-    while (!regs->prop_quit) {
-        last = now;
-        
-        SDL_Event e;
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) regs->buttons |= BTN_QUIT;
-        }	
-
+    while (running) {
         // const Uint8 *k = SDL_GetKeyboardState(NULL);
         // if (k[SDL_SCANCODE_LEFT]  || k[SDL_SCANCODE_A]) regs->buttons |= BTN_LEFT;
         // if (k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_D]) regs->buttons |= BTN_RIGHT;
@@ -170,30 +191,37 @@ int main(void) {
 	while ((rc = libevdev_next_event(dev, LIBEVDEV_READ_FLAG_NORMAL, &ev)) == 0) {
 		uint32_t ev_btn = 0;
 
+		printf("Key pressed: %d\t Mode: %d\n", ev.code, ev.value);
+
 		switch (ev.code) {
 			case KEY_LEFT:
-			case KEY_A:            
-				ev_btn |= BTN_LEFT; 
+			case KEY_A:
+				printf("Left!\n");
+				ev_btn |= 0x1; 
 				break;
 			case KEY_RIGHT:
-			case KEY_D:            
-				ev_btn |= BTN_RIGHT; 
+			case KEY_D:
+				printf("Right!\n");
+				ev_btn |= 0x2; 
 				break;
-			case KEY_UP:
-			case KEY_W:            
+			case KEY_W:
+				printf("Up!\n");
 				ev_btn |= BTN_UP; 
 				break;
-			case KEY_DOWN:
-			case KEY_S:            
+			case KEY_S:
+				printf("Down!\n");
 				ev_btn |= BTN_DOWN; 
 				break;
-			case KEY_SPACE:        
+			case KEY_SPACE:
+				printf("Fire!\n");
 				ev_btn |= (BTN_FIRE | BTN_SEL); 
 				break;
 			case KEY_ESC:
+				printf("Quit!\n");
 				ev_btn |= BTN_QUIT;
 				break;
 	        	case KEY_P:
+				printf("Pause!\n");
 				ev_btn |= BTN_PAUSE;
 				break;
 			case KEY_R:
@@ -206,8 +234,10 @@ int main(void) {
 				break;
 		}
 
-		if (ev.value == 1) regs->buttons |= ev_btn;
+		if (ev.value == 1 || ev.value == 2) regs->buttons |= ev_btn;
 		else if (ev.value == 0) regs->buttons &= ~ev_btn;
+
+		printf("0b%032b\n", regs->buttons);
 	}
 
         if (regs->buttons & BTN_QUIT) running = false;
@@ -236,29 +266,23 @@ int main(void) {
 
 	for (int y = 0; y < ch; y++) {
 		uint8_t *src = front + y * W * 4;
-		uint8_t *dst = fbp + y * finfo.line_length;
-
-		for (int x = 0; x < cw; x++) {
-			uint8_t r = src[4*x + 0];
-			uint8_t g = src[4*x + 1];
-			uint8_t b = src[4*x + 2];
-			uint8_t a = src[4*x + 3];
-
-			dst[3*x + 0] = (b * a) / 255;
-			dst[3*x + 1] = (g * a) / 255;
-			dst[3*x + 2] = (r * a) / 255;
+		
+		for (int i = 0; i < 3; i++) {
+			uint16_t *dst = fbp + (3*y+i) * finfo.line_length;
+			for (int x = 0; x < cw; x++) {
+				for (int j = 0; j < 3; j++) {
+  					uint16_t b = src[4*x + 0];
+  					uint16_t g = src[4*x + 1];
+  					uint16_t r = src[4*x + 2];
+  					uint16_t a = src[4*x + 3];
+  
+  					dst[3*x + j] = ((b >> 3) & 31) | (((g >> 2) & 63) << 5) | (((r >> 3) & 31) << 11);
+				}
+			}
 		}
 	}
 
-        now = SDL_GetPerformanceCounter();
-
-        deltaTime = (double)((now - last) * 1000) / (double)SDL_GetPerformanceFrequency();
-        deltaTime /= 1000.0;
-
-        
-        if (deltaTime < targetFrameTime) {
-          SDL_Delay((Uint32)((targetFrameTime - deltaTime) * 1000.0));
-        }
+	usleep(33333);
     }
 
     restore_tty();

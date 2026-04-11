@@ -40,7 +40,9 @@ RUN apt-get update && \
 				libselinux1 \
 				net-tools \
 				ca-certificates \
-				tmux
+				tmux \
+				libsdl2-dev \
+				libevdev-dev
 
 
 COPY petalinux*.run /
@@ -56,5 +58,7 @@ RUN echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen
 RUN update-ca-certificates
 
 RUN adduser petalinux
+
+RUN echo -e "\n\n[ -f /petalinux/settings.sh ] && source /petalinux/settings.sh" >> /home/petalinux/.bashrc
 
 USER petalinux

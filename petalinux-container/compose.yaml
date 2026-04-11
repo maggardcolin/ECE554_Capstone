@@ -30,3 +30,4 @@ services:
       - ./petalinux-build:/petalinux-build:Z,U
       - ./petalinux:/petalinux:Z,U
 
+
