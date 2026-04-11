@@ -4,8 +4,17 @@ OS := $(shell uname -s)
 
 SDLFLAGS := $(shell sdl2-config --cflags --libs)
 RTLIBRARY := $(if $(filter $(OS),Linux),-lrt,)
+ALSAFLAGS := $(shell pkg-config --cflags --libs alsa 2>/dev/null)
 
-GCCFLAGS := -O3 $(SDLFLAGS) $(RTLIBRARY)
+ifeq ($(strip $(ALSAFLAGS)),)
+AUDIODEFS := -DNO_ALSA=1
+AUDIOLIBS :=
+else
+AUDIODEFS :=
+AUDIOLIBS := $(ALSAFLAGS) -lpthread
+endif
+
+GCCFLAGS := -O3 $(AUDIODEFS) $(SDLFLAGS) $(RTLIBRARY) $(AUDIOLIBS)
 
 all: run
 
@@ -18,7 +27,7 @@ hardware:
 	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
 
 software:
-	gcc -D__HW_SIM__ sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c -o sw_game $(GCCFLAGS)
+	gcc -D__HW_SIM__ sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
 
 else
 
@@ -31,7 +40,7 @@ hardware:
 	gcc fb_sim.c -o fb_sim $(GCCFLAGS) -levdev
 
 software:
-	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c -o sw_game $(GCCFLAGS)
+	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
 
 endif
 

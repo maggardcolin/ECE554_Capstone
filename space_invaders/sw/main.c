@@ -2,6 +2,7 @@
 #include "shm_map.h"
 #include "gfx.h"
 #include "game.h"
+#include "music_alsa.h"
 #include <stdio.h>
 
 #define SHM_NAME "/pynq_fbmmio"
@@ -27,6 +28,11 @@ int sw_sim_main(void) {
     game_t game;
     game_init(&game);
 
+    int music_ok = (music_init() == 0);
+    if (!music_ok) {
+        fprintf(stderr, "music: disabled (ALSA init failed)\n");
+    }
+
     uint32_t last_ack = shm.regs->swap_ack;
 
     while (1) {
@@ -34,6 +40,18 @@ int sw_sim_main(void) {
         if (buttons & BTN_QUIT) break;
 
         game_update(&game, buttons, shm.regs->vsync_counter);
+
+        if (music_ok) {
+            music_mode_t mode = MUSIC_MODE_GAMEPLAY;
+            if (game.start_screen) mode = MUSIC_MODE_MENU;
+            else if (game.game_over) mode = MUSIC_MODE_GAME_OVER;
+            else if (game.level == 0 && !game.level_complete) mode = MUSIC_MODE_SILENT;
+            else if (game.paused) mode = MUSIC_MODE_PAUSED;
+            else if (game.in_shop) mode = MUSIC_MODE_SHOP;
+            else if (game.boss_alive) mode = MUSIC_MODE_BOSS;
+            music_set_mode(mode);
+        }
+
         game_render(&game, &lfb);
 
         uint32_t *back = shm_back_buffer_ptr(&shm);
@@ -44,6 +62,9 @@ int sw_sim_main(void) {
         last_ack = shm.regs->swap_ack;
     }
 
+    if (music_ok) {
+        music_shutdown();
+    }
     lfb_free(&lfb);
     shm_close_unmap(&shm);
     return 0;
