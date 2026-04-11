@@ -1,6 +1,8 @@
 # Stop tracking of binary files
 **/sw_*
 **/hw_sim
+**/fb_sim
+**/.DS_STORE
 usb_sim.raw
 
 # Always included files

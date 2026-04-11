@@ -17,6 +17,9 @@ run: hardware software
 hardware:
 	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
 
+software:
+	gcc -D__HW_SIM__ sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c -o sw_game $(GCCFLAGS)
+
 else
 
 run: hardware software
@@ -27,10 +30,10 @@ run: hardware software
 hardware:
 	gcc fb_sim.c -o fb_sim $(GCCFLAGS) -levdev
 
-endif
-
 software:
 	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c -o sw_game $(GCCFLAGS)
+
+endif
 
 clean:
 	rm -f hw_sim sw_game
