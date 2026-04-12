@@ -15,4 +15,5 @@ void music_set_mode(music_mode_t mode);
 void music_play_ding(void);
 void music_play_boom(void);
 void music_play_boom_long(void);
+void music_play_laser(void);
 void music_shutdown(void);

@@ -1019,6 +1019,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->boss_laser_last_hit_y = -1000;  // Reset hit tracking
             g->boss_green_laser_last_hit_y = -1000;  // Reset green laser tracking
             g->boss_power_timer = 0;  // Reset for next charge
+            music_play_laser();
             
             // Boss recovers 10% health if using green laser
             if (g->boss_attack_type == 1) {

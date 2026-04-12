@@ -30,6 +30,11 @@
 #define BOOM_LONG_DURATION_SAMPLES (AUDIO_RATE * 2 / 3)
 #define BOOM_LONG_GAIN 0.28f
 
+#define LASER_FREQ_START 320.0f
+#define LASER_FREQ_END 780.0f
+#define LASER_DURATION_SAMPLES (AUDIO_RATE / 5)
+#define LASER_GAIN 0.16f
+
 #define R 0.0f
 
 typedef struct {
@@ -50,6 +55,7 @@ typedef struct {
     int ding_pending;
     int boom_pending;
     int boom_long_pending;
+    int laser_pending;
 } music_ctx_t;
 
 static music_ctx_t g_music;
@@ -213,6 +219,8 @@ static void *audio_thread(void *arg) {
     float boom_phase = 0.0f;
     int boom_long_samples_left = 0;
     float boom_long_phase = 0.0f;
+    int laser_samples_left = 0;
+    float laser_phase = 0.0f;
 
     while (1) {
         pthread_mutex_lock(&g_music.lock);
@@ -233,6 +241,11 @@ static void *audio_thread(void *arg) {
             boom_long_phase = 0.0f;
             g_music.boom_long_pending = 0;
             boom_samples_left = 0;
+        }
+        if (g_music.laser_pending) {
+            laser_samples_left = LASER_DURATION_SAMPLES;
+            laser_phase = 0.0f;
+            g_music.laser_pending = 0;
         }
         pthread_mutex_unlock(&g_music.lock);
 
@@ -273,6 +286,7 @@ static void *audio_thread(void *arg) {
             float ding_mix = 0.0f;
             float boom_mix = 0.0f;
             float boom_long_mix = 0.0f;
+            float laser_mix = 0.0f;
 
             if (ding_samples_left > 0) {
                 float env = (float)ding_samples_left / (float)DING_DURATION_SAMPLES;
@@ -297,7 +311,16 @@ static void *audio_thread(void *arg) {
                 boom_long_samples_left--;
             }
 
-            int sample = (int)(((music_mix * pat->gain) + ding_mix + boom_mix + boom_long_mix) * 32767.0f);
+            if (laser_samples_left > 0) {
+                float progress = 1.0f - ((float)laser_samples_left / (float)LASER_DURATION_SAMPLES);
+                float freq = LASER_FREQ_START + (LASER_FREQ_END - LASER_FREQ_START) * progress;
+                float env = 1.0f - progress;
+                float laser = square(&laser_phase, freq, 0.40f);
+                laser_mix = laser * LASER_GAIN * env;
+                laser_samples_left--;
+            }
+
+            int sample = (int)(((music_mix * pat->gain) + ding_mix + boom_mix + boom_long_mix + laser_mix) * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
             buffer[i] = (int16_t)sample;
@@ -409,6 +432,14 @@ void music_play_boom_long(void) {
     pthread_mutex_unlock(&g_music.lock);
 }
 
+void music_play_laser(void) {
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running) {
+        g_music.laser_pending = 1;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
 void music_shutdown(void) {
     pthread_mutex_lock(&g_music.lock);
     int was_running = g_music.running;
@@ -442,6 +473,9 @@ void music_play_boom(void) {
 }
 
 void music_play_boom_long(void) {
+}
+
+void music_play_laser(void) {
 }
 
 void music_shutdown(void) {
