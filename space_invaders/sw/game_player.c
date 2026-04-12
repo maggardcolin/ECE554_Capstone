@@ -105,27 +105,19 @@ void render_score_display(const game_t *g, lfb_t *lfb) {
 }
 
 void render_player_health_bar(const game_t *g, lfb_t *lfb) {
-    const char *p1 = "PLAYER 1";
-    int scale = 1;
-    int x = 5;
-    int y = LH - 12;
-    l_draw_text(lfb, x, y, p1, scale, 0xFFFFFFFF);
+    int icon_x = 5;
+    int icon_y = LH - g->PLAYER.h - 4;
+    uint32_t player_color = get_player_color(g);
+    draw_sprite1r(lfb, &g->PLAYER, icon_x, icon_y, player_color);
 
-    int lx = x + text_width_5x5(p1, scale) + 6;
-    int bar_w = 40;
-    int bar_h = 6;
-    int bar_y = y - 1;
+    int x_text_x = icon_x + g->PLAYER.w + 4;
+    int text_y = LH - 12;
+    l_draw_text(lfb, x_text_x, text_y, "x", 1, 0xFFFFFFFF);
 
-    int max_lives = PLAYER_LIVES;
-    if (g->lives > max_lives) max_lives = g->lives;
-    int health_pct = (max_lives > 0) ? (g->lives * 100) / max_lives : 0;
-
-    uint32_t life_color = 0xFF00FF00;
-    if (health_pct <= 33) life_color = 0xFFFF0000;
-    else if (health_pct <= 67) life_color = 0xFFFFFF00;
-
-    int fill_w = (max_lives > 0) ? (g->lives * bar_w) / max_lives : 0;
-    draw_bar(lfb, lx, bar_y, bar_w, bar_h, fill_w, life_color);
+    int lives_x = x_text_x + text_width_5x5("x", 1) + 4;
+    int lives = g->lives;
+    if (lives < 0) lives = 0;
+    l_draw_score(lfb, lives_x, text_y, lives, 0xFFFFFFFF);
 }
 
 void render_player_shots(const game_t *g, lfb_t *lfb) {
