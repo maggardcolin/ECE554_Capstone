@@ -107,6 +107,17 @@ void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
         int r = 6;
         draw_filled_circle(lfb, x0, y0, r, 0xFFFFFF00);
         l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFF000000);
+    } else if (type == POWERUP_SHIELD) {
+        int r = 6;
+        draw_filled_circle(lfb, x0, y0, r, 0xFF1E6AD6);
+        for (int y = -r; y <= r; y++) {
+            for (int x = -r; x <= r; x++) {
+                int d = x * x + y * y;
+                if (d <= (r * r) && d >= ((r - 1) * (r - 1))) {
+                    l_putpix(lfb, x0 + x, y0 + y, 0xFF66CCFF);
+                }
+            }
+        }
     } else if (type == POWERUP_TRIPLE_SHOT) {
         int r = 6;
         draw_filled_circle(lfb, x0, y0, r, 0xFF0000FF);
@@ -153,6 +164,10 @@ int rapid_fire_active(const game_t *g) {
 
 int explosive_shot_active(const game_t *g) {
     return is_powerup_active(g, POWERUP_EXPLOSIVE);
+}
+
+int shield_power_active(const game_t *g) {
+    return is_powerup_active(g, POWERUP_SHIELD);
 }
 
 int boss_shield_x(const game_t *g) {

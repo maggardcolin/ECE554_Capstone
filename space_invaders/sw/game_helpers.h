@@ -18,6 +18,7 @@ int double_shot_active(const game_t *g);
 int triple_shot_active(const game_t *g);
 int rapid_fire_active(const game_t *g);
 int explosive_shot_active(const game_t *g);
+int shield_power_active(const game_t *g);
 
 int boss_shield_x(const game_t *g);
 int boss_shield_y(const game_t *g);

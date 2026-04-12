@@ -13,6 +13,7 @@
 #define EXIT_BLINK_TOGGLES 6
 #define PLAYER_DEATH_DELAY_FRAMES 60
 #define PLAYER_IFRAMES 60
+#define PLAYER_SHIELD_RADIUS 8
 #define ALIEN_EXPLOSION_FRAMES 18
 #define BOSS_BOMB_EXPLOSION_FRAMES 60
 #define BOSS_BOMB_SPEED 2
@@ -307,6 +308,9 @@ static int boss_bomb_explosion_radius(const game_t *g) {
 static void kill_alien_with_explosion(game_t *g, int r, int c);
 static void apply_player_damage(game_t *g, int damage);
 static int sprite_has_any_bits(const sprite1r_t *s);
+static int player_shield_radius(const game_t *g);
+static int projectile_hits_player_shield(const game_t *g, int px, int py);
+static void render_player_shield_ring(const game_t *g, lfb_t *lfb);
 
 static void apply_tower_asteroid_explosion_effects(game_t *g, int ai, int radius) {
     const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
@@ -990,6 +994,48 @@ static int player_visible_with_iframes(const game_t *g) {
     return ((g->player_iframe_timer / 4) & 1) == 0;
 }
 
+static int player_shield_radius(const game_t *g) {
+    int active_timer = 0;
+    for (int i = 0; i < 5; i++) {
+        if (g->powerup_type_slot[i] == POWERUP_SHIELD && g->powerup_slot_timer[i] > active_timer) {
+            active_timer = g->powerup_slot_timer[i];
+        }
+    }
+
+    int pulse = (active_timer / 5) & 3;
+    int extra = (pulse == 1 || pulse == 2) ? 1 : 0;
+    return PLAYER_SHIELD_RADIUS + extra;
+}
+
+static int projectile_hits_player_shield(const game_t *g, int px, int py) {
+    if (!shield_power_active(g)) return 0;
+
+    int cx = g->player_x + g->PLAYER.w / 2;
+    int cy = g->player_y + g->PLAYER.h / 2;
+    int dx = px - cx;
+    int dy = py - cy;
+    int r = player_shield_radius(g);
+    return (dx * dx + dy * dy) <= (r * r);
+}
+
+static void render_player_shield_ring(const game_t *g, lfb_t *lfb) {
+    if (!shield_power_active(g) || g->player_dying) return;
+
+    int cx = g->player_x + g->PLAYER.w / 2;
+    int cy = g->player_y + g->PLAYER.h / 2;
+    int r = player_shield_radius(g);
+    uint32_t ring_color = ((g->powerup_spawn_timer / 4) & 1) ? 0xFF66CCFF : 0xFF3399FF;
+
+    for (int y = -r; y <= r; y++) {
+        for (int x = -r; x <= r; x++) {
+            int d = x * x + y * y;
+            if (d <= (r * r) && d >= ((r - 1) * (r - 1))) {
+                l_putpix(lfb, cx + x, cy + y, ring_color);
+            }
+        }
+    }
+}
+
 static void trigger_player_death(game_t *g);
 
 static void apply_player_damage(game_t *g, int damage) {
@@ -1255,9 +1301,15 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
     }
 }
 
-static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
+static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot, int shield_blockable) {
     if (!shot->alive) return;
     if (g->player_dying) return;
+
+    if (shield_blockable && projectile_hits_player_shield(g, shot->x, shot->y)) {
+        shot->alive = 0;
+        return;
+    }
+
     if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, shot->x, shot->y)) {
         if (player_invulnerable(g)) {
             shot->alive = 0;
@@ -2145,17 +2197,19 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     static const powerup_type_t practice_pool[] = {
                         POWERUP_TRIPLE_SHOT,
                         POWERUP_RAPID_FIRE,
-                        POWERUP_EXPLOSIVE
+                        POWERUP_EXPLOSIVE,
+                        POWERUP_SHIELD
                     };
-                    int idx = rand() % 3;
+                    int idx = rand() % 4;
                     g->powerup_type = practice_pool[idx];
                 } else {
                     static const powerup_type_t spawn_pool[] = {
                         POWERUP_TRIPLE_SHOT,
                         POWERUP_RAPID_FIRE,
-                        POWERUP_EXPLOSIVE
+                        POWERUP_EXPLOSIVE,
+                        POWERUP_SHIELD
                     };
-                    int idx = rand() % 3;
+                    int idx = rand() % 4;
                     g->powerup_type = spawn_pool[idx];
                 }
                 g->powerup_active = 1;
@@ -2698,17 +2752,31 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     // collisions: alien and boss shots
-    handle_enemy_shot_collisions(g, &g->ashot);
-    handle_enemy_shot_collisions(g, &g->boss_shot);
+    handle_enemy_shot_collisions(g, &g->ashot, 1);
+    handle_enemy_shot_collisions(g, &g->boss_shot, 1);
     for (int i = 0; i < 3; i++) {
-        handle_enemy_shot_collisions(g, &g->boss_triple_shot[i]);
+        handle_enemy_shot_collisions(g, &g->boss_triple_shot[i], 1);
     }
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
-        handle_enemy_shot_collisions(g, &g->yellow_beam_shot[i]);
+        handle_enemy_shot_collisions(g, &g->yellow_beam_shot[i], 1);
     }
 
     for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
         if (g->tower_asteroid[ai].alive) {
+            if (shield_power_active(g)) {
+                int r = player_shield_radius(g) + TOWER_ASTEROID_RADIUS;
+                int cx = g->player_x + g->PLAYER.w / 2;
+                int cy = g->player_y + g->PLAYER.h / 2;
+                int dx = g->tower_asteroid[ai].x - cx;
+                int dy = g->tower_asteroid[ai].y - cy;
+                if ((dx * dx + dy * dy) <= (r * r)) {
+                    g->tower_asteroid[ai].alive = 0;
+                    g->tower_asteroid_hp[ai] = 0;
+                    g->tower_asteroid_dx[ai] = 0;
+                    continue;
+                }
+            }
+
             if (circle_hits_sprite(&g->PLAYER, g->player_x, g->player_y,
                                    g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, TOWER_ASTEROID_RADIUS)) {
                 apply_player_damage(g, 1);
@@ -3383,6 +3451,8 @@ void game_render(game_t *g, lfb_t *lfb) {
                         icon_color = 0xFFFFA500;  // Orange
                     } else if (g->powerup_type_slot[slot] == POWERUP_EXPLOSIVE) {
                         icon_color = 0xFFFF0000;  // Red
+                    } else if (g->powerup_type_slot[slot] == POWERUP_SHIELD) {
+                        icon_color = 0xFF3399FF;  // Blue
                     }
                     
                     // Draw "POWER:" label
@@ -3484,6 +3554,8 @@ void game_render(game_t *g, lfb_t *lfb) {
     } else if (player_visible_with_iframes(g)) {
         render_player(g, lfb);
     }
+
+    render_player_shield_ring(g, lfb);
 
     if (g->powerup_active) {
         draw_powerup_icon(lfb, g->powerup_x, g->powerup_y, g->powerup_type);

@@ -9,7 +9,8 @@ typedef enum {
     POWERUP_TRIPLE_SHOT = 1,  // Triple bullet spread (main + ±15 degrees)
     POWERUP_RAPID_FIRE = 2,   // Rapid fire (changes fire cooldown)
     POWERUP_EXPLOSIVE = 3,    // Explosive kills can chain to nearby aliens
-    POWERUP_COUNT = 4         // Total number of powerup types (update when adding new powerups)
+    POWERUP_SHIELD = 4,       // Blue shield ring blocks standard laser projectiles
+    POWERUP_COUNT = 5         // Total number of powerup types (update when adding new powerups)
 } powerup_type_t;
 
 /// Shop item types - extend to add more items later
