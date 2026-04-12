@@ -1382,7 +1382,16 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
             }
             if (asteroid_hit) {
-                g->tower_asteroid_hp[ai]--;
+                int dmg = player_shot_damage_for_hit(g, &shots[si]);
+                if (dmg <= 0) {
+                    shots[si].alive = 0;
+                    continue;
+                }
+                if (explosive_shot_active(g)) {
+                    start_tower_asteroid_explosion(g, ai);
+                } else {
+                    g->tower_asteroid_hp[ai] -= dmg;
+                }
                 if (g->tower_asteroid_hp[ai] <= 0) {
                     start_tower_asteroid_explosion(g, ai);
                 }
