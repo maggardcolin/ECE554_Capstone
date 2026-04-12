@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
@@ -45,7 +44,7 @@ static int blue_black_hole_enabled(const game_t *g) {
 
 static const char *boss_intro_special_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return blue_black_hole_enabled(g) ? "BLACK HOLE" : "BOMB";
-    if (g->level >= 3) return "PLASMA BEAM, HEAL BEAM";
+    if (g->level >= 3) return "PLASMA BEAM HEAL BEAM";
     return "PLASMA BEAM";
 }
 
@@ -67,6 +66,123 @@ static int boss_bomb_explosion_radius(const game_t *g) {
     int frame = age / 10;
     int base_r = 6 + frame * 3;
     return base_r + 4;
+}
+
+static void render_intro_regular_shot(lfb_t *lfb, int x, int y, uint32_t color) {
+    for (int i = 0; i < 5; i++) l_putpix(lfb, x, y + i, color);
+}
+
+static void render_intro_plasma_beam(lfb_t *lfb, int cx, int y, int beam_w, uint32_t color) {
+    int left = cx - beam_w / 2;
+    const int trail_offsets[] = {0, 5, 10, 20};
+    const int trail_intensity[] = {100, 65, 40, 22};
+
+    for (int t = 0; t < 4; t++) {
+        int ty = y - trail_offsets[t];
+        if (ty < 0 || ty >= LH) continue;
+        uint32_t c = color_with_intensity(color, trail_intensity[t]);
+        for (int px = left; px < left + beam_w; px++) {
+            if (px >= 0 && px < LW) l_putpix(lfb, px, ty, c);
+        }
+    }
+}
+
+static void render_intro_ring_points(lfb_t *lfb, int cx, int cy, int radius, uint32_t color) {
+    static const int ring_dx[20] = {16, 15, 13, 10, 5, 0, -5, -10, -13, -15,
+                                    -16, -15, -13, -10, -5, 0, 5, 10, 13, 15};
+    static const int ring_dy[20] = {0, 5, 10, 13, 15, 16, 15, 13, 10, 5,
+                                    0, -5, -10, -13, -15, -16, -15, -13, -10, -5};
+
+    for (int i = 0; i < 20; i++) {
+        int px = cx + (ring_dx[i] * radius) / 16;
+        int py = cy + (ring_dy[i] * radius) / 16;
+        l_putpix(lfb, px, py, color);
+    }
+}
+
+static void render_black_hole_explosion(lfb_t *lfb, int cx, int cy, int r) {
+    draw_filled_circle(lfb, cx, cy, r, 0xFF1A1A28);
+    draw_filled_circle(lfb, cx, cy, r - 3, 0xFF06070D);
+    int ring_r = r - 1;
+    if (ring_r > 1) {
+        render_intro_ring_points(lfb, cx, cy, ring_r, 0xFF66CCFF);
+    }
+}
+
+static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int boss_x, int boss_y, const sprite1r_t *BS) {
+    int elapsed = BOSS_INTRO_FRAMES - g->boss_intro_timer;
+    int start_y = boss_y + BS->h + 2;
+    int center_x = boss_x + BS->w / 2;
+
+    const int intro_hold = 10;
+    const int regular_dur = 24;
+    const int gap_dur = 8;
+    const int special_dur = 44;
+
+    int t0 = intro_hold;
+    int t1 = t0 + regular_dur;
+    int t2 = t1 + gap_dur;
+    int t3 = t2 + regular_dur;
+    int t4 = t3 + gap_dur;
+    int t5 = t4 + special_dur;
+    int t6 = t5 + special_dur;
+
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        if (elapsed >= t0 && elapsed < t1) {
+            int local = elapsed - t0;
+            int y = start_y + local * 2;
+            render_intro_regular_shot(lfb, center_x - 4 - local / 2, y, 0xFF3399FF);
+            render_intro_regular_shot(lfb, center_x, y, 0xFF3399FF);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 2, y, 0xFF3399FF);
+        } else if (elapsed >= t2 && elapsed < t3) {
+            int local = elapsed - t2;
+            int y = start_y + local * 2;
+            render_intro_regular_shot(lfb, center_x - 4 - local / 2, y, 0xFF3399FF);
+            render_intro_regular_shot(lfb, center_x, y, 0xFF3399FF);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 2, y, 0xFF3399FF);
+        } else if (elapsed >= t4 && elapsed < t5) {
+            int local = elapsed - t4;
+            int fall_frames = 18;
+            if (local < fall_frames) {
+                int by = start_y + local * 3;
+                draw_filled_circle(lfb, center_x, by, 4, 0xFF66CCFF);
+                draw_filled_circle(lfb, center_x, by, 2, 0xFFB8ECFF);
+            } else {
+                int ex = center_x;
+                int ey = start_y + fall_frames * 3;
+                int exp_local = local - fall_frames;
+                int r = 10 + (exp_local / 3) * 2;
+                if (r > 22) r = 22;
+                if (blue_black_hole_enabled(g)) {
+                    render_black_hole_explosion(lfb, ex, ey, r);
+                } else {
+                    draw_filled_circle(lfb, ex, ey, r, 0xFF0B3A8F);
+                    draw_filled_circle(lfb, ex, ey, r - 3, 0xFF1E6AD6);
+                    if ((exp_local & 1) == 0) {
+                        int core = r - 7;
+                        if (core < 1) core = 1;
+                        draw_filled_circle(lfb, ex, ey, core, 0xFF66CCFF);
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    // Multicolor boss preview.
+    if (elapsed >= t0 && elapsed < t1) {
+        int local = elapsed - t0;
+        render_intro_regular_shot(lfb, center_x, start_y + local * 2, 0xFFFF0000);
+    } else if (elapsed >= t2 && elapsed < t3) {
+        int local = elapsed - t2;
+        render_intro_regular_shot(lfb, center_x, start_y + local * 2, 0xFFFF0000);
+    } else if (elapsed >= t4 && elapsed < t5) {
+        int local = elapsed - t4;
+        render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, 0xFF8000FF);
+    } else if (g->level >= 3 && elapsed >= t5 && elapsed < t6) {
+        int local = elapsed - t5;
+        render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, 0xFF00FF00);
+    }
 }
 
 static sprite1r_t make_filled_sprite(int w, int h) {
@@ -1600,23 +1716,18 @@ void game_render(game_t *g, lfb_t *lfb) {
             l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF3399FF);
         } else if (g->level >= 3) {
             const char *spec1 = "PLASMA BEAM";
-            const char *spec2 = "HEAL BEAM";
+            const char *spec2 = " HEAL BEAM";
             int spec1_w = text_width_5x5(spec1, scale);
             int spec2_w = text_width_5x5(spec2, scale);
-            int comma_w = 4;
-            int value_total_w = spec1_w + comma_w + spec2_w;
+            int gap_w = 4;
+            int value_total_w = spec1_w + gap_w + spec2_w;
 
             special_x = (LW - (special_prefix_w + 6 + value_total_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
             l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
             l_draw_text(lfb, special_text_x, y, spec1, scale, 0xFF8000FF);
 
-            int comma_x = special_text_x + spec1_w + 1;
-            // Manual comma glyph to avoid unsupported punctuation in 5x5 font.
-            l_putpix(lfb, comma_x, y + 4, 0xFFFFFFFF);
-            l_putpix(lfb, comma_x + 1, y + 5, 0xFFFFFFFF);
-
-            l_draw_text(lfb, special_text_x + spec1_w + comma_w, y, spec2, scale, 0xFF00FF00);
+            l_draw_text(lfb, special_text_x + spec1_w + gap_w, y, spec2, scale, 0xFF00FF00);
         } else {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
@@ -1627,9 +1738,10 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         const sprite1r_t *BS = active_boss_sprite(g);
         int boss_x = (LW - BS->w) / 2;
-        int boss_y = LH / 2 - BS->h / 2 + 10;
+        int boss_y = 68;
         uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
         draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+        render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS);
         return;
     }
 
@@ -1936,12 +2048,16 @@ void game_render(game_t *g, lfb_t *lfb) {
             draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, 2, 0xFFB8ECFF);
         } else {
             int r = boss_bomb_explosion_radius(g);
-            draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, r, 0xFF0B3A8F);
-            draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, r - 3, 0xFF1E6AD6);
-            if ((g->boss_bomb.explode_timer & 1) == 0) {
-                int core_r = r - 7;
-                if (core_r < 1) core_r = 1;
-                draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, core_r, 0xFF66CCFF);
+            if (blue_black_hole_enabled(g)) {
+                render_black_hole_explosion(lfb, g->boss_bomb.x, g->boss_bomb.y, r);
+            } else {
+                draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, r, 0xFF0B3A8F);
+                draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, r - 3, 0xFF1E6AD6);
+                if ((g->boss_bomb.explode_timer & 1) == 0) {
+                    int core_r = r - 7;
+                    if (core_r < 1) core_r = 1;
+                    draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, core_r, 0xFF66CCFF);
+                }
             }
         }
     }

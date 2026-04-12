@@ -45,7 +45,7 @@ typedef struct {
 #define MAX_SHOP_ITEMS 3
 #define ACOLS 11
 #define AROWS 5
-#define START_LEVEL 1
+#define START_LEVEL 3
 
 #define BOSS_MAX_HEALTH(level) (\
     level == 0 ? 0 : \
