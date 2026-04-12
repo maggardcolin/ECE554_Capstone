@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
@@ -60,6 +61,34 @@ static int text_width_5x5(const char *text, int scale) {
     for (const char *p = text; *p; p++) count++;
     if (count == 0) return 0;
     return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
+}
+
+static void render_fps_counter(lfb_t *lfb) {
+    static struct timespec last_ts = {0, 0};
+    static int frame_count = 0;
+    static int fps = 0;
+
+    struct timespec now;
+    timespec_get(&now, TIME_UTC);
+    frame_count++;
+
+    if (last_ts.tv_sec == 0 && last_ts.tv_nsec == 0) {
+        last_ts = now;
+    }
+
+    double elapsed = (double)(now.tv_sec - last_ts.tv_sec) +
+                     (double)(now.tv_nsec - last_ts.tv_nsec) / 1000000000.0;
+    if (elapsed >= 1.0) {
+        fps = (int)(frame_count / elapsed);
+        frame_count = 0;
+        last_ts = now;
+    }
+
+    char fps_text[16];
+    snprintf(fps_text, sizeof(fps_text), "FPS:%d", fps);
+    int x = LW - text_width_5x5(fps_text, 1) - 5;
+    int y = 15;
+    l_draw_text(lfb, x, y, fps_text, 1, 0xFFFFFFFF);
 }
 
 static int exit_sign_visible(const game_t *g) {
@@ -702,6 +731,7 @@ static void shop_render(game_t *g, lfb_t *lfb) {
 
     // PLAYER 1 label and health bar
     render_player_health_bar(g, lfb);
+    render_fps_counter(lfb);
 }
 
 static int aliens_remaining(const game_t *g) {
@@ -1644,4 +1674,6 @@ void game_render(game_t *g, lfb_t *lfb) {
         int exit_y = g->player_y - 10;
         l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
     }
+
+    render_fps_counter(lfb);
 }
