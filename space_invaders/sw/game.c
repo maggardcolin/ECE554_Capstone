@@ -81,10 +81,10 @@ static void apply_boss_explosion_to_aliens(game_t *g) {
     }
 }
 
-static void render_player_explosion(const game_t *g, lfb_t *lfb) {
-    int cx = g->player_x + g->PLAYER.w / 2;
-    int cy = g->player_y + g->PLAYER.h / 2;
-    int age = PLAYER_DEATH_DELAY_FRAMES - g->player_death_timer;
+static void render_player_explosion_at(lfb_t *lfb, int cx, int cy, int age) {
+    if (age < 0) age = 0;
+    if (age > PLAYER_DEATH_DELAY_FRAMES) age = PLAYER_DEATH_DELAY_FRAMES;
+
     int frame = age / 12;
     int base_r = 3 + frame * 2;
 
@@ -101,6 +101,13 @@ static void render_player_explosion(const game_t *g, lfb_t *lfb) {
         uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         l_putpix(lfb, cx + dx, cy + dy, c);
     }
+}
+
+static void render_player_explosion(const game_t *g, lfb_t *lfb) {
+    int cx = g->player_x + g->PLAYER.w / 2;
+    int cy = g->player_y + g->PLAYER.h / 2;
+    int age = PLAYER_DEATH_DELAY_FRAMES - g->player_death_timer;
+    render_player_explosion_at(lfb, cx, cy, age);
 }
 
 static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer) {
@@ -1455,11 +1462,11 @@ void game_render(game_t *g, lfb_t *lfb) {
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int a_w = AS->w;
         int a_h = AS->h;
-        int p_w = g->PLAYER.w;
-        int p_h = g->PLAYER.h;
 
-        uint32_t player_color = triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00;
-        draw_sprite1r(lfb, &g->PLAYER, cx - p_w / 2, cy - p_h / 2, player_color);
+        int game_over_age = 90 - g->game_over_delay_timer;
+        if (game_over_age <= PLAYER_DEATH_DELAY_FRAMES) {
+            render_player_explosion_at(lfb, cx, cy, game_over_age);
+        }
 
         int r = 22;
         int hx[6] = { cx, cx + r, cx + r, cx, cx - r, cx - r };
