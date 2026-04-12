@@ -27,6 +27,10 @@
 #define OVERWORLD_FLY_FRAMES 120
 #define OVERWORLD_HOLD_FRAMES 36
 #define OVERWORLD_PIXELATE_FRAMES 36
+#define PRACTICE_LEVEL_MIN 1
+#define PRACTICE_LEVEL_MAX (WIN_LEVEL - 1)
+#define PRACTICE_EXIT_INDEX BOSS_TYPE_COUNT
+#define PRACTICE_MENU_COUNT (BOSS_TYPE_COUNT + 1)
 
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
@@ -47,6 +51,12 @@ static const char *boss_intro_type_text(const game_t *g) {
     return "MULTICOLOR";
 }
 
+static const char *boss_menu_label(int boss_type) {
+    if (boss_type == BOSS_TYPE_BLUE) return "BLUE BOSS";
+    if (boss_type == BOSS_TYPE_YELLOW) return "YELLOW SWARM";
+    return "MULTICOLOR BOSS";
+}
+
 static const char *boss_intro_main_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return "TRIPLE SHOT";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STANDARD LASER";
@@ -60,8 +70,8 @@ static int blue_black_hole_enabled(const game_t *g) {
 static const char *boss_intro_special_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return blue_black_hole_enabled(g) ? "BLACK HOLE" : "BOMB";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "SHUFFLE";
-    if (g->level >= 3) return "PLASMA BEAM HEAL BEAM";
-    return "PLASMA BEAM";
+    if (g->level >= 3) return "PLASMA HEAL";
+    return "PLASMA";
 }
 
 static int yellow_boss_hp_per_alien(const game_t *g) {
@@ -91,12 +101,23 @@ static void update_yellow_boss_health(game_t *g) {
     if (g->boss_health < 0) g->boss_health = 0;
 
     if (g->boss_type == BOSS_TYPE_YELLOW && g->boss_alive && g->boss_health <= 0) {
-        g->boss_alive = 0;
-        g->boss_power_active = 0;
-        g->boss_power_timer = 0;
-        g->boss_power_cooldown = 0;
-        for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
-            g->yellow_beam_shot[i].alive = 0;
+        if (g->practice_run_active) {
+            g->boss_alive = 0;
+            g->boss_power_active = 0;
+            g->boss_power_timer = 0;
+            g->boss_power_cooldown = 0;
+            g->practice_return_delay_timer = 60;
+            for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
+                g->yellow_beam_shot[i].alive = 0;
+            }
+        } else {
+            g->boss_alive = 0;
+            g->boss_power_active = 0;
+            g->boss_power_timer = 0;
+            g->boss_power_cooldown = 0;
+            for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
+                g->yellow_beam_shot[i].alive = 0;
+            }
         }
     }
 }
@@ -402,6 +423,100 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
     } else if (g->level >= 3 && elapsed >= t5 && elapsed < t6) {
         int local = elapsed - t5;
         render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, 0xFF00FF00);
+    }
+}
+
+static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_type) {
+    if (boss_type < 0 || boss_type >= BOSS_TYPE_COUNT) return;
+
+    game_t preview = *g;
+    preview.boss_type = boss_type;
+    preview.level = g->practice_level_selection;
+    preview.boss_intro_timer = g->practice_preview_timer;
+    if (preview.boss_intro_timer < 0) preview.boss_intro_timer = 0;
+    preview.boss_frame = ((BOSS_INTRO_FRAMES - preview.boss_intro_timer) / 12) & 1;
+
+    uint32_t preview_type_color = 0xFFFFFFFF;
+    if (boss_type == BOSS_TYPE_BLUE) {
+        preview_type_color = 0xFF3399FF;
+    } else if (boss_type == BOSS_TYPE_YELLOW) {
+        preview_type_color = 0xFFFFFF00;
+    } else {
+        if (preview.boss_intro_timer > 0) {
+            uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
+            int flicker_idx = ((BOSS_INTRO_FRAMES - preview.boss_intro_timer) / 8) & 3;
+            preview_type_color = flicker_palette[flicker_idx];
+        } else {
+            preview_type_color = 0xFF00FF00;
+        }
+    }
+
+    int right_x = LW / 2 + 6;
+    l_draw_text(lfb, right_x, 16, "TYPE:", 1, 0xFFFFFFFF);
+    l_draw_text(lfb, right_x + 34, 16, boss_intro_type_text(&preview), 1, preview_type_color);
+
+    l_draw_text(lfb, right_x, 28, "MAIN:", 1, 0xFFFFFFFF);
+    l_draw_text(lfb, right_x + 34, 28, boss_intro_main_attack_text(&preview), 1,
+                (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
+                (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 : 0xFFFF0000);
+
+    l_draw_text(lfb, right_x, 40, "SPECIAL:", 1, 0xFFFFFFFF);
+    if (boss_type == BOSS_TYPE_CLASSIC && preview.level >= 3) {
+        const char *spec1 = "PLASMA";
+        const char *spec2 = "HEAL";
+        int sx = right_x + 46;
+        int spec1_w = text_width_5x5(spec1, 1);
+        l_draw_text(lfb, sx, 40, spec1, 1, 0xFF8000FF);
+        l_draw_text(lfb, sx + spec1_w + 4, 40, spec2, 1, 0xFF00FF00);
+    } else {
+        l_draw_text(lfb, right_x + 46, 40, boss_intro_special_attack_text(&preview), 1,
+                    (boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
+                    (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 : 0xFF8000FF);
+    }
+
+    char level_text[20];
+    snprintf(level_text, sizeof(level_text), "LEVEL: %d", preview.level);
+    l_draw_text(lfb, right_x, 52, level_text, 1, 0xFFFFFFFF);
+
+    char hp_text[20];
+    snprintf(hp_text, sizeof(hp_text), "BOSS HP: %d", BOSS_MAX_HEALTH(preview.level));
+    l_draw_text(lfb, right_x + 80, 52, hp_text, 1, 0xFFBFBFBF);
+
+    const sprite1r_t *BS = boss_sprite_for_frame(&preview, preview.boss_frame);
+    int pane_center_x = LW * 3 / 4;
+    int boss_x = pane_center_x - BS->w / 2;
+    int boss_y = 84;
+    if (boss_type != BOSS_TYPE_YELLOW) {
+        uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
+        if (boss_type == BOSS_TYPE_CLASSIC) boss_color = preview_type_color;
+        draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+        render_intro_boss_attack_preview(&preview, lfb, boss_x, boss_y, BS);
+    } else {
+        const sprite1r_t *AS = preview.alien_frame ? &preview.ALIEN_B : &preview.ALIEN_A;
+        int spacing = 8;
+        int total_w = YELLOW_BOSS_ALIENS * AS->w + (YELLOW_BOSS_ALIENS - 1) * spacing;
+        int swarm_x0 = pane_center_x - total_w / 2;
+        int swarm_y = boss_y;
+        int elapsed = BOSS_INTRO_FRAMES - preview.boss_intro_timer;
+
+        for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
+            int x = swarm_x0 + i * (AS->w + spacing);
+            if (elapsed >= 42 && elapsed < 66) {
+                int wave = ((elapsed / 4) + i * 2) % 4;
+                x += wave - 2;
+            }
+            draw_sprite1r(lfb, AS, x, swarm_y, 0xFFFFFF00);
+        }
+
+        int shot_start_y = swarm_y + AS->h + 2;
+        if ((elapsed >= 10 && elapsed < 34) || (elapsed >= 42 && elapsed < 66)) {
+            int local = (elapsed >= 42) ? (elapsed - 42) : (elapsed - 10);
+            int beam_y = shot_start_y + local * 2;
+            for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
+                int beam_x = swarm_x0 + i * (AS->w + spacing) + AS->w / 2;
+                render_intro_regular_shot(lfb, beam_x, beam_y, 0xFFFFFF00);
+            }
+        }
     }
 }
 
@@ -1116,6 +1231,21 @@ static int aliens_remaining(const game_t *g) {
 
 static void bunkers_rebuild(game_t *g);
 
+static void setup_practice_run(game_t *g, int boss_type) {
+    if (boss_type < 0 || boss_type >= BOSS_TYPE_COUNT) return;
+    if (g->practice_level_selection < PRACTICE_LEVEL_MIN) g->practice_level_selection = PRACTICE_LEVEL_MIN;
+    if (g->practice_level_selection > PRACTICE_LEVEL_MAX) g->practice_level_selection = PRACTICE_LEVEL_MAX;
+    g->start_screen = 0;
+    g->practice_menu_active = 0;
+    g->practice_run_active = 1;
+    g->practice_return_delay_timer = 0;
+    g->forced_boss_type = boss_type;
+    reset_win_state(g);
+    setup_level(g, g->practice_level_selection, 1);
+    g->boss_intro_active = 1;
+    g->boss_intro_timer = BOSS_INTRO_FRAMES;
+}
+
 static void setup_level(game_t *g, int level, int reset_score) {
     if (reset_score) g->score = 0;
     g->level = level;
@@ -1196,7 +1326,15 @@ static void setup_level(game_t *g, int level, int reset_score) {
     // Boss alien setup (separate from regular aliens)
     // No boss on level 0 (tutorial)
     g->boss_alive = (level > 0) ? 1 : 0;
-    g->boss_type = (level > 0) ? (rand() % BOSS_TYPE_COUNT) : BOSS_TYPE_CLASSIC;
+    if (level > 0) {
+        if (g->forced_boss_type >= 0 && g->forced_boss_type < BOSS_TYPE_COUNT) {
+            g->boss_type = g->forced_boss_type;
+        } else {
+            g->boss_type = rand() % BOSS_TYPE_COUNT;
+        }
+    } else {
+        g->boss_type = BOSS_TYPE_CLASSIC;
+    }
     g->boss_max_health = BOSS_MAX_HEALTH(level);
     g->boss_health = g->boss_max_health;
     clear_yellow_boss_state(g);
@@ -1235,7 +1373,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_green_laser_last_hit_y = -1000;  // Far off screen
     refill_sprite_full(&g->BOSS_SHIELD);
 
-    if (level > 0) {
+    if (level > 0 && !g->practice_run_active) {
         int to_node = level - 1;
         int from_node = level - 2;
 
@@ -1293,6 +1431,14 @@ void game_init(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 1;
     g->start_screen_delay_timer = 0;
+    g->main_menu_selection = 0;
+    g->practice_menu_active = 0;
+    g->practice_menu_selection = 0;
+    g->practice_level_selection = PRACTICE_LEVEL_MIN;
+    g->practice_preview_timer = BOSS_INTRO_FRAMES;
+    g->practice_run_active = 0;
+    g->practice_return_delay_timer = 0;
+    g->forced_boss_type = -1;
     reset_player_progression(g);
 
     setup_level(g, 0, 1);
@@ -1303,6 +1449,14 @@ void game_reset(game_t *g) {
     g->game_over_score = 0;
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
+    g->main_menu_selection = 0;
+    g->practice_menu_active = 0;
+    g->practice_menu_selection = 0;
+    g->practice_level_selection = PRACTICE_LEVEL_MIN;
+    g->practice_preview_timer = BOSS_INTRO_FRAMES;
+    g->practice_run_active = 0;
+    g->practice_return_delay_timer = 0;
+    g->forced_boss_type = -1;
     g->paused = 0;
     reset_win_state(g);
     reset_player_progression(g);
@@ -1313,14 +1467,23 @@ void game_reset(game_t *g) {
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     // Handle reset button (anytime during gameplay)
     static uint32_t prev_buttons = 0;
-    if ((buttons & BTN_RESET) && !(prev_buttons & BTN_RESET)) {
+    uint32_t old_buttons = prev_buttons;
+    if ((buttons & BTN_RESET) && !(old_buttons & BTN_RESET)) {
         g->start_screen = 1;
+        g->practice_menu_active = 0;
+        g->practice_run_active = 0;
+        g->practice_return_delay_timer = 0;
+        g->forced_boss_type = -1;
+        g->main_menu_selection = 0;
+        g->practice_menu_selection = 0;
+        g->practice_level_selection = PRACTICE_LEVEL_MIN;
+        g->practice_preview_timer = BOSS_INTRO_FRAMES;
         g->start_screen_delay_timer = 30;
     }
     
     // Handle pause toggle (only in active gameplay)
     if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen && !g->boss_intro_active && !g->overworld_cutscene_active) {
-        if ((buttons & BTN_PAUSE) && !(prev_buttons & BTN_PAUSE)) {
+        if ((buttons & BTN_PAUSE) && !(old_buttons & BTN_PAUSE)) {
             g->paused = !g->paused;
         }
     }
@@ -1337,7 +1500,62 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (g->start_screen) {
         if (g->start_screen_delay_timer > 0) g->start_screen_delay_timer--;
-        if (g->start_screen_delay_timer == 0 && (buttons & BTN_FIRE)) game_reset(g);
+        if (g->start_screen_delay_timer == 0) {
+            int up_pressed = (buttons & BTN_UP) && !(old_buttons & BTN_UP);
+            int down_pressed = (buttons & BTN_DOWN) && !(old_buttons & BTN_DOWN);
+            int left_pressed = (buttons & BTN_LEFT) && !(old_buttons & BTN_LEFT);
+            int right_pressed = (buttons & BTN_RIGHT) && !(old_buttons & BTN_RIGHT);
+            int select_pressed = (buttons & BTN_FIRE) && !(old_buttons & BTN_FIRE);
+
+            if (!g->practice_menu_active) {
+                if (up_pressed || down_pressed) {
+                    g->main_menu_selection = 1 - g->main_menu_selection;
+                }
+                if (select_pressed) {
+                    if (g->main_menu_selection == 0) {
+                        game_reset(g);
+                    } else {
+                        g->practice_menu_active = 1;
+                        g->practice_menu_selection = 0;
+                        g->practice_level_selection = PRACTICE_LEVEL_MIN;
+                        g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                    }
+                }
+            } else {
+                if (left_pressed) {
+                    g->practice_level_selection--;
+                    if (g->practice_level_selection < PRACTICE_LEVEL_MIN) g->practice_level_selection = PRACTICE_LEVEL_MIN;
+                }
+                if (right_pressed) {
+                    g->practice_level_selection++;
+                    if (g->practice_level_selection > PRACTICE_LEVEL_MAX) g->practice_level_selection = PRACTICE_LEVEL_MAX;
+                }
+                if (up_pressed) {
+                    g->practice_menu_selection--;
+                    if (g->practice_menu_selection < 0) g->practice_menu_selection = PRACTICE_MENU_COUNT - 1;
+                    g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                }
+                if (down_pressed) {
+                    g->practice_menu_selection++;
+                    if (g->practice_menu_selection >= PRACTICE_MENU_COUNT) g->practice_menu_selection = 0;
+                    g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                }
+                if (g->practice_menu_selection < BOSS_TYPE_COUNT) {
+                    if (g->practice_preview_timer > 0) g->practice_preview_timer--;
+                } else {
+                    g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                }
+
+                if (select_pressed) {
+                    if (g->practice_menu_selection == PRACTICE_EXIT_INDEX) {
+                        g->practice_menu_active = 0;
+                        g->main_menu_selection = 0;
+                    } else {
+                        setup_practice_run(g, g->practice_menu_selection);
+                    }
+                }
+            }
+        }
         return;
     }
     if (g->level_complete) {
@@ -1345,8 +1563,16 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->level_complete_timer == 0) {
             g->level_complete = 0;
             g->level_complete_timer = 0;
-            // Skip shop after level 0 (tutorial)
-            if (g->level == 0) {
+            if (g->practice_run_active) {
+                g->start_screen = 1;
+                g->practice_menu_active = 1;
+                g->practice_run_active = 0;
+                g->forced_boss_type = -1;
+                g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                reset_player_progression(g);
+                setup_level(g, 0, 1);
+            } else if (g->level == 0) {
+                // Skip shop after level 0 (tutorial)
                 setup_level(g, START_LEVEL, 0); // SET LEVEL
             } else if ((g->level % 2) == 0) {
                 enter_shop(g);
@@ -1359,13 +1585,26 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->game_over) {
         g->alien_frame = (int)((vsync_counter / 20u) & 1u);
         if (g->game_over_delay_timer > 0) g->game_over_delay_timer--;
-        if (g->game_over_delay_timer == 0 && (buttons & BTN_FIRE)) {
-            g->game_over = 0;
-            g->game_over_score = 0;
-            g->start_screen = 1;
-            g->start_screen_delay_timer = 30;
-            reset_player_progression(g);
-            setup_level(g, 0, 1);
+        if (g->game_over_delay_timer == 0) {
+            if (g->practice_run_active) {
+                g->game_over = 0;
+                g->game_over_score = 0;
+                g->start_screen = 1;
+                g->start_screen_delay_timer = 30;
+                g->practice_menu_active = 1;
+                g->practice_run_active = 0;
+                g->forced_boss_type = -1;
+                g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                reset_player_progression(g);
+                setup_level(g, 0, 1);
+            } else if (buttons & BTN_FIRE) {
+                g->game_over = 0;
+                g->game_over_score = 0;
+                g->start_screen = 1;
+                g->start_screen_delay_timer = 30;
+                reset_player_progression(g);
+                setup_level(g, 0, 1);
+            }
         }
         return;
     }
@@ -1402,10 +1641,21 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
 
         if (g->win_prompt_ready && (buttons & BTN_FIRE)) {
-            g->start_screen = 1;
-            g->start_screen_delay_timer = 30;
-            reset_player_progression(g);
-            setup_level(g, 0, 1);
+            if (g->practice_run_active) {
+                g->start_screen = 1;
+                g->start_screen_delay_timer = 30;
+                g->practice_menu_active = 1;
+                g->practice_run_active = 0;
+                g->forced_boss_type = -1;
+                g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                reset_player_progression(g);
+                setup_level(g, 0, 1);
+            } else {
+                g->start_screen = 1;
+                g->start_screen_delay_timer = 30;
+                reset_player_progression(g);
+                setup_level(g, 0, 1);
+            }
         }
         return;
     }
@@ -1505,7 +1755,17 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 int ty = 30/tile + (rand() % rows);  // Start from top, avoid bunkers
                 g->powerup_x = tx * tile + tile / 2;
                 g->powerup_y = ty * tile + tile / 2;
-                g->powerup_type = (powerup_type_t)(g->score % POWERUP_COUNT);
+                if (g->practice_run_active) {
+                    static const powerup_type_t practice_pool[] = {
+                        POWERUP_TRIPLE_SHOT,
+                        POWERUP_RAPID_FIRE,
+                        POWERUP_EXPLOSIVE
+                    };
+                    int idx = rand() % 3;
+                    g->powerup_type = practice_pool[idx];
+                } else {
+                    g->powerup_type = (powerup_type_t)(g->score % POWERUP_COUNT);
+                }
                 g->powerup_active = 1;
                 g->powerup_timer = 300;  // 5 seconds at ~60 FPS
                 g->powerup_spawn_timer = 0;
@@ -2024,6 +2284,23 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         update_yellow_boss_health(g);
     }
 
+    if (g->practice_run_active && !g->boss_alive && !g->boss_dying) {
+        if (g->practice_return_delay_timer > 0) {
+            g->practice_return_delay_timer--;
+            return;
+        }
+        g->start_screen = 1;
+        g->start_screen_delay_timer = 30;
+        g->practice_menu_active = 1;
+        g->practice_run_active = 0;
+        g->practice_return_delay_timer = 0;
+        g->forced_boss_type = -1;
+        g->practice_preview_timer = BOSS_INTRO_FRAMES;
+        reset_player_progression(g);
+        setup_level(g, 0, 1);
+        return;
+    }
+
     // Check if player reached right side to exit level (when exit is available)
     if (g->exit_available && g->player_x >= LW - g->PLAYER.w) {
         g->level_complete = 1;
@@ -2075,20 +2352,63 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
         l_clear(lfb, 0xFF000000);
-        const char *title = "ALIENS";
-        const char *prompt = "PRESS SPACE TO START";
+        if (!g->practice_menu_active) {
+            const char *title = "ALIENS";
+            const char *options[2] = {"START GAME", "PRACTICE MODE"};
 
-        int title_scale = 3;
-        int title_w = text_width_5x5(title, title_scale);
-        int title_x = (LW - title_w) / 2;
-        int title_y = LH / 2 - 30;
-        l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
+            int title_scale = 3;
+            int title_w = text_width_5x5(title, title_scale);
+            int title_x = (LW - title_w) / 2;
+            int title_y = 38;
+            l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
 
-        int prompt_scale = 2;
-        int prompt_w = text_width_5x5(prompt, prompt_scale);
-        int prompt_x = (LW - prompt_w) / 2;
-        int prompt_y = title_y + 40;
-        l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
+            int option_scale = 2;
+            int option_base_y = title_y + 56;
+            for (int i = 0; i < 2; i++) {
+                int is_selected = (i == g->main_menu_selection);
+                int opt_w = text_width_5x5(options[i], option_scale);
+                int opt_x = (LW - opt_w) / 2;
+                int opt_y = option_base_y + i * 28;
+                if (is_selected) {
+                    l_draw_text(lfb, opt_x - 18, opt_y, ">", option_scale, 0xFFFFFFFF);
+                }
+                l_draw_text(lfb, opt_x, opt_y, options[i], option_scale,
+                            is_selected ? 0xFFFFFFFF : 0xFF9A9A9A);
+            }
+
+            const char *hint = "UP/DOWN TO CHOOSE  SPACE TO SELECT";
+            int hint_w = text_width_5x5(hint, 1);
+            l_draw_text(lfb, (LW - hint_w) / 2, LH - 22, hint, 1, 0xFFBFBFBF);
+        } else {
+            const char *entries[PRACTICE_MENU_COUNT] = {
+                boss_menu_label(BOSS_TYPE_CLASSIC),
+                boss_menu_label(BOSS_TYPE_BLUE),
+                boss_menu_label(BOSS_TYPE_YELLOW),
+                "EXIT TO MAIN MENU"
+            };
+
+            int base_y = 16;
+            int row_h = 13;
+            for (int i = 0; i < PRACTICE_MENU_COUNT; i++) {
+                int is_selected = (i == g->practice_menu_selection);
+                uint32_t color = is_selected ? 0xFF00FF00 : 0xFFAAAAAA;
+                if (i == PRACTICE_EXIT_INDEX && !is_selected) color = 0xFFFF7A7A;
+
+                int entry_y = base_y + i * row_h;
+                if (is_selected) {
+                    l_draw_text(lfb, 16, entry_y, ">", 1, 0xFF00FF00);
+                }
+                l_draw_text(lfb, 26, entry_y, entries[i], 1, color);
+            }
+
+            if (g->practice_menu_selection < BOSS_TYPE_COUNT) {
+                render_practice_boss_preview(g, lfb, g->practice_menu_selection);
+            }
+
+            const char *hint = "UP/DOWN BOSS  LEFT/RIGHT LEVEL  SPACE ENTER";
+            int hint_w = text_width_5x5(hint, 1);
+            l_draw_text(lfb, (LW - hint_w) / 2, LH - 18, hint, 1, 0xFFBFBFBF);
+        }
         return;
     }
 
@@ -2266,8 +2586,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
             l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFFFFF00);
         } else if (g->level >= 3) {
-            const char *spec1 = "PLASMA BEAM";
-            const char *spec2 = "HEAL BEAM";
+            const char *spec1 = "PLASMA";
+            const char *spec2 = "HEAL";
             int spec1_w = text_width_5x5(spec1, scale);
             int spec2_w = text_width_5x5(spec2, scale);
             int gap_w = 4;

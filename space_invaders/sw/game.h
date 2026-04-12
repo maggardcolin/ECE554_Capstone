@@ -66,6 +66,14 @@ typedef struct {
     int level;
     int start_screen;
     int start_screen_delay_timer;
+    int main_menu_selection;   // 0 = start game, 1 = practice mode
+    int practice_menu_active;
+    int practice_menu_selection; // 0..2 boss entries, 3 exit
+    int practice_level_selection;
+    int practice_preview_timer;
+    int practice_run_active;
+    int practice_return_delay_timer;
+    int forced_boss_type;      // -1 random, otherwise one of boss_type_t
     int lives;
     int level_complete;
     int level_complete_timer;
