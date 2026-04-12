@@ -288,10 +288,10 @@ static const pattern_t PATTERN_WIN = {
 };
 
 static const pattern_t PATTERN_PAUSED = {
-    .melody = {523.25f, R, R, R, 523.25f, R, R, R,
-               659.25f, R, R, R, 659.25f, R, R, R},
-    .bass = {130.81f, R, R, R, 130.81f, R, R, R,
-             146.83f, R, R, R, 146.83f, R, R, R},
+    .melody = {R, R, R, R, R, R, R, R,
+             R, R, R, R, R, R, R, R},
+    .bass = {R, R, R, R, R, R, R, R,
+             R, R, R, R, R, R, R, R},
     .harm = {R, R, R, R, R, R, R, R,
              R, R, R, R, R, R, R, R},
     .len = 16,

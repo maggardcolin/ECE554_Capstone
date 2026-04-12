@@ -1311,6 +1311,7 @@ static void reset_player_progression(game_t *g) {
     g->fire_speed_bonus = 0;
     g->player_damage = PLAYER_BASE_DAMAGE;
     g->pierce_unlocked = 0;
+    g->points_unlocked = 0;
     reset_shop_state(g);
     reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
 }
@@ -1378,6 +1379,7 @@ static const char *shop_item_label(shop_item_type_t type) {
         case SHOP_ITEM_LIFE:       return "LIFE";
         case SHOP_ITEM_DAMAGE:     return "DMG";
         case SHOP_ITEM_PIERCE:     return "PIERCE";
+        case SHOP_ITEM_POINTS:     return "POINTS";
         default:                   return "ITEM";
     }
 }
@@ -1387,7 +1389,7 @@ static void enter_shop(game_t *g) {
     g->shop_next_level = g->level + 1;
     g->shop_count++;
 
-    shop_item_type_t shop_pool[4];
+    shop_item_type_t shop_pool[5];
     int shop_pool_count = 0;
     shop_pool[shop_pool_count++] = SHOP_ITEM_FIRE_SPEED;
     shop_pool[shop_pool_count++] = SHOP_ITEM_LIFE;
@@ -1395,27 +1397,34 @@ static void enter_shop(game_t *g) {
     if (!g->pierce_unlocked) {
         shop_pool[shop_pool_count++] = SHOP_ITEM_PIERCE;
     }
+    if (!g->points_unlocked) {
+        shop_pool[shop_pool_count++] = SHOP_ITEM_POINTS;
+    }
 
     int price_multiplier = g->shop_count; // Base * shops seen
     int spacing = 60;
     int start_x = LW / 2 - spacing;
     int y = LH / 2;
     int pierce_added = 0;
+    int points_added = 0;
     for (int i = 0; i < MAX_SHOP_ITEMS; i++) {
         shop_item_type_t picked = shop_pool[rand() % shop_pool_count];
-        if (!g->pierce_unlocked && picked == SHOP_ITEM_PIERCE && pierce_added) {
-            static const shop_item_type_t non_pierce_pool[] = {
+        if ((!g->pierce_unlocked && picked == SHOP_ITEM_PIERCE && pierce_added) ||
+            (!g->points_unlocked && picked == SHOP_ITEM_POINTS && points_added)) {
+            static const shop_item_type_t fallback_pool[] = {
                 SHOP_ITEM_FIRE_SPEED,
                 SHOP_ITEM_LIFE,
                 SHOP_ITEM_DAMAGE
             };
-            picked = non_pierce_pool[rand() % 3];
+            picked = fallback_pool[rand() % 3];
         }
 
         g->shop_items[i].active = 1;
         g->shop_items[i].type = picked;
         if (picked == SHOP_ITEM_PIERCE) {
             pierce_added = 1;
+        } else if (picked == SHOP_ITEM_POINTS) {
+            points_added = 1;
         }
         g->shop_items[i].price = 500 * price_multiplier;
         g->shop_items[i].x = start_x + i * spacing;
@@ -1467,6 +1476,7 @@ static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         else if (g->shop_items[it].type == SHOP_ITEM_LIFE) g->lives++;
                         else if (g->shop_items[it].type == SHOP_ITEM_DAMAGE) g->player_damage++;
                         else if (g->shop_items[it].type == SHOP_ITEM_PIERCE) g->pierce_unlocked = 1;
+                        else if (g->shop_items[it].type == SHOP_ITEM_POINTS) g->points_unlocked = 1;
                         g->shop_items[it].active = 0;
                     }
                     if (bi == 0) g->pshot[si].alive = 0;
@@ -1535,6 +1545,8 @@ static void shop_render(game_t *g, lfb_t *lfb) {
             int icon_x = center_x - icon->w / 2;
             int icon_y = center_y - icon->h / 2;
             draw_sprite1r(lfb, icon, icon_x, icon_y, icon_color);
+        } else if (g->shop_items[i].type == SHOP_ITEM_POINTS) {
+            draw_points_upgrade_icon(lfb, center_x, center_y);
         }
 
         // Label and price
@@ -2143,7 +2155,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     int idx = rand() % 3;
                     g->powerup_type = practice_pool[idx];
                 } else {
-                    g->powerup_type = (powerup_type_t)(g->score % POWERUP_COUNT);
+                    static const powerup_type_t spawn_pool[] = {
+                        POWERUP_TRIPLE_SHOT,
+                        POWERUP_RAPID_FIRE,
+                        POWERUP_EXPLOSIVE
+                    };
+                    int idx = rand() % 3;
+                    g->powerup_type = spawn_pool[idx];
                 }
                 g->powerup_active = 1;
                 g->powerup_timer = 300;  // 5 seconds at ~60 FPS

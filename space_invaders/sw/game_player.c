@@ -134,10 +134,42 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
     if (lives < 0) lives = 0;
     l_draw_score(lfb, lives_x, text_y, lives, 0xFFFFFFFF);
 
-    if (g->pierce_unlocked) {
-        int pierce_x = lives_x + digit_count(lives) * 4 + 8;
-        int pierce_y = LH - g->SHOP_PIERCE.h - 4;
-        draw_sprite1r(lfb, &g->SHOP_PIERCE, pierce_x, pierce_y, 0xFF66CCFF);
+    int status_x = lives_x + digit_count(lives) * 4 + 8;
+    int unlocked_icon_type[2];
+    int unlocked_count = 0;
+    if (g->pierce_unlocked) unlocked_icon_type[unlocked_count++] = SHOP_ITEM_PIERCE;
+    if (g->points_unlocked) unlocked_icon_type[unlocked_count++] = SHOP_ITEM_POINTS;
+
+    int box_x = status_x;
+    int box_y = text_y - 5;
+    int box_w = 12;
+    int box_h = 12;
+    int box_gap = 2;
+
+    for (int i = 0; i < 3; i++) {
+        int x0 = box_x + i * (box_w + box_gap);
+        uint32_t border = 0xFFFFFFFF;
+
+        for (int x = 0; x < box_w; x++) {
+            l_putpix(lfb, x0 + x, box_y, border);
+            l_putpix(lfb, x0 + x, box_y + box_h - 1, border);
+        }
+        for (int y = 0; y < box_h; y++) {
+            l_putpix(lfb, x0, box_y + y, border);
+            l_putpix(lfb, x0 + box_w - 1, box_y + y, border);
+        }
+
+        if (i < unlocked_count) {
+            if (unlocked_icon_type[i] == SHOP_ITEM_PIERCE) {
+                int px = x0 + (box_w - g->SHOP_PIERCE.w) / 2;
+                int py = box_y + (box_h - g->SHOP_PIERCE.h) / 2;
+                draw_sprite1r(lfb, &g->SHOP_PIERCE, px, py, 0xFF66CCFF);
+            } else if (unlocked_icon_type[i] == SHOP_ITEM_POINTS) {
+                int cx = x0 + box_w / 2;
+                int cy = box_y + box_h / 2;
+                draw_points_upgrade_icon(lfb, cx, cy);
+            }
+        }
     }
 }
 

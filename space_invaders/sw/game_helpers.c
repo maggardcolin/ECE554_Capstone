@@ -127,6 +127,11 @@ void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
     }
 }
 
+void draw_points_upgrade_icon(lfb_t *lfb, int x0, int y0) {
+    // Compact single-digit glyph without the circular backdrop.
+    l_draw_text(lfb, x0 - 1, y0 - 2, "2", 1, 0xFFFFFF00);
+}
+
 int is_powerup_active(const game_t *g, powerup_type_t type) {
     for (int i = 0; i < 5; i++) {
         if (g->powerup_slot_timer[i] > 0 && g->powerup_type_slot[i] == type) return 1;
@@ -135,7 +140,7 @@ int is_powerup_active(const game_t *g, powerup_type_t type) {
 }
 
 int double_shot_active(const game_t *g) {
-    return is_powerup_active(g, POWERUP_DOUBLE_SHOT);
+    return g->points_unlocked || is_powerup_active(g, POWERUP_DOUBLE_SHOT);
 }
 
 int triple_shot_active(const game_t *g) {

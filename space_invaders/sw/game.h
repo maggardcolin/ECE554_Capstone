@@ -19,7 +19,8 @@ typedef enum {
     SHOP_ITEM_LIFE = 2,
     SHOP_ITEM_DAMAGE = 3,
     SHOP_ITEM_PIERCE = 4,
-    SHOP_ITEM_COUNT = 5
+    SHOP_ITEM_POINTS = 5,
+    SHOP_ITEM_COUNT = 6
 } shop_item_type_t;
 
 typedef enum {
@@ -199,6 +200,7 @@ typedef struct {
     int fire_speed_bonus;      // Each point reduces cooldown
     int player_damage;         // Base 1, increased by shop item
     int pierce_unlocked;       // Permanent shop upgrade
+    int points_unlocked;       // Permanent 2x-points shop upgrade
 
     // Shop state
     int in_shop;
