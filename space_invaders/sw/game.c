@@ -67,6 +67,22 @@ static int text_width_5x5(const char *text, int scale) {
     return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
 }
 
+static uint32_t color_with_intensity(uint32_t color, int intensity_pct) {
+    if (intensity_pct < 0) intensity_pct = 0;
+    if (intensity_pct > 100) intensity_pct = 100;
+
+    uint32_t a = color & 0xFF000000u;
+    uint32_t r = (color >> 16) & 0xFFu;
+    uint32_t g = (color >> 8) & 0xFFu;
+    uint32_t b = color & 0xFFu;
+
+    r = (r * (uint32_t)intensity_pct) / 100u;
+    g = (g * (uint32_t)intensity_pct) / 100u;
+    b = (b * (uint32_t)intensity_pct) / 100u;
+
+    return a | (r << 16) | (g << 8) | b;
+}
+
 static void render_fps_counter(lfb_t *lfb) {
     static struct timespec last_ts = {0, 0};
     static int frame_count = 0;
@@ -1970,14 +1986,23 @@ void game_render(game_t *g, lfb_t *lfb) {
         for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
     }
 
-    // Boss laser beam (straight down) - purple or green depending on attack type
+    // Boss laser beam and trailing after-image copies.
+    // Only the leading beam is used for collision in update logic.
     if (g->boss_laser.alive) {
         int laser_w = g->BOSS_A.w;  // Width matches boss width
         int laser_left = g->boss_laser.x - laser_w / 2;
         uint32_t laser_color = (g->boss_attack_type == 1) ? 0xFF00FF00 : 0xFF8000FF;  // Green or purple
-        for (int px = laser_left; px < laser_left + laser_w; px++) {
-            if (px >= 0 && px < LW && g->boss_laser.y >= 0 && g->boss_laser.y < LH) {
-                l_putpix(lfb, px, g->boss_laser.y, laser_color);
+        const int trail_offsets[] = {0, 5, 10, 20};
+        const int trail_intensity[] = {100, 65, 40, 22};
+
+        for (int t = 0; t < 4; t++) {
+            int trail_y = g->boss_laser.y - trail_offsets[t];
+            if (trail_y < 0 || trail_y >= LH) continue;
+            uint32_t trail_color = color_with_intensity(laser_color, trail_intensity[t]);
+            for (int px = laser_left; px < laser_left + laser_w; px++) {
+                if (px >= 0 && px < LW) {
+                    l_putpix(lfb, px, trail_y, trail_color);
+                }
             }
         }
     }
