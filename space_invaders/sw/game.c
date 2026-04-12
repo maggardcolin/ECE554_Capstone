@@ -585,11 +585,6 @@ static void enter_shop(game_t *g) {
     g->boss_shot.alive = 0;
     g->fire_cooldown = 0;
 
-    // Reset powerups
-    for (int i = 0; i < 5; i++) {
-        g->powerup_slot_timer[i] = 0;
-    }
-
     // Position player on left side, keep y position constant
     g->player_x = 10;
 
@@ -751,7 +746,6 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->powerup_active = 0;
     g->powerup_timer = 0;
     g->powerup_spawn_timer = 0;
-    for (int i = 0; i < 5; i++) g->powerup_slot_timer[i] = 0;
 
     g->player_x = 5;  // Spawn on left side
     g->player_y = LH - 30;
