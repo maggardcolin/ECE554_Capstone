@@ -15,6 +15,7 @@
 #define PLAYER_DEATH_DELAY_FRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
 #define BOSS_BOMB_EXPLOSION_FRAMES 60
+#define BOSS_INTRO_FRAMES 180
 #define WIN_LEVEL 8
 #define WIN_RING_ALIENS 6
 #define WIN_EXPLOSION_DELAY_FRAMES 10
@@ -28,6 +29,20 @@ static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
 
 static const sprite1r_t *active_boss_sprite(const game_t *g) {
     return boss_sprite_for_frame(g, g->boss_frame);
+}
+
+static const char *boss_intro_type_text(const game_t *g) {
+    return (g->boss_type == BOSS_TYPE_BLUE) ? "BLUE" : "MULTICOLOR";
+}
+
+static const char *boss_intro_main_attack_text(const game_t *g) {
+    return (g->boss_type == BOSS_TYPE_BLUE) ? "TRIPLE SHOT" : "STANDARD LASER";
+}
+
+static const char *boss_intro_special_attack_text(const game_t *g) {
+    if (g->boss_type == BOSS_TYPE_BLUE) return "BOMB";
+    if (g->level >= 3) return "PLASMA BEAM, HEAL BEAM";
+    return "PLASMA BEAM";
 }
 
 static void clear_boss_projectiles(game_t *g) {
@@ -567,6 +582,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->level_complete = 0;
     g->level_complete_timer = 0;
     g->level_just_completed = 0;
+    g->boss_intro_active = 0;
+    g->boss_intro_timer = 0;
 
     g->powerup_active = 0;
     g->powerup_timer = 0;
@@ -667,6 +684,11 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_green_laser_last_hit_y = -1000;  // Far off screen
     refill_sprite_full(&g->BOSS_SHIELD);
 
+    if (level > 0) {
+        g->boss_intro_active = 1;
+        g->boss_intro_timer = BOSS_INTRO_FRAMES;
+    }
+
     bunkers_rebuild(g);
 }
 
@@ -737,7 +759,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
     
     // Handle pause toggle (only in active gameplay)
-    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen) {
+    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen && !g->boss_intro_active) {
         if ((buttons & BTN_PAUSE) && !(prev_buttons & BTN_PAUSE)) {
             g->paused = !g->paused;
         }
@@ -838,6 +860,16 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (g->in_shop) {
         shop_update(g, buttons, vsync_counter);
+        return;
+    }
+
+    if (g->boss_intro_active) {
+        if (g->boss_intro_timer > 0) {
+            g->boss_intro_timer--;
+        }
+        if (g->boss_intro_timer <= 0) {
+            g->boss_intro_active = 0;
+        }
         return;
     }
 
@@ -1489,6 +1521,48 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     if (g->in_shop) {
         shop_render(g, lfb);
+        return;
+    }
+
+    if (g->boss_intro_active) {
+        l_clear(lfb, 0xFF000000);
+
+        const char *type_prefix = "ALIEN TYPE:";
+        const char *type_value = boss_intro_type_text(g);
+        const char *main_prefix = "MAIN ATTACK:";
+        const char *main_value = boss_intro_main_attack_text(g);
+        const char *special_prefix = "SPECIAL ATTACK:";
+        const char *special_value = boss_intro_special_attack_text(g);
+
+        int scale = 1;
+        int y = 18;
+
+        int type_prefix_w = text_width_5x5(type_prefix, scale);
+        int type_value_w = text_width_5x5(type_value, scale);
+        int type_x = (LW - (type_prefix_w + 6 + type_value_w)) / 2;
+        l_draw_text(lfb, type_x, y, type_prefix, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, type_x + type_prefix_w + 6, y, type_value, scale,
+                    (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFFFF55AA);
+
+        y += 14;
+        int main_prefix_w = text_width_5x5(main_prefix, scale);
+        int main_value_w = text_width_5x5(main_value, scale);
+        int main_x = (LW - (main_prefix_w + 6 + main_value_w)) / 2;
+        l_draw_text(lfb, main_x, y, main_prefix, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, 0xFFFFFFFF);
+
+        y += 14;
+        int special_prefix_w = text_width_5x5(special_prefix, scale);
+        int special_value_w = text_width_5x5(special_value, scale);
+        int special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
+        l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, special_x + special_prefix_w + 6, y, special_value, scale, 0xFFFFFFFF);
+
+        const sprite1r_t *BS = active_boss_sprite(g);
+        int boss_x = (LW - BS->w) / 2;
+        int boss_y = LH / 2 - BS->h / 2 + 10;
+        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
+        draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
         return;
     }
 

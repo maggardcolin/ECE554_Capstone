@@ -65,6 +65,8 @@ typedef struct {
     int level_complete;
     int level_complete_timer;
     int level_just_completed;
+    int boss_intro_active;
+    int boss_intro_timer;
 
     // Powerup system
     int powerup_active;
