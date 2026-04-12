@@ -230,6 +230,51 @@ static const pattern_t PATTERN_BOSS_YELLOW = {
         77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R
     },
     .harm = {
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R,
+
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R,
+
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R,
+
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R
+    },
+    .len = 64,
+    .bpm = 128,
+    .gain = 0.22f,
+};
+
+static const pattern_t PATTERN_BOSS_TOWER = {
+    .melody = {
+        349.23f, R, R, R, R, R, R, R,
+        349.23f, R, R, R, R, R, R, R,
+
+        349.23f, R, R, R, R, R, R, R,
+        349.23f, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R
+    },
+    .bass = {
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R
+    },
+    .harm = {
         174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
         174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
 
@@ -315,6 +360,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_BOSS_BLUE;
     case MUSIC_MODE_BOSS_YELLOW:
         return &PATTERN_BOSS_YELLOW;
+    case MUSIC_MODE_BOSS_TOWER:
+        return &PATTERN_BOSS_TOWER;
     case MUSIC_MODE_SHOP:
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:
