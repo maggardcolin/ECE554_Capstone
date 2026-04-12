@@ -2427,10 +2427,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (g->boss_health > g->boss_max_health) {
                     g->boss_health = g->boss_max_health;
                 }
-                if (g->level >= 5) {
-                    g->boss_shield_active = 1;
-                    refill_sprite_full(&g->BOSS_SHIELD);
-                }
             }
         }
 
