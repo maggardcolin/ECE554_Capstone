@@ -35,6 +35,11 @@
 #define LASER_DURATION_SAMPLES (AUDIO_RATE / 5)
 #define LASER_GAIN 0.16f
 
+#define POWERUP_FREQ_START 520.0f
+#define POWERUP_FREQ_END 1240.0f
+#define POWERUP_DURATION_SAMPLES (AUDIO_RATE / 6)
+#define POWERUP_GAIN 0.17f
+
 #define R 0.0f
 
 typedef struct {
@@ -56,6 +61,7 @@ typedef struct {
     int boom_pending;
     int boom_long_pending;
     int laser_pending;
+    int powerup_pending;
 } music_ctx_t;
 
 static music_ctx_t g_music;
@@ -221,6 +227,8 @@ static void *audio_thread(void *arg) {
     float boom_long_phase = 0.0f;
     int laser_samples_left = 0;
     float laser_phase = 0.0f;
+    int powerup_samples_left = 0;
+    float powerup_phase = 0.0f;
 
     while (1) {
         pthread_mutex_lock(&g_music.lock);
@@ -246,6 +254,11 @@ static void *audio_thread(void *arg) {
             laser_samples_left = LASER_DURATION_SAMPLES;
             laser_phase = 0.0f;
             g_music.laser_pending = 0;
+        }
+        if (g_music.powerup_pending) {
+            powerup_samples_left = POWERUP_DURATION_SAMPLES;
+            powerup_phase = 0.0f;
+            g_music.powerup_pending = 0;
         }
         pthread_mutex_unlock(&g_music.lock);
 
@@ -287,6 +300,7 @@ static void *audio_thread(void *arg) {
             float boom_mix = 0.0f;
             float boom_long_mix = 0.0f;
             float laser_mix = 0.0f;
+            float powerup_mix = 0.0f;
 
             if (ding_samples_left > 0) {
                 float env = (float)ding_samples_left / (float)DING_DURATION_SAMPLES;
@@ -320,7 +334,16 @@ static void *audio_thread(void *arg) {
                 laser_samples_left--;
             }
 
-            int sample = (int)(((music_mix * pat->gain) + ding_mix + boom_mix + boom_long_mix + laser_mix) * 32767.0f);
+            if (powerup_samples_left > 0) {
+                float progress = 1.0f - ((float)powerup_samples_left / (float)POWERUP_DURATION_SAMPLES);
+                float freq = POWERUP_FREQ_START + (POWERUP_FREQ_END - POWERUP_FREQ_START) * progress;
+                float env = 1.0f - (progress * 0.6f);
+                float p = square(&powerup_phase, freq, 0.45f);
+                powerup_mix = p * POWERUP_GAIN * env;
+                powerup_samples_left--;
+            }
+
+            int sample = (int)(((music_mix * pat->gain) + ding_mix + boom_mix + boom_long_mix + laser_mix + powerup_mix) * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
             buffer[i] = (int16_t)sample;
@@ -440,6 +463,14 @@ void music_play_laser(void) {
     pthread_mutex_unlock(&g_music.lock);
 }
 
+void music_play_powerup(void) {
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running) {
+        g_music.powerup_pending = 1;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
 void music_shutdown(void) {
     pthread_mutex_lock(&g_music.lock);
     int was_running = g_music.running;
@@ -476,6 +507,9 @@ void music_play_boom_long(void) {
 }
 
 void music_play_laser(void) {
+}
+
+void music_play_powerup(void) {
 }
 
 void music_shutdown(void) {

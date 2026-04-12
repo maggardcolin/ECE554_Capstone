@@ -112,6 +112,49 @@ static int rapid_fire_active(const game_t *g) {
 
 static void clear_player_shots(game_t *g);
 
+static int circle_intersects_rect(int cx, int cy, int r, int rx, int ry, int rw, int rh) {
+    int closest_x = cx;
+    int closest_y = cy;
+
+    if (closest_x < rx) closest_x = rx;
+    else if (closest_x > rx + rw) closest_x = rx + rw;
+
+    if (closest_y < ry) closest_y = ry;
+    else if (closest_y > ry + rh) closest_y = ry + rh;
+
+    int dx = cx - closest_x;
+    int dy = cy - closest_y;
+    return (dx * dx + dy * dy) <= (r * r);
+}
+
+static int boss_explosion_radius(const game_t *g) {
+    int age = BOSS_DEATH_DELAY_FRAMES - g->boss_death_timer;
+    int frame = age / 10;
+    int base_r = 6 + frame * 3;
+    return base_r + 4;
+}
+
+static void apply_boss_explosion_to_aliens(game_t *g) {
+    if (!g->boss_dying) return;
+
+    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    int spacing_x = 6, spacing_y = 5;
+    int cx = g->boss_x + g->BOSS_A.w / 2;
+    int cy = g->boss_y + g->BOSS_A.h / 2;
+    int radius = boss_explosion_radius(g);
+
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[r][c]) continue;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+            int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+            if (circle_intersects_rect(cx, cy, radius, ax, ay, AS->w, AS->h)) {
+                g->alien_alive[r][c] = 0;
+            }
+        }
+    }
+}
+
 static void render_player_explosion(const game_t *g, lfb_t *lfb) {
     int cx = g->player_x + g->PLAYER.w / 2;
     int cy = g->player_y + g->PLAYER.h / 2;
@@ -345,6 +388,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     if (g->powerup_slot_timer[i] == 0) {
                         g->powerup_slot_timer[i] = 600;
                         g->powerup_type_slot[i] = g->powerup_type;
+                        music_play_powerup();
                         break;
                     }
                 }
@@ -877,6 +921,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->boss_dying) {
         g->boss_shot.alive = 0;
         g->boss_laser.alive = 0;
+        apply_boss_explosion_to_aliens(g);
         if (g->boss_death_timer > 0) {
             g->boss_death_timer--;
         }
