@@ -152,6 +152,55 @@ static int explosive_shot_active(const game_t *g) {
     return is_powerup_active(g, POWERUP_EXPLOSIVE);
 }
 
+static sprite1r_t make_filled_sprite(int w, int h) {
+    int stride = (w + 7) / 8;
+    uint8_t *bits = (uint8_t *)calloc((size_t)h * (size_t)stride, 1);
+    if (!bits) {
+        fprintf(stderr, "calloc failed\n");
+        exit(1);
+    }
+    for (int y = 0; y < h; y++) {
+        memset(bits + y * stride, 0xFF, (size_t)stride);
+    }
+    if ((w & 7) != 0) {
+        uint8_t mask = (uint8_t)(0xFFu << (8 - (w & 7)));
+        for (int y = 0; y < h; y++) {
+            bits[y * stride + (stride - 1)] &= mask;
+        }
+    }
+    sprite1r_t s = { .w = w, .h = h, .stride = stride, .bits = bits };
+    return s;
+}
+
+static void refill_sprite_full(sprite1r_t *s) {
+    for (int y = 0; y < s->h; y++) {
+        memset(s->bits + y * s->stride, 0xFF, (size_t)s->stride);
+    }
+    if ((s->w & 7) != 0) {
+        uint8_t mask = (uint8_t)(0xFFu << (8 - (s->w & 7)));
+        for (int y = 0; y < s->h; y++) {
+            s->bits[y * s->stride + (s->stride - 1)] &= mask;
+        }
+    }
+}
+
+static int sprite_has_any_bits(const sprite1r_t *s) {
+    for (int y = 0; y < s->h; y++) {
+        for (int b = 0; b < s->stride; b++) {
+            if (s->bits[y * s->stride + b] != 0) return 1;
+        }
+    }
+    return 0;
+}
+
+static int boss_shield_x(const game_t *g) {
+    return g->boss_x;
+}
+
+static int boss_shield_y(const game_t *g) {
+    return g->boss_y + g->BOSS_A.h + 2;
+}
+
 static void clear_player_shots(game_t *g);
 
 static int circle_intersects_rect(int cx, int cy, int r, int rx, int ry, int rw, int rh) {
@@ -270,6 +319,7 @@ static void trigger_boss_death(game_t *g) {
     g->boss_death_timer = BOSS_DEATH_DELAY_FRAMES;
     g->boss_laser.alive = 0;
     g->boss_shot.alive = 0;
+    g->boss_shield_active = 0;
     g->ashot.alive = 0;
     music_play_boom_long();
 }
@@ -440,14 +490,14 @@ static void kill_alien_with_explosion(game_t *g, int r, int c) {
 }
 
 static void trigger_explosive_chain(game_t *g, int seed_r, int seed_c) {
-    int chained = 0;
-    for (int r = seed_r - 1; r >= 0 && chained < 2; r--) {
-        if (!g->alien_alive[r][seed_c]) continue;
-        g->alien_health[r][seed_c] -= 1;
-        if (g->alien_health[r][seed_c] <= 0) {
-            kill_alien_with_explosion(g, r, seed_c);
-        }
-        chained++;
+    const int dr[4] = {-1, 1, 0, 0};
+    const int dc[4] = {0, 0, -1, 1};
+    for (int i = 0; i < 4; i++) {
+        int r = seed_r + dr[i];
+        int c = seed_c + dc[i];
+        if (r < 0 || r >= AROWS || c < 0 || c >= ACOLS) continue;
+        if (!g->alien_alive[r][c]) continue;
+        kill_alien_with_explosion(g, r, c);
     }
 }
 
@@ -474,6 +524,27 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     }
                 }
                 g->powerup_active = 0;
+                shots[si].alive = 0;
+            }
+        }
+        if (!shots[si].alive) continue;
+
+        if (g->boss_shield_active && g->boss_alive && !g->boss_dying) {
+            int shield_hit = 0;
+            int sx = boss_shield_x(g);
+            int sy = boss_shield_y(g);
+            for (int bi = 0; bi < 5 && !shield_hit; bi++) {
+                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int by = shots[si].y - bi;
+                if (bullet_hits_sprite(&g->BOSS_SHIELD, sx, sy, bx, by)) {
+                    bunker_damage(&g->BOSS_SHIELD, bx - sx, by - sy, 3);
+                    shield_hit = 1;
+                }
+            }
+            if (shield_hit) {
+                if (!sprite_has_any_bits(&g->BOSS_SHIELD)) {
+                    g->boss_shield_active = 0;
+                }
                 shots[si].alive = 0;
             }
         }
@@ -844,6 +915,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_dx = 1;
     g->boss_dying = 0;
     g->boss_death_timer = 0;
+    g->boss_shield_active = 0;
     g->boss_frame = 0;
     g->boss_timer = 0;
     g->boss_period = BOSS_PERIOD(level); // Faster boss at higher levels
@@ -852,6 +924,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->ashot.alive = 0;
     g->boss_shot.alive = 0;
     g->boss_laser.alive = 0;
+    g->boss_shield_active = 0;
     g->fire_cooldown = 0;
 
     // Initialize boss power system
@@ -863,6 +936,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_attack_type = 0;  // Current attack being executed
     g->next_boss_attack_type = 0;  // Next attack to be charged
     g->boss_green_laser_last_hit_y = -1000;  // Far off screen
+    refill_sprite_full(&g->BOSS_SHIELD);
 
     bunkers_rebuild(g);
 }
@@ -891,6 +965,7 @@ void game_init(game_t *g) {
     g->ALIEN_B = make_sprite_from_ascii(alienB_rows, 8);
     g->BOSS_A  = make_sprite_from_ascii(bossA_rows, 10);
     g->BOSS_B  = make_sprite_from_ascii(bossB_rows, 10);
+    g->BOSS_SHIELD = make_filled_sprite(g->BOSS_A.w, 3);
     g->SHOP_LIFE = make_sprite_from_ascii(shop_life_rows, 7);
     g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
     g->SHOP_MOVE = make_sprite_from_ascii(shop_move_rows, 7);
@@ -1156,6 +1231,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (g->boss_health > g->boss_max_health) {
                     g->boss_health = g->boss_max_health;
                 }
+                if (g->level >= 5) {
+                    g->boss_shield_active = 1;
+                    refill_sprite_full(&g->BOSS_SHIELD);
+                }
             }
         }
 
@@ -1211,6 +1290,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_power_active = 0;
             }
         }
+
     }
 
     // Aliens destroy bunkers on collision (not on level 0)
@@ -1674,6 +1754,10 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
         draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
+
+        if (g->boss_shield_active) {
+            draw_sprite1r(lfb, &g->BOSS_SHIELD, boss_shield_x(g), boss_shield_y(g), 0xFF00FF00);
+        }
     } else if (g->boss_dying) {
         render_boss_explosion(g, lfb);
     }

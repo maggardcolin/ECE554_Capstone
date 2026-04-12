@@ -62,6 +62,7 @@ typedef struct {
     int powerup_type_slot[5];        // Type of powerup in each slot
 
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B;
+    sprite1r_t BOSS_SHIELD;
     sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE, SHOP_DMG;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
     sprite1r_t *bunkers[4];
@@ -85,8 +86,9 @@ typedef struct {
     int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
     int boss_dx;
-        int boss_dying;
-        int boss_death_timer;
+    int boss_dying;
+    int boss_death_timer;
+    int boss_shield_active;
     int boss_frame;
     int boss_timer;
     int boss_period;
