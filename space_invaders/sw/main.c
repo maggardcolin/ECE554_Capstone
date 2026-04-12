@@ -49,7 +49,9 @@ int sw_sim_main(void) {
             else if (game.level == 0 && !game.level_complete) mode = MUSIC_MODE_SILENT;
             else if (game.paused) mode = MUSIC_MODE_PAUSED;
             else if (game.in_shop) mode = MUSIC_MODE_SHOP;
-            else if (game.boss_alive) mode = MUSIC_MODE_BOSS;
+            else if (game.boss_alive) {
+                mode = (game.boss_type == BOSS_TYPE_BLUE) ? MUSIC_MODE_BOSS_BLUE : MUSIC_MODE_BOSS;
+            }
             music_set_mode(mode);
         }
 

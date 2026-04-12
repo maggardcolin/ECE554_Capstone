@@ -142,6 +142,51 @@ static const pattern_t PATTERN_BOSS = {
     .gain = 0.22f,
 };
 
+static const pattern_t PATTERN_BOSS_BLUE = {
+    .melody = {
+        349.23f, R, 349.23f, 415.30f, 466.16f, R, 466.16f, 523.25f,
+        349.23f, R, 349.23f, 415.30f, R, R, R, R,
+
+        349.23f, R, 349.23f, 415.30f, 466.16f, R, 466.16f, 523.25f,
+        349.23f, R, 349.23f, 415.30f, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R
+    },
+    .bass = {
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R
+    },
+    .harm = {
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R,
+        174.61f, R, 233.08f, R, 261.63f, R, 311.13f, R
+    },
+    .len = 64,
+    .bpm = 128,
+    .gain = 0.22f,
+};
+
 static const pattern_t PATTERN_SHOP = {
     .melody = {},
     .bass = {164.81f, R, 196.00f, R, 220.00f, R, 196.00f, R,
@@ -204,6 +249,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_GAMEPLAY;
     case MUSIC_MODE_BOSS:
         return &PATTERN_BOSS;
+    case MUSIC_MODE_BOSS_BLUE:
+        return &PATTERN_BOSS_BLUE;
     case MUSIC_MODE_SHOP:
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:

@@ -17,6 +17,13 @@ static void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
     l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
 }
 
+static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        return frame ? &g->BOSS2_B : &g->BOSS2_A;
+    }
+    return frame ? &g->BOSS_B : &g->BOSS_A;
+}
+
 void boss_trigger_death(game_t *g, int points_awarded) {
     if (g->boss_dying || !g->boss_alive) return;
     g->boss_dying = 1;
@@ -27,6 +34,12 @@ void boss_trigger_death(game_t *g, int points_awarded) {
     }
     g->boss_laser.alive = 0;
     g->boss_shot.alive = 0;
+    for (int i = 0; i < 3; i++) {
+        g->boss_triple_shot[i].alive = 0;
+    }
+    g->boss_bomb.alive = 0;
+    g->boss_bomb.exploding = 0;
+    g->boss_bomb.hit_player = 0;
     g->boss_shield_active = 0;
     g->ashot.alive = 0;
     music_play_boom_long();
@@ -36,9 +49,10 @@ void boss_apply_explosion_to_aliens(game_t *g) {
     if (!g->boss_dying) return;
 
     const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    const sprite1r_t *BS = boss_sprite_for_frame(g, g->boss_frame);
     int spacing_x = 6, spacing_y = 5;
-    int cx = g->boss_x + g->BOSS_A.w / 2;
-    int cy = g->boss_y + g->BOSS_A.h / 2;
+    int cx = g->boss_x + BS->w / 2;
+    int cy = g->boss_y + BS->h / 2;
     int radius = boss_explosion_radius(g);
 
     for (int r = 0; r < AROWS; r++) {
@@ -57,7 +71,7 @@ void boss_apply_alien_explosions_to_boss(game_t *g) {
     if (!g->boss_alive || g->boss_dying) return;
 
     const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-    const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
+    const sprite1r_t *BS = boss_sprite_for_frame(g, g->boss_frame);
     int spacing_x = 6, spacing_y = 5;
 
     for (int r = 0; r < AROWS; r++) {
@@ -84,8 +98,9 @@ void boss_apply_alien_explosions_to_boss(game_t *g) {
 }
 
 void boss_render_explosion(const game_t *g, lfb_t *lfb) {
-    int cx = g->boss_x + g->BOSS_A.w / 2;
-    int cy = g->boss_y + g->BOSS_A.h / 2;
+    const sprite1r_t *BS = boss_sprite_for_frame(g, g->boss_frame);
+    int cx = g->boss_x + BS->w / 2;
+    int cy = g->boss_y + BS->h / 2;
     int age = BOSS_DEATH_DELAY_FRAMES - g->boss_death_timer;
     int frame = age / 10;
     int base_r = 6 + frame * 3;
