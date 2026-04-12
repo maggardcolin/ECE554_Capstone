@@ -361,6 +361,20 @@ static void apply_tower_asteroid_explosion_effects(game_t *g, int ai, int radius
         }
     }
 
+    // Chain reaction: explosion can ignite other active asteroids.
+    for (int other = 0; other < MAX_TOWER_ASTEROIDS; other++) {
+        if (other == ai) continue;
+        if (!g->tower_asteroid[other].alive) continue;
+        if (g->tower_asteroid_exploding[other]) continue;
+
+        int dx = g->tower_asteroid[other].x - g->tower_asteroid[ai].x;
+        int dy = g->tower_asteroid[other].y - g->tower_asteroid[ai].y;
+        int trigger_r = radius + TOWER_ASTEROID_RADIUS;
+        if ((dx * dx + dy * dy) <= (trigger_r * trigger_r)) {
+            start_tower_asteroid_explosion(g, other);
+        }
+    }
+
     if (!g->player_dying) {
         const sprite1r_t *p = &g->PLAYER;
         if (circle_intersects_rect(g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, radius,
@@ -2811,7 +2825,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    // Blue charged bomb explosion: same radius progression as boss death explosion and 2 damage to player.
+    // Blue charged bomb / black-hole explosion: same radius progression as boss death explosion and 1 damage to player.
     if (g->boss_attack_type == 2 && g->boss_bomb.alive && g->boss_bomb.exploding) {
         int radius = boss_bomb_explosion_radius(g);
         apply_reversed_bomb_explosion_effects(g, radius);
@@ -2845,7 +2859,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
         if (!g->boss_bomb.hit_player && (dx * dx + dy * dy) <= (radius * radius)) {
             g->boss_bomb.hit_player = 1;
-            apply_player_damage(g, 2);
+            apply_player_damage(g, 1);
         }
     }
 
