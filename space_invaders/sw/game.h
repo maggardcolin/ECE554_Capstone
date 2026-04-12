@@ -33,10 +33,14 @@ typedef struct { int x,y; int alive; } bullet_t;
 typedef struct {
     int x;
     int y;
+    int dy;
     int alive;
     int exploding;
     int explode_timer;
     int hit_player;
+    int hits_taken;
+    int reversed;
+    int reverse_damage_applied;
 } boss_bomb_t;
 
 #define MAX_PSHOTS 8
@@ -106,6 +110,7 @@ typedef struct {
     int boss_health; // 0-20 HP
     int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
+    int boss_start_y;
     int boss_dx;
     int boss_dying;
     int boss_death_timer;

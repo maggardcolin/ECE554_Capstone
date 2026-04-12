@@ -15,6 +15,8 @@
 #define PLAYER_IFRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
 #define BOSS_BOMB_EXPLOSION_FRAMES 60
+#define BOSS_BOMB_SPEED 2
+#define BOSS_BOMB_HITS_TO_REVERSE 2
 #define BOSS_INTRO_FRAMES 180
 #define YELLOW_BOSS_ALIENS 5
 #define YELLOW_BOSS_ATTACK_SHUFFLE 3
@@ -184,9 +186,13 @@ static void clear_boss_projectiles(game_t *g) {
         g->yellow_beam_shot[i].alive = 0;
     }
     g->boss_bomb.alive = 0;
+    g->boss_bomb.dy = BOSS_BOMB_SPEED;
     g->boss_bomb.exploding = 0;
     g->boss_bomb.explode_timer = 0;
     g->boss_bomb.hit_player = 0;
+    g->boss_bomb.hits_taken = 0;
+    g->boss_bomb.reversed = 0;
+    g->boss_bomb.reverse_damage_applied = 0;
 }
 
 static int boss_bomb_explosion_radius(const game_t *g) {
@@ -195,6 +201,57 @@ static int boss_bomb_explosion_radius(const game_t *g) {
     int frame = age / 10;
     int base_r = 6 + frame * 3;
     return base_r + 4;
+}
+
+static void kill_alien_with_explosion(game_t *g, int r, int c);
+
+static void apply_reversed_bomb_explosion_effects(game_t *g, int radius) {
+    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    int spacing_x = 6, spacing_y = 5;
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[r][c]) continue;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x) + AS->w / 2;
+            int ay = g->alien_origin_y + r * (AS->h + spacing_y) + AS->h / 2;
+            int dx = ax - g->boss_bomb.x;
+            int dy = ay - g->boss_bomb.y;
+            if ((dx * dx + dy * dy) <= (radius * radius)) {
+                kill_alien_with_explosion(g, r, c);
+            }
+        }
+    }
+
+    if (!g->boss_bomb.reverse_damage_applied && g->boss_alive && !g->boss_dying) {
+        const sprite1r_t *BS = active_boss_sprite(g);
+        int left = g->boss_x;
+        int right = g->boss_x + BS->w - 1;
+        int top = g->boss_y;
+        int bottom = g->boss_y + BS->h - 1;
+
+        int nearest_x = g->boss_bomb.x;
+        if (nearest_x < left) nearest_x = left;
+        if (nearest_x > right) nearest_x = right;
+
+        int nearest_y = g->boss_bomb.y;
+        if (nearest_y < top) nearest_y = top;
+        if (nearest_y > bottom) nearest_y = bottom;
+
+        int dx = g->boss_bomb.x - nearest_x;
+        int dy = g->boss_bomb.y - nearest_y;
+        int boss_hit_by_explosion = (dx * dx + dy * dy) <= (radius * radius);
+
+        if (boss_hit_by_explosion) {
+            int boss_damage = g->boss_max_health / 5;
+            if (boss_damage < 1) boss_damage = 1;
+            g->boss_health -= boss_damage;
+            g->boss_bomb.reverse_damage_applied = 1;
+
+            if (g->boss_health <= 0) {
+                g->boss_health = 0;
+                boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
+            }
+        }
+    }
 }
 
 static void render_intro_regular_shot(lfb_t *lfb, int x, int y, uint32_t color) {
@@ -584,6 +641,28 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
                 g->powerup_active = 0;
                 shots[si].alive = 0;
+            }
+        }
+        if (!shots[si].alive) continue;
+
+        if (g->boss_attack_type == 2 && g->boss_bomb.alive && !g->boss_bomb.exploding) {
+            int bomb_hit = 0;
+            for (int bi = 0; bi < 5 && !bomb_hit; bi++) {
+                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int by = shots[si].y - bi;
+                int dx = bx - g->boss_bomb.x;
+                int dy = by - g->boss_bomb.y;
+                if ((dx * dx + dy * dy) <= 25) {
+                    bomb_hit = 1;
+                }
+            }
+            if (bomb_hit) {
+                shots[si].alive = 0;
+                g->boss_bomb.hits_taken++;
+                if (!g->boss_bomb.reversed && g->boss_bomb.hits_taken >= BOSS_BOMB_HITS_TO_REVERSE) {
+                    g->boss_bomb.reversed = 1;
+                    g->boss_bomb.dy = -BOSS_BOMB_SPEED;
+                }
             }
         }
         if (!shots[si].alive) continue;
@@ -996,6 +1075,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     const sprite1r_t *BS = active_boss_sprite(g);
     g->boss_x = (LW - BS->w) / 2;
     g->boss_y = 15;
+    g->boss_start_y = g->boss_y;
     g->boss_dx = 1;
     g->boss_dying = 0;
     g->boss_death_timer = 0;
@@ -1406,6 +1486,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_bomb.exploding = 0;
                 g->boss_bomb.explode_timer = 0;
                 g->boss_bomb.hit_player = 0;
+                g->boss_bomb.hits_taken = 0;
+                g->boss_bomb.reversed = 0;
+                g->boss_bomb.reverse_damage_applied = 0;
+                g->boss_bomb.dy = BOSS_BOMB_SPEED;
                 g->boss_bomb.x = g->boss_x + boss_w / 2;
                 g->boss_bomb.y = g->boss_y + boss_h + 2;
             } else {
@@ -1489,10 +1573,15 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->boss_attack_type == 2) {
             if (g->boss_bomb.alive) {
                 if (!g->boss_bomb.exploding) {
-                    g->boss_bomb.y += 3;
-                    if (g->boss_bomb.y >= g->player_y || g->boss_bomb.y >= LH - 6) {
+                    g->boss_bomb.y += g->boss_bomb.dy;
+                    if ((!g->boss_bomb.reversed && (g->boss_bomb.y >= g->player_y || g->boss_bomb.y >= LH - 6)) ||
+                        (g->boss_bomb.reversed && g->boss_bomb.y <= g->boss_start_y)) {
+                        if (g->boss_bomb.reversed) {
+                            g->boss_bomb.y = g->boss_start_y;
+                        }
                         g->boss_bomb.exploding = 1;
                         g->boss_bomb.explode_timer = BOSS_BOMB_EXPLOSION_FRAMES;
+                        g->boss_bomb.dy = 0;
                     }
                 } else {
                     if (g->boss_bomb.explode_timer > 0) {
@@ -1738,6 +1827,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     // Blue charged bomb explosion: same radius progression as boss death explosion and 2 damage to player.
     if (g->boss_attack_type == 2 && g->boss_bomb.alive && g->boss_bomb.exploding) {
         int radius = boss_bomb_explosion_radius(g);
+        apply_reversed_bomb_explosion_effects(g, radius);
         int pcx = g->player_x + g->PLAYER.w / 2;
         int pcy = g->player_y + g->PLAYER.h / 2;
         int dx = pcx - g->boss_bomb.x;
