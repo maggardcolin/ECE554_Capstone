@@ -21,6 +21,9 @@ static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
     if (g->boss_type == BOSS_TYPE_BLUE) {
         return frame ? &g->BOSS2_B : &g->BOSS2_A;
     }
+    if (g->boss_type == BOSS_TYPE_TOWER) {
+        return frame ? &g->BOSS3_B : &g->BOSS3_A;
+    }
     return frame ? &g->BOSS_B : &g->BOSS_A;
 }
 
@@ -37,9 +40,19 @@ void boss_trigger_death(game_t *g, int points_awarded) {
     for (int i = 0; i < 3; i++) {
         g->boss_triple_shot[i].alive = 0;
     }
+    for (int i = 0; i < MAX_TOWER_ASTEROIDS; i++) {
+        g->tower_asteroid[i].alive = 0;
+        g->tower_asteroid_exploding[i] = 0;
+        g->tower_asteroid_explode_timer[i] = 0;
+        g->tower_asteroid_hp[i] = 0;
+    }
     g->boss_bomb.alive = 0;
     g->boss_bomb.exploding = 0;
     g->boss_bomb.hit_player = 0;
+    g->tower_wall_active = 0;
+    g->tower_wall_timer = 0;
+    g->tower_wall_left = 0;
+    g->tower_wall_right = 0;
     g->boss_shield_active = 0;
     g->ashot.alive = 0;
     music_play_boom_long();
@@ -111,6 +124,12 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
         if ((age & 1) == 0) {
             draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFF66CCFF);
         }
+    } else if (g->boss_type == BOSS_TYPE_TOWER) {
+        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF4A2E12);
+        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF8B5A2B);
+        if ((age & 1) == 0) {
+            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFC08A4B);
+        }
     } else {
         draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFFFF4500);
         draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFFFF8C00);
@@ -126,6 +145,8 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
         uint32_t c;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             c = (i & 1) ? 0xFF66CCFF : 0xFFB8ECFF;
+        } else if (g->boss_type == BOSS_TYPE_TOWER) {
+            c = (i & 1) ? 0xFFC08A4B : 0xFF8B5A2B;
         } else {
             c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         }

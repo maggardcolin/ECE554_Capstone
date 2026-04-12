@@ -73,8 +73,12 @@ void update_player_movement(game_t *g, uint32_t buttons) {
     if (buttons & BTN_LEFT) g->player_x -= g->player_speed;
     if (buttons & BTN_RIGHT) g->player_x += g->player_speed;
 
-    if (g->player_x < 0) g->player_x = 0;
-    if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
+    int left_limit = g->tower_wall_active ? g->tower_wall_left : 0;
+    int right_limit = g->tower_wall_active ? (g->tower_wall_right - g->PLAYER.w) : (LW - g->PLAYER.w);
+    if (right_limit < left_limit) right_limit = left_limit;
+
+    if (g->player_x < left_limit) g->player_x = left_limit;
+    if (g->player_x > right_limit) g->player_x = right_limit;
 }
 
 void update_player_firing(game_t *g, uint32_t buttons) {

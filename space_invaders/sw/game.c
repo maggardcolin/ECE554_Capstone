@@ -20,6 +20,13 @@
 #define BOSS_INTRO_FRAMES 225
 #define YELLOW_BOSS_ALIENS 5
 #define YELLOW_BOSS_ATTACK_SHUFFLE 3
+#define TOWER_WALL_ATTACK 4
+#define TOWER_ASTEROID_RADIUS 7
+#define TOWER_ASTEROID_EXPLOSION_FRAMES 28
+#define TOWER_WALL_WIDTH 22
+#define TOWER_WALL_STEP 6
+#define TOWER_WALL_MIN_GAP 0
+#define TOWER_WALL_DURATION_FRAMES 150
 #define WIN_LEVEL 8
 #define WIN_RING_ALIENS 6
 #define WIN_EXPLOSION_DELAY_FRAMES 10
@@ -31,12 +38,17 @@
 #define PRACTICE_LEVEL_MAX (WIN_LEVEL - 1)
 #define PRACTICE_EXIT_INDEX BOSS_TYPE_COUNT
 #define PRACTICE_MENU_COUNT (BOSS_TYPE_COUNT + 1)
+#define TOP_HUD_SEPARATOR_Y 15
+#define BOTTOM_HUD_SEPARATOR_Y (LH - 20)
 
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
 static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
     if (g->boss_type == BOSS_TYPE_BLUE) {
         return frame ? &g->BOSS2_B : &g->BOSS2_A;
+    }
+    if (g->boss_type == BOSS_TYPE_TOWER) {
+        return frame ? &g->BOSS3_B : &g->BOSS3_A;
     }
     return frame ? &g->BOSS_B : &g->BOSS_A;
 }
@@ -48,18 +60,21 @@ static const sprite1r_t *active_boss_sprite(const game_t *g) {
 static const char *boss_intro_type_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return "MOON";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STAR";
+    if (g->boss_type == BOSS_TYPE_TOWER) return "TOWER";
     return "EMPEROR";
 }
 
 static const char *boss_menu_label(int boss_type) {
     if (boss_type == BOSS_TYPE_BLUE) return "MOON";
     if (boss_type == BOSS_TYPE_YELLOW) return "STAR";
+    if (boss_type == BOSS_TYPE_TOWER) return "TOWER";
     return "EMPEROR";
 }
 
 static const char *boss_intro_main_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return "TRIPLE SHOT";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STANDARD LASER";
+    if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID";
     return "STANDARD LASER";
 }
 
@@ -70,8 +85,54 @@ static int blue_black_hole_enabled(const game_t *g) {
 static const char *boss_intro_special_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return blue_black_hole_enabled(g) ? "BLACK HOLE" : "BOMB";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "SHUFFLE";
+    if (g->boss_type == BOSS_TYPE_TOWER) return "WALLS";
     if (g->level >= 3) return "PLASMA HEAL";
     return "PLASMA";
+}
+
+static int movement_left_bound(const game_t *g) {
+    return g->tower_wall_active ? g->tower_wall_left : 0;
+}
+
+static int movement_right_bound(const game_t *g) {
+    return g->tower_wall_active ? g->tower_wall_right : LW;
+}
+
+static int tower_walls_closed(const game_t *g) {
+    return g->tower_wall_active && (g->tower_wall_right <= g->tower_wall_left);
+}
+
+static int tower_wall_path_clear(const game_t *g, int proposed_left, int proposed_right) {
+    const sprite1r_t *BS = active_boss_sprite(g);
+    int boss_left = g->boss_x;
+    int boss_right = g->boss_x + BS->w;
+    if (boss_left < proposed_left || boss_right > proposed_right) {
+        return 0;
+    }
+
+    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    int spacing_x = 6, spacing_y = 5;
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[r][c]) continue;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+            int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+            (void)ay;
+            if (ax < proposed_left || (ax + AS->w) > proposed_right) {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
+static int tower_asteroid_explosion_radius(const game_t *g, int ai) {
+    int age = TOWER_ASTEROID_EXPLOSION_FRAMES - g->tower_asteroid_explode_timer[ai];
+    int radius = TOWER_ASTEROID_RADIUS + (age / 2);
+    int max_radius = TOWER_ASTEROID_RADIUS * 2 + 3;
+    if (radius > max_radius) radius = max_radius;
+    return radius;
 }
 
 static int yellow_boss_hp_per_alien(const game_t *g) {
@@ -212,6 +273,15 @@ static void clear_boss_projectiles(game_t *g) {
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
         g->yellow_beam_shot[i].alive = 0;
     }
+    for (int i = 0; i < MAX_TOWER_ASTEROIDS; i++) {
+        g->tower_asteroid[i].alive = 0;
+        g->tower_asteroid_spin[i] = 0;
+        g->tower_asteroid_hp[i] = 0;
+        g->tower_asteroid_dx[i] = 0;
+        g->tower_asteroid_exploding[i] = 0;
+        g->tower_asteroid_explode_timer[i] = 0;
+        g->tower_asteroid_boss_damage_applied[i] = 0;
+    }
     g->boss_bomb.alive = 0;
     g->boss_bomb.dy = BOSS_BOMB_SPEED;
     g->boss_bomb.exploding = 0;
@@ -220,6 +290,20 @@ static void clear_boss_projectiles(game_t *g) {
     g->boss_bomb.hits_taken = 0;
     g->boss_bomb.reversed = 0;
     g->boss_bomb.reverse_damage_applied = 0;
+    g->tower_wall_active = 0;
+    g->tower_wall_timer = 0;
+    g->tower_wall_left = 0;
+    g->tower_wall_right = LW;
+}
+
+static void start_tower_asteroid_explosion(game_t *g, int ai) {
+    if (g->tower_asteroid_exploding[ai]) return;
+    g->tower_asteroid[ai].alive = 0;
+    g->tower_asteroid_hp[ai] = 0;
+    g->tower_asteroid_dx[ai] = 0;
+    g->tower_asteroid_exploding[ai] = 1;
+    g->tower_asteroid_explode_timer[ai] = TOWER_ASTEROID_EXPLOSION_FRAMES;
+    g->tower_asteroid_boss_damage_applied[ai] = 0;
 }
 
 static int boss_bomb_explosion_radius(const game_t *g) {
@@ -231,6 +315,60 @@ static int boss_bomb_explosion_radius(const game_t *g) {
 }
 
 static void kill_alien_with_explosion(game_t *g, int r, int c);
+static void apply_player_damage(game_t *g, int damage);
+static int sprite_has_any_bits(const sprite1r_t *s);
+
+static void apply_tower_asteroid_explosion_effects(game_t *g, int ai, int radius) {
+    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    int spacing_x = 6, spacing_y = 5;
+
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[r][c]) continue;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x) + AS->w / 2;
+            int ay = g->alien_origin_y + r * (AS->h + spacing_y) + AS->h / 2;
+            int dx = ax - g->tower_asteroid[ai].x;
+            int dy = ay - g->tower_asteroid[ai].y;
+            if ((dx * dx + dy * dy) <= (radius * radius)) {
+                kill_alien_with_explosion(g, r, c);
+            }
+        }
+    }
+
+    if (!g->tower_asteroid_boss_damage_applied[ai] && g->boss_alive && !g->boss_dying && g->boss_type != BOSS_TYPE_YELLOW) {
+        const sprite1r_t *BS = active_boss_sprite(g);
+        if (circle_intersects_rect(g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, radius,
+                                   g->boss_x, g->boss_y, BS->w, BS->h)) {
+            int boss_damage = g->boss_max_health / 10;
+            if (boss_damage < 1) boss_damage = 1;
+            g->boss_health -= boss_damage;
+            g->tower_asteroid_boss_damage_applied[ai] = 1;
+
+            if (g->boss_health <= 0) {
+                g->boss_health = 0;
+                boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
+            }
+        }
+    }
+
+    for (int i = 0; i < 4; i++) {
+        sprite1r_t *b = g->bunkers[i];
+        if (!sprite_has_any_bits(b)) continue;
+        int bx = g->bunker_x[i];
+        int by = g->bunker_y;
+        if (circle_intersects_rect(g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, radius, bx, by, b->w, b->h)) {
+            memset(b->bits, 0, (size_t)b->stride * (size_t)b->h);
+        }
+    }
+
+    if (!g->player_dying) {
+        const sprite1r_t *p = &g->PLAYER;
+        if (circle_intersects_rect(g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, radius,
+                                   g->player_x, g->player_y, p->w, p->h)) {
+            apply_player_damage(g, 1);
+        }
+    }
+}
 
 static void apply_reversed_bomb_explosion_effects(game_t *g, int radius) {
     const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
@@ -322,7 +460,57 @@ static void render_black_hole_explosion(lfb_t *lfb, int cx, int cy, int r) {
     }
 }
 
-static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int boss_x, int boss_y, const sprite1r_t *BS) {
+static void render_tower_asteroid(lfb_t *lfb, int cx, int cy, int spin) {
+    draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS, 0xFF8B5A2B);
+    draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS - 2, 0xFF6A4421);
+
+    int phase = (spin / 4) & 3;
+    if (phase == 0) {
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + i, cy + (i / 2), 0xFFC08A4B);
+    } else if (phase == 1) {
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + (i / 2), cy + i, 0xFFC08A4B);
+    } else if (phase == 2) {
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + i, cy - (i / 2), 0xFFC08A4B);
+    } else {
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx - (i / 2), cy + i, 0xFFC08A4B);
+    }
+}
+
+static int circle_hits_sprite(const sprite1r_t *s, int sx, int sy, int cx, int cy, int r) {
+    int nearest_x = cx;
+    int nearest_y = cy;
+    int left = sx;
+    int right = sx + s->w - 1;
+    int top = sy;
+    int bottom = sy + s->h - 1;
+
+    if (nearest_x < left) nearest_x = left;
+    if (nearest_x > right) nearest_x = right;
+    if (nearest_y < top) nearest_y = top;
+    if (nearest_y > bottom) nearest_y = bottom;
+
+    int dx = cx - nearest_x;
+    int dy = cy - nearest_y;
+    return (dx * dx + dy * dy) <= (r * r);
+}
+
+static void render_tower_walls(lfb_t *lfb, const game_t *g) {
+    if (!g->tower_wall_active) return;
+    int top = TOP_HUD_SEPARATOR_Y + 1;
+    int bottom = BOTTOM_HUD_SEPARATOR_Y - 1;
+    if (bottom < top) return;
+
+    for (int y = top; y <= bottom; y++) {
+        for (int x = 0; x < g->tower_wall_left; x++) {
+            l_putpix(lfb, x, y, 0xFF4A2E12);
+        }
+        for (int x = g->tower_wall_right; x < LW; x++) {
+            l_putpix(lfb, x, y, 0xFF4A2E12);
+        }
+    }
+}
+
+static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int boss_x, int boss_y, const sprite1r_t *BS, int allow_tower_walls) {
     int elapsed = BOSS_INTRO_FRAMES - g->boss_intro_timer;
     int start_y = boss_y + BS->h + 2;
     int center_x = boss_x + BS->w / 2;
@@ -410,6 +598,26 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
         return;
     }
 
+    if (g->boss_type == BOSS_TYPE_TOWER) {
+        if (elapsed >= t0 && elapsed < t1) {
+            int local = elapsed - t0;
+            int y = start_y + local;
+            render_tower_asteroid(lfb, center_x, y, local * 2);
+        } else if (elapsed >= t2 && elapsed < t3) {
+            int local = elapsed - t2;
+            int y = start_y + local;
+            render_tower_asteroid(lfb, center_x, y, local * 2 + 10);
+        } else if (allow_tower_walls && elapsed >= t4 && elapsed < t5) {
+            int wall_left = TOWER_WALL_WIDTH;
+            int wall_right = LW - TOWER_WALL_WIDTH;
+            for (int y = 0; y < LH; y++) {
+                for (int x = 0; x < wall_left; x++) l_putpix(lfb, x, y, 0xFF4A2E12);
+                for (int x = wall_right; x < LW; x++) l_putpix(lfb, x, y, 0xFF4A2E12);
+            }
+        }
+        return;
+    }
+
     // Multicolor boss preview.
     if (elapsed >= t0 && elapsed < t1) {
         int local = elapsed - t0;
@@ -441,6 +649,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
         preview_type_color = 0xFF3399FF;
     } else if (boss_type == BOSS_TYPE_YELLOW) {
         preview_type_color = 0xFFFFFF00;
+    } else if (boss_type == BOSS_TYPE_TOWER) {
+        preview_type_color = 0xFF8B5A2B;
     } else {
         if (preview.boss_intro_timer > 0) {
             uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
@@ -458,7 +668,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     l_draw_text(lfb, right_x, 28, "MAIN:", 1, 0xFFFFFFFF);
     l_draw_text(lfb, right_x + 34, 28, boss_intro_main_attack_text(&preview), 1,
                 (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 : 0xFFFF0000);
+                (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
+                (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFFFF0000);
 
     l_draw_text(lfb, right_x, 40, "SPECIAL:", 1, 0xFFFFFFFF);
     if (boss_type == BOSS_TYPE_CLASSIC && preview.level >= 3) {
@@ -471,7 +682,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     } else {
         l_draw_text(lfb, right_x + 46, 40, boss_intro_special_attack_text(&preview), 1,
                     (boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
-                    (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 : 0xFF8000FF);
+                    (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
+                    (boss_type == BOSS_TYPE_TOWER) ? 0xFF4A2E12 : 0xFF8000FF);
     }
 
     char level_text[20];
@@ -487,10 +699,11 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     int boss_x = pane_center_x - BS->w / 2;
     int boss_y = 84;
     if (boss_type != BOSS_TYPE_YELLOW) {
-        uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
+        uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
+                              (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
         if (boss_type == BOSS_TYPE_CLASSIC) boss_color = preview_type_color;
         draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
-        render_intro_boss_attack_preview(&preview, lfb, boss_x, boss_y, BS);
+        render_intro_boss_attack_preview(&preview, lfb, boss_x, boss_y, BS, 0);
     } else {
         const sprite1r_t *AS = preview.alien_frame ? &preview.ALIEN_B : &preview.ALIEN_A;
         int spacing = 8;
@@ -924,6 +1137,28 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     g->boss_bomb.reversed = 1;
                     g->boss_bomb.dy = -BOSS_BOMB_SPEED;
                 }
+            }
+        }
+        if (!shots[si].alive) continue;
+
+        for (int ai = 0; ai < MAX_TOWER_ASTEROIDS && shots[si].alive; ai++) {
+            if (!g->tower_asteroid[ai].alive) continue;
+            int asteroid_hit = 0;
+            for (int bi = 0; bi < 5 && !asteroid_hit; bi++) {
+                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int by = shots[si].y - bi;
+                int dx = bx - g->tower_asteroid[ai].x;
+                int dy = by - g->tower_asteroid[ai].y;
+                if ((dx * dx + dy * dy) <= (TOWER_ASTEROID_RADIUS * TOWER_ASTEROID_RADIUS)) {
+                    asteroid_hit = 1;
+                }
+            }
+            if (asteroid_hit) {
+                g->tower_asteroid_hp[ai]--;
+                if (g->tower_asteroid_hp[ai] <= 0) {
+                    start_tower_asteroid_explosion(g, ai);
+                }
+                shots[si].alive = 0;
             }
         }
         if (!shots[si].alive) continue;
@@ -1436,10 +1671,16 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_power_cooldown = 0;
     g->boss_laser_last_hit_y = -1000;  // Far off screen
     g->boss_attack_type = (g->boss_type == BOSS_TYPE_BLUE) ? 2 :
-                          (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE : 0;  // Current attack being executed
+                         (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE :
+                         (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK : 0;  // Current attack being executed
     g->next_boss_attack_type = (g->boss_type == BOSS_TYPE_BLUE) ? 2 :
-                               (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE : 0;  // Next attack to be charged
+                             (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE :
+                             (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK : 0;  // Next attack to be charged
     g->boss_green_laser_last_hit_y = -1000;  // Far off screen
+        g->tower_wall_active = 0;
+        g->tower_wall_timer = 0;
+        g->tower_wall_left = 0;
+        g->tower_wall_right = LW;
     refill_sprite_full(&g->BOSS_SHIELD);
 
     if (level > 0 && !g->practice_run_active) {
@@ -1485,6 +1726,8 @@ void game_init(game_t *g) {
     g->BOSS_B  = make_sprite_from_ascii(bossB_rows, 10);
     g->BOSS2_A = make_sprite_from_ascii(boss2A_rows, 10);
     g->BOSS2_B = make_sprite_from_ascii(boss2B_rows, 10);
+    g->BOSS3_A = make_sprite_from_ascii(boss3A_rows, 10);
+    g->BOSS3_B = make_sprite_from_ascii(boss3B_rows, 10);
     g->BOSS_SHIELD = make_filled_sprite(g->BOSS_A.w, 3);
     g->SHOP_LIFE = make_sprite_from_ascii(shop_life_rows, 7);
     g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
@@ -1730,6 +1973,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         return;
     }
 
+    if (!g->player_dying && !g->game_over && tower_walls_closed(g)) {
+        g->lives = 0;
+        trigger_player_death(g);
+        return;
+    }
+
     if (g->player_dying) {
         if (g->player_death_timer > 0) {
             g->player_death_timer--;
@@ -1818,10 +2067,24 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->powerup_spawn_timer++;
             if (g->powerup_spawn_timer >= 900) {
                 int tile = 8;
-                // Constrain spawning to center area and upper half to ensure hittable
-                int cols = (LW - 80) / tile;  // Leave 40px margin on each side
+                // Constrain spawning to the current movement corridor and upper half.
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                int left_spawn_px = left_bound + 8;
+                int right_spawn_px = right_bound - 8;
+                if (right_spawn_px <= left_spawn_px) {
+                    left_spawn_px = left_bound;
+                    right_spawn_px = right_bound;
+                }
+
+                int col_start = left_spawn_px / tile;
+                int col_end = (right_spawn_px - 1) / tile;
+                if (col_end < col_start) col_end = col_start;
+                int cols = col_end - col_start + 1;
                 int rows = (LH - 100) / tile;  // Leave space at bottom for player
-                int tx = 40/tile + (rand() % cols);  // Start from left margin
+                if (rows < 1) rows = 1;
+
+                int tx = col_start + (rand() % cols);
                 int ty = 30/tile + (rand() % rows);  // Start from top, avoid bunkers
                 g->powerup_x = tx * tile + tile / 2;
                 g->powerup_y = ty * tile + tile / 2;
@@ -1869,7 +2132,25 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 int next_left  = next_origin_x + minc * (AS->w + spacing_x);
                 int next_right = next_left + grid_w;
 
-                if (next_left < 5 || next_right > LW - 5) {
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                if (next_left < left_bound + 5 || next_right > right_bound - 5) {
+                    int stride = AS->w + spacing_x;
+                    int min_origin = (left_bound + 5) - minc * stride;
+                    int max_origin = (right_bound - 5) - grid_w - minc * stride;
+
+                    if (max_origin < min_origin) {
+                        max_origin = min_origin;
+                    }
+
+                    if (next_origin_x < min_origin) {
+                        g->alien_origin_x = min_origin;
+                    } else if (next_origin_x > max_origin) {
+                        g->alien_origin_x = max_origin;
+                    } else {
+                        g->alien_origin_x = next_origin_x;
+                    }
+
                     g->alien_dx = -g->alien_dx;
                     g->alien_origin_y += g->alien_drop_px;
                     // After boss is killed, speed up aliens on each wall hit
@@ -1921,9 +2202,15 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         // Boss power charging system
         int prev_power_timer = g->boss_power_timer;
         int health_pct = (g->boss_health * 100) / g->boss_max_health;
-        if (health_pct <= 33) g->boss_power_timer += 3 + (g->level / 6);
-        else if (health_pct <= 67) g->boss_power_timer += 2 + (g->level / 6);
-        else g->boss_power_timer += 1 + (g->level / 6);
+        if (g->boss_type == BOSS_TYPE_TOWER) {
+            if (health_pct <= 33) g->boss_power_timer += 3;
+            else if (health_pct <= 67) g->boss_power_timer += 2;
+            else g->boss_power_timer += 1;
+        } else {
+            if (health_pct <= 33) g->boss_power_timer += 3 + (g->level / 6);
+            else if (health_pct <= 67) g->boss_power_timer += 2 + (g->level / 6);
+            else g->boss_power_timer += 1 + (g->level / 6);
+        }
         if (g->boss_power_timer > g->boss_power_max) {
             g->boss_power_timer = g->boss_power_max;
         }
@@ -1933,6 +2220,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (prev_power_timer == 0 && g->boss_power_timer > 0) {
             if (g->boss_type == BOSS_TYPE_BLUE) {
                 g->next_boss_attack_type = 2;
+            } else if (g->boss_type == BOSS_TYPE_TOWER) {
+                g->next_boss_attack_type = TOWER_WALL_ATTACK;
             } else {
                 int alive_count = 0;
                 for (int r = 0; r < AROWS; r++) {
@@ -1950,20 +2239,47 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
 
         // When power reaches max, trigger special attack
-        if (g->boss_power_timer >= g->boss_power_max && g->boss_power_active == 0) {
+        if (g->boss_power_timer >= g->boss_power_max && g->boss_power_active == 0 && g->boss_power_cooldown == 0) {
+            int defer_tower_wall = 0;
             g->boss_power_active = 1;
-            g->boss_power_cooldown = 30;
+            g->boss_power_cooldown = (g->boss_type == BOSS_TYPE_TOWER) ? 0 : 30;
             
             // Use the next attack type that was determined during charging
             g->boss_attack_type = g->next_boss_attack_type;
 
-            g->boss_laser.alive = 0;
-            g->boss_bomb.alive = 0;
-            g->boss_bomb.exploding = 0;
-            g->boss_bomb.explode_timer = 0;
-            g->boss_bomb.hit_player = 0;
+            if (g->boss_attack_type == TOWER_WALL_ATTACK) {
+                int wall_thickness = g->tower_wall_active ? g->tower_wall_left : TOWER_WALL_WIDTH;
+                int max_thickness = (LW - TOWER_WALL_MIN_GAP) / 2;
+                if (max_thickness < TOWER_WALL_WIDTH) max_thickness = TOWER_WALL_WIDTH;
+                if (g->tower_wall_active) {
+                    wall_thickness += TOWER_WALL_STEP;
+                }
+                if (wall_thickness > max_thickness) wall_thickness = max_thickness;
 
-            if (g->boss_attack_type == 2) {
+                int proposed_left = wall_thickness;
+                int proposed_right = LW - wall_thickness;
+                if (!tower_wall_path_clear(g, proposed_left, proposed_right)) {
+                    defer_tower_wall = 1;
+                    g->boss_power_active = 0;
+                    g->boss_power_cooldown = 30; // Wait an extra 0.5s before retrying.
+                } else {
+                    g->boss_laser.alive = 0;
+                    g->boss_bomb.alive = 0;
+                    g->boss_bomb.exploding = 0;
+                    g->boss_bomb.explode_timer = 0;
+                    g->boss_bomb.hit_player = 0;
+                    g->tower_wall_active = 1;
+                    g->tower_wall_timer = TOWER_WALL_DURATION_FRAMES;
+                    g->tower_wall_left = proposed_left;
+                    g->tower_wall_right = proposed_right;
+                    g->boss_power_active = 0;
+                }
+            } else if (g->boss_attack_type == 2) {
+                g->boss_laser.alive = 0;
+                g->boss_bomb.alive = 0;
+                g->boss_bomb.exploding = 0;
+                g->boss_bomb.explode_timer = 0;
+                g->boss_bomb.hit_player = 0;
                 g->boss_bomb.alive = 1;
                 g->boss_bomb.exploding = 0;
                 g->boss_bomb.explode_timer = 0;
@@ -1975,15 +2291,22 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_bomb.x = g->boss_x + boss_w / 2;
                 g->boss_bomb.y = g->boss_y + boss_h + 2;
             } else {
+                g->boss_laser.alive = 0;
+                g->boss_bomb.alive = 0;
+                g->boss_bomb.exploding = 0;
+                g->boss_bomb.explode_timer = 0;
+                g->boss_bomb.hit_player = 0;
                 g->boss_laser.alive = 1;
                 g->boss_laser.x = g->boss_x + boss_w / 2;
                 g->boss_laser.y = g->boss_y + boss_h + 1;
             }
 
-            g->boss_laser_last_hit_y = -1000;  // Reset hit tracking
-            g->boss_green_laser_last_hit_y = -1000;  // Reset green laser tracking
-            g->boss_power_timer = 0;  // Reset for next charge
-            music_play_laser();
+            if (!defer_tower_wall) {
+                g->boss_laser_last_hit_y = -1000;  // Reset hit tracking
+                g->boss_green_laser_last_hit_y = -1000;  // Reset green laser tracking
+                g->boss_power_timer = 0;  // Reset for next charge
+                music_play_laser();
+            }
             
             // Boss recovers 10% health if using green laser
             if (g->boss_attack_type == 1) {
@@ -1998,11 +2321,15 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
         }
 
-        // Handle stun/frozen state during special attack
+        // Handle stun/frozen state during special attack.
+        // Tower keeps moving even while using cooldown as a wall-retry delay.
+        int freeze_boss = 0;
         if (g->boss_power_cooldown > 0) {
+            freeze_boss = (g->boss_type != BOSS_TYPE_TOWER);
             g->boss_power_cooldown--;
-            // Boss doesn't move during stun
-        } else {
+        }
+
+        if (!freeze_boss) {
             // Normal movement
             g->boss_timer++;
             if (g->boss_timer >= g->boss_period) {
@@ -2011,7 +2338,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
 
             int next_bx = g->boss_x + g->boss_dx;
-            if (next_bx < 0 || next_bx > LW - boss_w) {
+            int left_bound = movement_left_bound(g);
+            int right_bound = movement_right_bound(g);
+            if (next_bx < left_bound || next_bx > right_bound - boss_w) {
                 g->boss_dx = -g->boss_dx;
                 next_bx = g->boss_x + g->boss_dx;
             }
@@ -2025,7 +2354,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
             }
             int total_aliens = AROWS * ACOLS;
-            if (alive_count <= total_aliens / 2) {
+            if (g->boss_type != BOSS_TYPE_TOWER && alive_count <= total_aliens / 2) {
                 if (g->boss_timer == 0) g->boss_y += 1;
             }
         }
@@ -2178,7 +2507,76 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (health_pct <= 10) period = 15;       // fast when red
             else if (health_pct <= 50) period = 30;  // medium when yellow
 
-            if (g->boss_type == BOSS_TYPE_BLUE) {
+            if (g->boss_type == BOSS_TYPE_TOWER) {
+                int total_aliens = AROWS * ACOLS;
+                int remaining_aliens = count_aliens_remaining(g);
+                const int tower_period_max = 180;
+                const int tower_period_min = 70;
+                int tower_period = tower_period_min + (remaining_aliens * (tower_period_max - tower_period_min)) / total_aliens;
+                if (tower_period < tower_period_min) tower_period = tower_period_min;
+                if (tower_period > tower_period_max) tower_period = tower_period_max;
+
+                int level_speedup = (g->level - 1) * 4;
+                if (level_speedup < 0) level_speedup = 0;
+                if (level_speedup > 40) level_speedup = 40;
+                tower_period -= level_speedup;
+                if (tower_period < 30) tower_period = 30;
+
+                if ((vsync_counter % (uint32_t)tower_period) == 0u) {
+                    int active_count = 0;
+                    for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
+                        if (g->tower_asteroid[ai].alive) active_count++;
+                    }
+
+                    int spawn_slot = -1;
+                    if (active_count < 10) {
+                        for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
+                            if (!g->tower_asteroid[ai].alive && !g->tower_asteroid_exploding[ai]) {
+                                spawn_slot = ai;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (spawn_slot >= 0) {
+                        const sprite1r_t *BS = active_boss_sprite(g);
+                        g->tower_asteroid[spawn_slot].alive = 1;
+                        g->tower_asteroid[spawn_slot].x = g->boss_x + BS->w / 2;
+                        g->tower_asteroid[spawn_slot].y = g->boss_y + BS->h + 2;
+                        g->tower_asteroid_hp[spawn_slot] = 3;
+                        g->tower_asteroid_dx[spawn_slot] = ((rand() & 1) == 0) ? -1 : 1;
+                        g->tower_asteroid_spin[spawn_slot] = 0;
+                        g->tower_asteroid_exploding[spawn_slot] = 0;
+                        g->tower_asteroid_explode_timer[spawn_slot] = 0;
+                        g->tower_asteroid_boss_damage_applied[spawn_slot] = 0;
+                    }
+                }
+
+                for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
+                    if (!g->tower_asteroid[ai].alive) continue;
+                    if ((vsync_counter & 1u) == 0u) {
+                        g->tower_asteroid[ai].y += 1;
+                        g->tower_asteroid[ai].x += g->tower_asteroid_dx[ai];
+                        if (g->tower_asteroid[ai].x < movement_left_bound(g) + TOWER_ASTEROID_RADIUS) {
+                            g->tower_asteroid[ai].x = movement_left_bound(g) + TOWER_ASTEROID_RADIUS;
+                            g->tower_asteroid_dx[ai] = -g->tower_asteroid_dx[ai];
+                        }
+                        if (g->tower_asteroid[ai].x > movement_right_bound(g) - TOWER_ASTEROID_RADIUS - 1) {
+                            g->tower_asteroid[ai].x = movement_right_bound(g) - TOWER_ASTEROID_RADIUS - 1;
+                            g->tower_asteroid_dx[ai] = -g->tower_asteroid_dx[ai];
+                        }
+                    }
+                    g->tower_asteroid_spin[ai]++;
+                    if (g->tower_asteroid[ai].y - TOWER_ASTEROID_RADIUS > LH) {
+                        g->tower_asteroid[ai].alive = 0;
+                        g->tower_asteroid_hp[ai] = 0;
+                    }
+                }
+                g->boss_shot.alive = 0;
+                for (int i = 0; i < 3; i++) {
+                    g->boss_triple_shot[i].alive = 0;
+                }
+            } else if (g->boss_type == BOSS_TYPE_BLUE) {
             int any_triple_alive = 0;
             for (int i = 0; i < 3; i++) {
                 if (g->boss_triple_shot[i].alive) {
@@ -2248,6 +2646,41 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
         handle_enemy_shot_collisions(g, &g->yellow_beam_shot[i]);
+    }
+
+    for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
+        if (g->tower_asteroid[ai].alive) {
+            if (circle_hits_sprite(&g->PLAYER, g->player_x, g->player_y,
+                                   g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, TOWER_ASTEROID_RADIUS)) {
+                apply_player_damage(g, 1);
+                start_tower_asteroid_explosion(g, ai);
+            }
+
+            if (g->tower_asteroid[ai].alive && g->level != 0) {
+                for (int i = 0; i < 4 && g->tower_asteroid[ai].alive; i++) {
+                    sprite1r_t *b = g->bunkers[i];
+                    if (!sprite_has_any_bits(b)) continue;
+                    int bx = g->bunker_x[i], by = g->bunker_y;
+                    if (circle_hits_sprite(b, bx, by,
+                                           g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, TOWER_ASTEROID_RADIUS)) {
+                        bunker_damage(b, g->tower_asteroid[ai].x - bx, g->tower_asteroid[ai].y - by, 6);
+                        start_tower_asteroid_explosion(g, ai);
+                    }
+                }
+            }
+        }
+
+        if (g->tower_asteroid_exploding[ai]) {
+            int radius = tower_asteroid_explosion_radius(g, ai);
+            apply_tower_asteroid_explosion_effects(g, ai, radius);
+            if (g->tower_asteroid_explode_timer[ai] > 0) {
+                g->tower_asteroid_explode_timer[ai]--;
+            }
+            if (g->tower_asteroid_explode_timer[ai] <= 0) {
+                g->tower_asteroid_exploding[ai] = 0;
+                g->tower_asteroid_explode_timer[ai] = 0;
+            }
+        }
     }
 
     // Handle boss laser collision (only with player, phases through)
@@ -2336,8 +2769,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->player_x -= step;
             }
 
-            if (g->player_x < 0) g->player_x = 0;
-            if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
+            int left_bound = movement_left_bound(g);
+            int right_bound = movement_right_bound(g);
+            if (g->player_x < left_bound) g->player_x = left_bound;
+            if (g->player_x > right_bound - g->PLAYER.w) g->player_x = right_bound - g->PLAYER.w;
 
             // Recompute center after movement for hit test.
             pcx = g->player_x + g->PLAYER.w / 2;
@@ -2454,6 +2889,7 @@ void game_render(game_t *g, lfb_t *lfb) {
                 boss_menu_label(BOSS_TYPE_CLASSIC),
                 boss_menu_label(BOSS_TYPE_BLUE),
                 boss_menu_label(BOSS_TYPE_YELLOW),
+                boss_menu_label(BOSS_TYPE_TOWER),
                 "EXIT TO MAIN MENU"
             };
 
@@ -2618,6 +3054,10 @@ void game_render(game_t *g, lfb_t *lfb) {
             uint32_t yellow_flicker_palette[4] = {0xFFFFFF66, 0xFFFFFF00, 0xFFFFD700, 0xFFFFFF00};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = yellow_flicker_palette[flicker_idx];
+        } else if (g->boss_type == BOSS_TYPE_TOWER) {
+            uint32_t tower_flicker_palette[4] = {0xFF6A4421, 0xFF8B5A2B, 0xFFC08A4B, 0xFF8B5A2B};
+            int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
+            type_color = tower_flicker_palette[flicker_idx];
         } else {
             uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
@@ -2635,7 +3075,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int main_value_w = text_width_5x5(main_value, scale);
         int main_x = (LW - (main_prefix_w + 6 + main_value_w)) / 2;
         uint32_t main_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                      (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 : 0xFFFF0000;
+                      (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
+                      (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFFFF0000;
         l_draw_text(lfb, main_x, y, main_prefix, scale, 0xFFFFFFFF);
         l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, main_color);
 
@@ -2655,6 +3096,12 @@ void game_render(game_t *g, lfb_t *lfb) {
             special_text_x = special_x + special_prefix_w + 6;
             l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
             l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFFFFF00);
+        } else if (g->boss_type == BOSS_TYPE_TOWER) {
+            int special_value_w = text_width_5x5(special_value, scale);
+            special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
+            special_text_x = special_x + special_prefix_w + 6;
+            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF4A2E12);
         } else if (g->level >= 3) {
             const char *spec1 = "PLASMA";
             const char *spec2 = "HEAL";
@@ -2681,13 +3128,14 @@ void game_render(game_t *g, lfb_t *lfb) {
         int boss_x = (LW - BS->w) / 2;
         int boss_y = 68;
         if (g->boss_type != BOSS_TYPE_YELLOW) {
-            uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
+            uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
+                                  (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
             if (g->boss_type == BOSS_TYPE_CLASSIC) {
                 boss_color = type_color;
             }
             draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
         }
-        render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS);
+        render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS, 1);
         return;
     }
 
@@ -2753,7 +3201,8 @@ void game_render(game_t *g, lfb_t *lfb) {
     // Boss health bar on the left side of screen
     if (g->boss_alive) {
         uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                              (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 : 0xFF00FF00;
+                              (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
+                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             if (health_pct <= 33) boss_color = 0xFF114488;
@@ -2761,6 +3210,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         } else if (g->boss_type == BOSS_TYPE_YELLOW) {
             if (health_pct <= 33) boss_color = 0xFFFFC000;
             else if (health_pct <= 67) boss_color = 0xFFFFD84D;
+        } else if (g->boss_type == BOSS_TYPE_TOWER) {
+            if (health_pct <= 33) boss_color = 0xFF4A2E12;
+            else if (health_pct <= 67) boss_color = 0xFF6A4421;
         } else {
             if (health_pct <= 33) boss_color = 0xFFFF0000;
             else if (health_pct <= 67) boss_color = 0xFFFFFF00;
@@ -2798,6 +3250,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         else if (g->next_boss_attack_type == 1) power_color = 0xFF00FF00;  // Green (for green laser heal)
         else if (g->next_boss_attack_type == 2) power_color = 0xFF3399FF;  // Blue bomb
         else if (g->next_boss_attack_type == YELLOW_BOSS_ATTACK_SHUFFLE) power_color = 0xFFFFFF00;  // Yellow shuffle
+        else if (g->next_boss_attack_type == TOWER_WALL_ATTACK) power_color = 0xFF8B5A2B;  // Tower walls
         else power_color = 0xFF808080;  // Gray (unknown)
 
         int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * power_bar_w) / g->boss_power_max : 0;
@@ -2806,9 +3259,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // Draw a separator line below the top HUD (boss/level info) to frame gameplay area.
     {
-        const int top_hud_separator_y = 15;
         for (int x = 0; x < LW; x++) {
-            l_putpix(lfb, x, top_hud_separator_y, 0xFFFFFFFF);
+            l_putpix(lfb, x, TOP_HUD_SEPARATOR_Y, 0xFFFFFFFF);
         }
     }
 
@@ -2837,9 +3289,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // Draw a separator line above the bottom HUD (player/powerup info) with a small gap.
     {
-        const int bottom_hud_separator_y = LH - 20;
         for (int x = 0; x < LW; x++) {
-            l_putpix(lfb, x, bottom_hud_separator_y, 0xFFFFFFFF);
+            l_putpix(lfb, x, BOTTOM_HUD_SEPARATOR_Y, 0xFFFFFFFF);
         }
     }
 
@@ -2908,10 +3359,14 @@ void game_render(game_t *g, lfb_t *lfb) {
     // boss (drawn behind regular aliens)
     if (g->boss_alive && !g->boss_dying && g->boss_type != BOSS_TYPE_YELLOW) {
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
-        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
+        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
+                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             if (health_pct <= 33) boss_color = 0xFF114488;
             else if (health_pct <= 67) boss_color = 0xFF1E6AD6;
+        } else if (g->boss_type == BOSS_TYPE_TOWER) {
+            if (health_pct <= 33) boss_color = 0xFF4A2E12;
+            else if (health_pct <= 67) boss_color = 0xFF6A4421;
         } else {
             if (health_pct <= 33) boss_color = 0xFFFF0000;
             else if (health_pct <= 67) boss_color = 0xFFFFFF00;
@@ -2996,6 +3451,20 @@ void game_render(game_t *g, lfb_t *lfb) {
             l_putpix(lfb, g->yellow_beam_shot[s].x, g->yellow_beam_shot[s].y + i, 0xFFFFFF00);
         }
     }
+    for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
+        if (g->tower_asteroid[ai].alive) {
+            render_tower_asteroid(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, g->tower_asteroid_spin[ai]);
+        } else if (g->tower_asteroid_exploding[ai]) {
+            int r = tower_asteroid_explosion_radius(g, ai);
+            draw_filled_circle(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r, 0xFFFF4500);
+            draw_filled_circle(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r - 2, 0xFFFF8C00);
+            if ((g->tower_asteroid_explode_timer[ai] & 1) == 0) {
+                int core_r = r - 4;
+                if (core_r < 1) core_r = 1;
+                draw_filled_circle(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, core_r, 0xFFFFFF00);
+            }
+        }
+    }
 
     // Boss laser beam and trailing after-image copies.
     // Only the leading beam is used for collision in update logic.
@@ -3045,6 +3514,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int exit_y = g->player_y - 10;
         render_exit_indicator(lfb, exit_y);
     }
+
+    render_tower_walls(lfb, g);
 
     render_fps_counter(lfb);
 }
