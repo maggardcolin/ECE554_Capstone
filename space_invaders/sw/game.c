@@ -396,11 +396,26 @@ static void start_tower_asteroid_explosion(game_t *g, int ai) {
 }
 
 static int boss_bomb_explosion_radius(const game_t *g) {
-    (void)g;
     int age = BOSS_BOMB_EXPLOSION_FRAMES - g->boss_bomb.explode_timer;
     int frame = age / 10;
     int base_r = 6 + frame * 3;
-    return base_r + 4;
+    int radius = base_r + 4;
+
+    // Moon boss variant: once half the alien wave is gone, boost bomb/black-hole radius.
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        int alive_count = 0;
+        for (int r = 0; r < AROWS; r++) {
+            for (int c = 0; c < ACOLS; c++) {
+                alive_count += g->alien_alive[r][c] ? 1 : 0;
+            }
+        }
+        int total_aliens = AROWS * ACOLS;
+        if (alive_count <= total_aliens / 2) {
+            radius = (radius * 3) / 2;
+        }
+    }
+
+    return radius;
 }
 
 static void kill_alien_with_explosion(game_t *g, int r, int c);
@@ -2680,7 +2695,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
             }
             int total_aliens = AROWS * ACOLS;
-            if (g->boss_type != BOSS_TYPE_TOWER && g->boss_type != BOSS_TYPE_HERMIT && alive_count <= total_aliens / 2) {
+            if (g->boss_type != BOSS_TYPE_BLUE && g->boss_type != BOSS_TYPE_TOWER && g->boss_type != BOSS_TYPE_HERMIT && alive_count <= total_aliens / 2) {
                 if (g->boss_timer == 0) g->boss_y += 1;
             }
         }
@@ -3150,7 +3165,18 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         int dy = pcy - g->boss_bomb.y;
 
         if (blue_black_hole_enabled(g) && !g->player_dying) {
+            int alive_count = 0;
+            for (int r = 0; r < AROWS; r++) {
+                for (int c = 0; c < ACOLS; c++) {
+                    alive_count += g->alien_alive[r][c] ? 1 : 0;
+                }
+            }
+            int total_aliens = AROWS * ACOLS;
+
             int pull_step = g->player_speed / 2;
+            if (alive_count < total_aliens / 2) {
+                pull_step = (g->player_speed * 5) / 4;
+            }
             if (pull_step < 1) pull_step = 1;
 
             int delta_x = g->boss_bomb.x - pcx;
