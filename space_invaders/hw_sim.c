@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 
 // OSX includes the all SDL2 libraries by default in the sdl2-config
 #ifdef __APPLE__
@@ -21,6 +22,20 @@
 
 
 #define SHM_NAME "/pynq_fbmmio"
+#define DEFAULT_SCALE_FACTOR 2
+
+static int read_scale_factor(void) {
+    const char *s = getenv("HW_SIM_SCALE");
+    if (!s || !*s) return DEFAULT_SCALE_FACTOR;
+
+    char *end = NULL;
+    long v = strtol(s, &end, 10);
+    if (end == s || *end != '\0' || v <= 0 || v > 16) {
+        fprintf(stderr, "Invalid HW_SIM_SCALE='%s', using %d\n", s, DEFAULT_SCALE_FACTOR);
+        return DEFAULT_SCALE_FACTOR;
+    }
+    return (int)v;
+}
 
 /// shm_total_size: Calculate total shared memory size needed
 /// Returns: Bytes needed = page-aligned registers + 2 framebuffers (double-buffered)
@@ -62,8 +77,14 @@ int main(void) {
         return 1;
     }
 
+    int scale_factor = read_scale_factor();
+    int out_w = W * scale_factor;
+    int out_h = H * scale_factor;
+
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+
     SDL_Window *win = SDL_CreateWindow("hw_sim 720p",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, W, H, 0);
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, out_w, out_h, 0);
     if (!win) { fprintf(stderr, "SDL_CreateWindow failed\n"); return 1; }
 
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
@@ -72,6 +93,8 @@ int main(void) {
     SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, W, H);
     if (!tex) { fprintf(stderr, "SDL_CreateTexture failed\n"); return 1; }
+
+    SDL_Rect dst_rect = {0, 0, out_w, out_h};
 
     bool running = true;
 
@@ -120,7 +143,7 @@ int main(void) {
 
         SDL_UpdateTexture(tex, NULL, front, W * 4);
         SDL_RenderClear(ren);
-        SDL_RenderCopy(ren, tex, NULL, NULL);
+        SDL_RenderCopy(ren, tex, NULL, &dst_rect);
         SDL_RenderPresent(ren);
 
         now = SDL_GetPerformanceCounter();
