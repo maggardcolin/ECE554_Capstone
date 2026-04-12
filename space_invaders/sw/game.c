@@ -421,6 +421,34 @@ static void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
     l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
 }
 
+static void render_exit_indicator(lfb_t *lfb, int exit_y) {
+    const char *exit_label = "EXIT";
+    int exit_w = text_width_5x5(exit_label, 1);
+    int arrow_gap = 3;
+    int arrow_shaft_w = 5;
+    int arrow_head_w = 4;
+    int arrow_w = arrow_shaft_w + arrow_head_w;
+    int right_margin = 5;
+
+    int arrow_x = LW - right_margin - arrow_w;
+    int exit_x = arrow_x - arrow_gap - exit_w;
+    l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
+
+    int arrow_mid_y = exit_y + 2;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = 0; x < arrow_shaft_w; x++) {
+            l_putpix(lfb, arrow_x + x, arrow_mid_y + y, 0xFFFF0000);
+        }
+    }
+    for (int i = 0; i < arrow_head_w; i++) {
+        int hx = arrow_x + arrow_shaft_w + i;
+        int half_h = arrow_head_w - 1 - i;
+        for (int y = -half_h; y <= half_h; y++) {
+            l_putpix(lfb, hx, arrow_mid_y + y, 0xFFFF0000);
+        }
+    }
+}
+
 static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int points) {
     int age = ALIEN_EXPLOSION_FRAMES - timer;
     int base_r = 2 + (age / 3);
@@ -852,11 +880,8 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     }
 
     // Exit sign
-    const char *exit_label = "EXIT";
-    int exit_w = text_width_5x5(exit_label, 1);
-    int exit_x = LW - exit_w - 4;
     int exit_y = g->player_y - 10;
-    l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
+    render_exit_indicator(lfb, exit_y);
 
     // Player
     render_player(g, lfb);
@@ -2353,11 +2378,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // Exit sign when boss is killed
     if (exit_sign_visible(g)) {
-        const char *exit_label = "EXIT";
-        int exit_w = text_width_5x5(exit_label, 1);
-        int exit_x = LW - exit_w - 4;
         int exit_y = g->player_y - 10;
-        l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
+        render_exit_indicator(lfb, exit_y);
     }
 
     render_fps_counter(lfb);
