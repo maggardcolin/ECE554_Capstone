@@ -1746,6 +1746,7 @@ static void enter_shop(game_t *g) {
     g->in_shop = 1;
     g->shop_next_level = g->level + 1;
     g->shop_count++;
+    if (g->lives < PLAYER_LIVES) g->lives = PLAYER_LIVES;
 
     int to_node = overworld_shop_node_after_level(g->level);
     if (to_node >= 0) {
@@ -1948,6 +1949,10 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     {
         const char *shop_label = "SHOP";
         l_draw_text(lfb, 5, 5, shop_label, 1, 0xFF8000FF);
+
+        const char *heal_label = "FULLY HEALED";
+        int heal_w = text_width_5x5(heal_label, 1);
+        l_draw_text(lfb, (LW - heal_w) / 2, 5, heal_label, 1, 0xFF3CFF68);
     }
 
     // PLAYER 1 label and health bar
