@@ -43,16 +43,6 @@
 
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
-static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
-    if (g->boss_type == BOSS_TYPE_BLUE) {
-        return frame ? &g->BOSS2_B : &g->BOSS2_A;
-    }
-    if (g->boss_type == BOSS_TYPE_TOWER) {
-        return frame ? &g->BOSS3_B : &g->BOSS3_A;
-    }
-    return frame ? &g->BOSS_B : &g->BOSS_A;
-}
-
 static const sprite1r_t *active_boss_sprite(const game_t *g) {
     return boss_sprite_for_frame(g, g->boss_frame);
 }
@@ -936,15 +926,6 @@ static void render_player_explosion(const game_t *g, lfb_t *lfb) {
     int cy = g->player_y + g->PLAYER.h / 2;
     int age = PLAYER_DEATH_DELAY_FRAMES - g->player_death_timer;
     render_player_explosion_at(lfb, cx, cy, age);
-}
-
-static void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
-    if (points <= 0) return;
-
-    char points_text[16];
-    snprintf(points_text, sizeof(points_text), "%d", points);
-    int text_w = text_width_5x5(points_text, 1);
-    l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
 }
 
 static void render_exit_indicator(lfb_t *lfb, int exit_y) {

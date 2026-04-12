@@ -1,31 +1,9 @@
 #include "boss.h"
 
-#include <stdio.h>
-#include "font.h"
 #include "game_helpers.h"
 #include "music_alsa.h"
 
 #define BOSS_DEATH_DELAY_FRAMES 60
-#define ALIEN_EXPLOSION_FRAMES 18
-
-static void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
-    if (points <= 0) return;
-
-    char points_text[16];
-    snprintf(points_text, sizeof(points_text), "%d", points);
-    int text_w = text_width_5x5(points_text, 1);
-    l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
-}
-
-static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
-    if (g->boss_type == BOSS_TYPE_BLUE) {
-        return frame ? &g->BOSS2_B : &g->BOSS2_A;
-    }
-    if (g->boss_type == BOSS_TYPE_TOWER) {
-        return frame ? &g->BOSS3_B : &g->BOSS3_A;
-    }
-    return frame ? &g->BOSS_B : &g->BOSS_A;
-}
 
 void boss_trigger_death(game_t *g, int points_awarded) {
     if (g->boss_dying || !g->boss_alive) return;

@@ -163,6 +163,25 @@ int boss_shield_y(const game_t *g) {
     return g->boss_y + g->BOSS_A.h + 2;
 }
 
+const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        return frame ? &g->BOSS2_B : &g->BOSS2_A;
+    }
+    if (g->boss_type == BOSS_TYPE_TOWER) {
+        return frame ? &g->BOSS3_B : &g->BOSS3_A;
+    }
+    return frame ? &g->BOSS_B : &g->BOSS_A;
+}
+
+void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
+    if (points <= 0) return;
+
+    char points_text[16];
+    snprintf(points_text, sizeof(points_text), "%d", points);
+    int text_w = text_width_5x5(points_text, 1);
+    l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
+}
+
 int circle_intersects_rect(int cx, int cy, int r, int rx, int ry, int rw, int rh) {
     int closest_x = cx;
     int closest_y = cy;
