@@ -1574,9 +1574,17 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (g->boss_bomb.alive) {
                 if (!g->boss_bomb.exploding) {
                     g->boss_bomb.y += g->boss_bomb.dy;
+                    int hit_boss_while_reversing = 0;
+                    if (g->boss_bomb.reversed) {
+                        if (g->boss_bomb.x >= g->boss_x && g->boss_bomb.x < g->boss_x + boss_w &&
+                            g->boss_bomb.y >= g->boss_y && g->boss_bomb.y < g->boss_y + boss_h) {
+                            hit_boss_while_reversing = 1;
+                        }
+                    }
                     if ((!g->boss_bomb.reversed && (g->boss_bomb.y >= g->player_y || g->boss_bomb.y >= LH - 6)) ||
-                        (g->boss_bomb.reversed && g->boss_bomb.y <= g->boss_start_y)) {
-                        if (g->boss_bomb.reversed) {
+                        (g->boss_bomb.reversed && g->boss_bomb.y <= g->boss_start_y) ||
+                        hit_boss_while_reversing) {
+                        if (g->boss_bomb.reversed && !hit_boss_while_reversing) {
                             g->boss_bomb.y = g->boss_start_y;
                         }
                         g->boss_bomb.exploding = 1;

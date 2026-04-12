@@ -105,17 +105,30 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
     int frame = age / 10;
     int base_r = 6 + frame * 3;
 
-    draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFFFF4500);
-    draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFFFF8C00);
-    if ((age & 1) == 0) {
-        draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00);
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF0B3A8F);
+        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF1E6AD6);
+        if ((age & 1) == 0) {
+            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFF66CCFF);
+        }
+    } else {
+        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFFFF4500);
+        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFFFF8C00);
+        if ((age & 1) == 0) {
+            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00);
+        }
     }
 
     int spark_r = base_r + 6;
     for (int i = 0; i < 14; i++) {
         int dx = ((i * 13 + age * 4) % (spark_r * 2 + 1)) - spark_r;
         int dy = ((i * 17 + age * 5) % (spark_r * 2 + 1)) - spark_r;
-        uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
+        uint32_t c;
+        if (g->boss_type == BOSS_TYPE_BLUE) {
+            c = (i & 1) ? 0xFF66CCFF : 0xFFB8ECFF;
+        } else {
+            c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
+        }
         l_putpix(lfb, cx + dx, cy + dy, c);
     }
 
