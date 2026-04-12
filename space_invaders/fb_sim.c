@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <SDL/SDL.h>
 
 #define SHM_NAME "/pynq_fbmmio"
@@ -106,7 +107,7 @@ int find_keyboard_event(char *out_path, size_t out_size) {
 /// main: Hardware simulator main loop
 /// Creates shared memory and MMIO registers, initializes SDL2 window/renderer,
 /// polls keyboard input, increments vsync counter, handles buffer swaps,
-/// and displays framebuffer at ~30 Hz (16ms per frame)
+/// and displays framebuffer at ~60 Hz (~16.7ms per frame)
 /// Returns: 0 on normal exit (window closed), 1 on initialization error
 int fb_sim_main(void) {
     shm_unlink(SHM_NAME);
@@ -171,9 +172,29 @@ int fb_sim_main(void) {
     //     SDL_TEXTUREACCESS_STREAMING, W, H);
     // if (!tex) { fprintf(stderr, "SDL_CreateTexture failed\n"); return 1; }
     
-    bool running = true;
+	bool running = true;
+	const double target_frame_time_sec = 1.0 / 60.0;
+	struct timespec prev_frame_time;
+	if (clock_gettime(CLOCK_MONOTONIC, &prev_frame_time) != 0) {
+		perror("clock_gettime");
+		return 1;
+	}
 
-    while (running) {
+	while (running) {
+		struct timespec frame_start_time;
+		if (clock_gettime(CLOCK_MONOTONIC, &frame_start_time) != 0) {
+			perror("clock_gettime");
+			break;
+		}
+
+		double delta_time_sec =
+			(double)(frame_start_time.tv_sec - prev_frame_time.tv_sec) +
+			(double)(frame_start_time.tv_nsec - prev_frame_time.tv_nsec) / 1e9;
+		if (delta_time_sec < 0.0) {
+			delta_time_sec = 0.0;
+		}
+		prev_frame_time = frame_start_time;
+
         // const Uint8 *k = SDL_GetKeyboardState(NULL);
         // if (k[SDL_SCANCODE_LEFT]  || k[SDL_SCANCODE_A]) regs->buttons |= BTN_LEFT;
         // if (k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_D]) regs->buttons |= BTN_RIGHT;
@@ -282,7 +303,13 @@ int fb_sim_main(void) {
 		}
 	}
 
-	usleep(33333);
+	if (delta_time_sec < target_frame_time_sec) {
+		double sleep_sec = target_frame_time_sec - delta_time_sec;
+		struct timespec sleep_time;
+		sleep_time.tv_sec = (time_t)sleep_sec;
+		sleep_time.tv_nsec = (long)((sleep_sec - (double)sleep_time.tv_sec) * 1e9);
+		nanosleep(&sleep_time, NULL);
+	}
     }
 
     restore_tty();
