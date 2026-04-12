@@ -1403,6 +1403,34 @@ static void kill_alien_with_explosion(game_t *g, int r, int c) {
     g->alien_explode_points[r][c] = award_alien_kill_points(g, killed_yellow_boss_alien);
 }
 
+static void kill_alien_cleanup_with_explosion(game_t *g, int r, int c) {
+    if (!g->alien_alive[r][c]) return;
+    g->alien_alive[r][c] = 0;
+    g->yellow_boss_marked[r][c] = 0;
+    g->alien_health[r][c] = 0;
+    g->alien_explode_timer[r][c] = ALIEN_EXPLOSION_FRAMES;
+    g->alien_explode_hit_boss[r][c] = 0;
+    g->alien_explode_points[r][c] = 10;
+    g->score += 10;
+}
+
+static void trigger_random_alien_cleanup_explosion(game_t *g) {
+    int remaining = count_aliens_remaining(g);
+    if (remaining <= 0) return;
+
+    int pick = rand() % remaining;
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[r][c]) continue;
+            if (pick == 0) {
+                kill_alien_cleanup_with_explosion(g, r, c);
+                return;
+            }
+            pick--;
+        }
+    }
+}
+
 static void trigger_explosive_chain(game_t *g, int seed_r, int seed_c) {
     const int dr[4] = {-1, 1, 0, 0};
     const int dc[4] = {0, 0, -1, 1};
@@ -2061,6 +2089,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->alien_frame = 0;
     g->alien_timer = 0;
     g->alien_period = 20 - (level - 1) * 2; // Faster aliens at higher levels
+    g->alien_cleanup_timer = 0;
     if (g->alien_period < 5) g->alien_period = 5; // Minimum period
 
     // Boss alien setup (separate from regular aliens)
@@ -2465,13 +2494,26 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (g->boss_dying) {
         clear_boss_projectiles(g);
-        boss_apply_explosion_to_aliens(g);
         if (g->boss_death_timer > 0) {
             g->boss_death_timer--;
         }
         if (g->boss_death_timer <= 0) {
             g->boss_dying = 0;
             g->boss_alive = 0;
+        }
+    }
+
+    if (!g->boss_alive && !g->game_over && g->level != 0) {
+        clear_boss_projectiles(g);
+        g->ashot.alive = 0;
+        if (!g->boss_dying && aliens_remaining(g)) {
+            if (g->alien_cleanup_timer > 0) {
+                g->alien_cleanup_timer--;
+            }
+            if (g->alien_cleanup_timer <= 0) {
+                trigger_random_alien_cleanup_explosion(g);
+                g->alien_cleanup_timer = 4 + (rand() % 7);
+            }
         }
     }
 
@@ -2530,7 +2572,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (rows < 1) rows = 1;
 
                 int tx = col_start + (rand() % cols);
-                int ty = 30/tile + (rand() % rows);  // Start from top, avoid bunkers
+                int ty = 30 / tile + (rand() % rows);  // Start from top, avoid bunkers
                 g->powerup_x = tx * tile + tile / 2;
                 g->powerup_y = ty * tile + tile / 2;
                 if (g->practice_run_active) {
@@ -2561,68 +2603,91 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (g->powerup_timer == 0) g->powerup_active = 0;
         }
     }
-    
+
     update_player_movement(g, buttons);
     update_player_firing(g, buttons);
 
-    g->alien_timer++;
-    if (g->alien_timer >= g->alien_period) {
-        g->alien_timer = 0;
-        g->alien_frame ^= 1;
+    if (g->boss_alive && !g->boss_dying) {
+        g->alien_timer++;
+        if (g->alien_timer >= g->alien_period) {
+            g->alien_timer = 0;
+            g->alien_frame ^= 1;
 
-        if (g->level != 0) {
-            int minc = ACOLS, maxc = -1;
-            for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) {
-                if (g->alien_alive[r][c]) { if (c < minc) minc = c; if (c > maxc) maxc = c; }
-            }
+            if (g->level != 0) {
+                int minc = ACOLS, maxc = -1;
+                for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) {
+                    if (g->alien_alive[r][c]) { if (c < minc) minc = c; if (c > maxc) maxc = c; }
+                }
 
-            if (maxc >= 0) {
-                const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-                int spacing_x = 6;
-                int grid_w = (maxc - minc + 1) * (AS->w + spacing_x) - spacing_x;
+                if (maxc >= 0) {
+                    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+                    int spacing_x = 6;
+                    int grid_w = (maxc - minc + 1) * (AS->w + spacing_x) - spacing_x;
 
-                int next_origin_x = g->alien_origin_x + g->alien_dx * g->alien_step_px;
-                int next_left  = next_origin_x + minc * (AS->w + spacing_x);
-                int next_right = next_left + grid_w;
+                    int next_origin_x = g->alien_origin_x + g->alien_dx * g->alien_step_px;
+                    int next_left  = next_origin_x + minc * (AS->w + spacing_x);
+                    int next_right = next_left + grid_w;
 
-                int left_bound = movement_left_bound(g);
-                int right_bound = movement_right_bound(g);
-                if (next_left < left_bound + 5 || next_right > right_bound - 5) {
-                    int stride = AS->w + spacing_x;
-                    int min_origin = (left_bound + 5) - minc * stride;
-                    int max_origin = (right_bound - 5) - grid_w - minc * stride;
+                    int left_bound = movement_left_bound(g);
+                    int right_bound = movement_right_bound(g);
+                    if (next_left < left_bound + 5 || next_right > right_bound - 5) {
+                        int stride = AS->w + spacing_x;
+                        int min_origin = (left_bound + 5) - minc * stride;
+                        int max_origin = (right_bound - 5) - grid_w - minc * stride;
 
-                    if (max_origin < min_origin) {
-                        max_origin = min_origin;
-                    }
+                        if (max_origin < min_origin) {
+                            max_origin = min_origin;
+                        }
 
-                    if (next_origin_x < min_origin) {
-                        g->alien_origin_x = min_origin;
-                    } else if (next_origin_x > max_origin) {
-                        g->alien_origin_x = max_origin;
+                        if (next_origin_x < min_origin) {
+                            g->alien_origin_x = min_origin;
+                        } else if (next_origin_x > max_origin) {
+                            g->alien_origin_x = max_origin;
+                        } else {
+                            g->alien_origin_x = next_origin_x;
+                        }
+
+                        g->alien_dx = -g->alien_dx;
+                        g->alien_origin_y += g->alien_drop_px;
                     } else {
                         g->alien_origin_x = next_origin_x;
                     }
 
-                    g->alien_dx = -g->alien_dx;
-                    g->alien_origin_y += g->alien_drop_px;
-                    // After boss is killed, speed up aliens on each wall hit
-                    if (!g->boss_alive && g->boss_health == 0) {
-                        g->alien_period -= 2;
-                        if (g->alien_period < 5) g->alien_period = 5;
+                    int alive_count = 0;
+                    for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) alive_count += g->alien_alive[r][c] ? 1 : 0;
+                    if (alive_count > 0) {
+                        int target = 10 + alive_count / 6;
+                        if (target < g->alien_period) g->alien_period = target;
                     }
-                } else {
-                    g->alien_origin_x = next_origin_x;
-                }
-
-                int alive_count = 0;
-                for (int r = 0; r < AROWS; r++) for (int c = 0; c < ACOLS; c++) alive_count += g->alien_alive[r][c] ? 1 : 0;
-                if (alive_count > 0) {
-                    int target = 10 + alive_count / 6;
-                    if (target < g->alien_period) g->alien_period = target;
                 }
             }
         }
+    }
+
+    // No alien shooting on level 0 (tutorial) or after the boss has been defeated.
+    if (g->level != 0 && g->boss_alive && !g->boss_dying) {
+        if (!g->ashot.alive) {
+            static int col_cursor = 0;
+            col_cursor = (col_cursor + 1) % ACOLS;
+            int c = col_cursor;
+            int r_fire = -1;
+            for (int r = AROWS - 1; r >= 0; r--) if (g->alien_alive[r][c]) { r_fire = r; break; }
+
+            if (r_fire >= 0 && (vsync_counter % 30u) == 0u) {
+                const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+                int spacing_x = 6, spacing_y = 5;
+                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+                int ay = g->alien_origin_y + r_fire * (AS->h + spacing_y);
+                g->ashot.alive = 1;
+                g->ashot.x = ax + AS->w / 2;
+                g->ashot.y = ay + AS->h + 1;
+            }
+        } else {
+            g->ashot.y += 3;
+            if (g->ashot.y > LH) g->ashot.alive = 0;
+        }
+    } else {
+        g->ashot.alive = 0;
     }
 
     if (g->boss_alive && !g->boss_dying && g->boss_type == BOSS_TYPE_YELLOW) {
@@ -2900,30 +2965,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     update_player_shots(g);
-
-    // No alien shooting on level 0 (tutorial)
-    if (g->level != 0) {
-        if (!g->ashot.alive) {
-            static int col_cursor = 0;
-            col_cursor = (col_cursor + 1) % ACOLS;
-            int c = col_cursor;
-            int r_fire = -1;
-            for (int r = AROWS - 1; r >= 0; r--) if (g->alien_alive[r][c]) { r_fire = r; break; }
-
-            if (r_fire >= 0 && (vsync_counter % 30u) == 0u) {
-                const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-                int spacing_x = 6, spacing_y = 5;
-                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
-                int ay = g->alien_origin_y + r_fire * (AS->h + spacing_y);
-                g->ashot.alive = 1;
-                g->ashot.x = ax + AS->w/2;
-                g->ashot.y = ay + AS->h + 1;
-            }
-        } else {
-            g->ashot.y += 3;
-            if (g->ashot.y > LH) g->ashot.alive = 0;
-        }
-    }
 
     // Boss shooting logic (rate depends on health)
     if (g->boss_alive && !g->boss_dying) {

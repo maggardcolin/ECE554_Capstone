@@ -144,6 +144,7 @@ typedef struct {
     int alien_frame;
     int alien_timer;
     int alien_period;
+    int alien_cleanup_timer;
 
     // Boss alien state
     int boss_alive;
