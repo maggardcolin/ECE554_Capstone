@@ -1205,7 +1205,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     }
     const sprite1r_t *BS = active_boss_sprite(g);
     g->boss_x = (LW - BS->w) / 2;
-    g->boss_y = 15;
+    g->boss_y = 18;
     g->boss_start_y = g->boss_y;
     g->boss_dx = 1;
     g->boss_dying = 0;
@@ -2414,6 +2414,14 @@ void game_render(game_t *g, lfb_t *lfb) {
         draw_bar(lfb, power_bar_x, power_bar_y, power_bar_w, power_bar_h, power_fill_w, power_color);
     }
 
+    // Draw a separator line below the top HUD (boss/level info) to frame gameplay area.
+    {
+        const int top_hud_separator_y = 15;
+        for (int x = 0; x < LW; x++) {
+            l_putpix(lfb, x, top_hud_separator_y, 0xFFFFFFFF);
+        }
+    }
+
     {
         const char *label = "LEVEL:";
         int label_scale = 1;
@@ -2435,6 +2443,14 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, remaining_x, 5, remaining_label, remaining_label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, remaining_x + remaining_label_w + 6, 5, remaining_count, 0xFFFFFFFF);
 
+    }
+
+    // Draw a separator line above the bottom HUD (player/powerup info) with a small gap.
+    {
+        const int bottom_hud_separator_y = LH - 20;
+        for (int x = 0; x < LW; x++) {
+            l_putpix(lfb, x, bottom_hud_separator_y, 0xFFFFFFFF);
+        }
     }
 
     render_player_health_bar(g, lfb);

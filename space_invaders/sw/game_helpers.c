@@ -91,8 +91,8 @@ void render_fps_counter(lfb_t *lfb) {
 
     char fps_text[16];
     snprintf(fps_text, sizeof(fps_text), "FPS:%d", fps);
-    int x = LW - text_width_5x5(fps_text, 1) - 5;
-    int y = 15;
+    int x = LW - text_width_5x5(fps_text, 1) - 80;
+    int y = LH - 12;
     l_draw_text(lfb, x, y, fps_text, 1, 0xFFFFFFFF);
 }
 
