@@ -292,6 +292,51 @@ static const pattern_t PATTERN_BOSS_TOWER = {
     .gain = 0.22f,
 };
 
+static const pattern_t PATTERN_BOSS_HERMIT = {
+    .melody = {
+        311.13f, R, 369.99f, R, 415.30f, R, 466.16f, R,
+        349.23f, R, 415.30f, R, 466.16f, R, 622.25f, R,
+
+        311.13f, R, 369.99f, R, 415.30f, R, 466.16f, R,
+        349.23f, R, 415.30f, R, 523.25f, R, 622.25f, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R
+    },
+    .bass = {
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R,
+
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R,
+
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R,
+
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R
+    },
+    .harm = {
+        155.56f, R, 207.65f, R, 233.08f, R, 311.13f, R,
+        155.56f, R, 207.65f, R, 233.08f, R, 311.13f, R,
+
+        155.56f, R, 207.65f, R, 233.08f, R, 311.13f, R,
+        155.56f, R, 207.65f, R, 261.63f, R, 311.13f, R,
+
+        155.56f, R, 207.65f, R, 233.08f, R, 311.13f, R,
+        155.56f, R, 207.65f, R, 233.08f, R, 311.13f, R,
+
+        155.56f, R, 207.65f, R, 233.08f, R, 311.13f, R,
+        155.56f, R, 207.65f, R, 261.63f, R, 311.13f, R
+    },
+    .len = 64,
+    .bpm = 128,
+    .gain = 0.22f,
+};
+
 static const pattern_t PATTERN_SHOP = {
     .melody = {},
     .bass = {164.81f, R, 196.00f, R, 220.00f, R, 196.00f, R,
@@ -362,6 +407,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_BOSS_YELLOW;
     case MUSIC_MODE_BOSS_TOWER:
         return &PATTERN_BOSS_TOWER;
+    case MUSIC_MODE_BOSS_HERMIT:
+        return &PATTERN_BOSS_HERMIT;
     case MUSIC_MODE_SHOP:
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:

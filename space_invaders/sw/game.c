@@ -22,6 +22,12 @@
 #define YELLOW_BOSS_ALIENS 5
 #define YELLOW_BOSS_ATTACK_SHUFFLE 3
 #define TOWER_WALL_ATTACK 4
+#define HERMIT_DODGE_ATTACK 5
+#define HERMIT_LIGHTNING_SPEED 1.5f
+#define HERMIT_LIGHTNING_YELLOW_FRAMES 30
+#define HERMIT_LIGHTNING_MAX_TRAIL 42.0f
+#define HERMIT_LIGHTNING_TAIL_SPEED 24.0f
+#define HERMIT_LIGHTNING_FADE_SPEED 36.0f
 #define TOWER_ASTEROID_RADIUS 7
 #define TOWER_ASTEROID_EXPLOSION_FRAMES 28
 #define TOWER_WALL_WIDTH 22
@@ -52,6 +58,7 @@ static const char *boss_intro_type_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return "MOON";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STAR";
     if (g->boss_type == BOSS_TYPE_TOWER) return "TOWER";
+    if (g->boss_type == BOSS_TYPE_HERMIT) return "HERMIT";
     return "EMPEROR";
 }
 
@@ -59,6 +66,7 @@ static const char *boss_menu_label(int boss_type) {
     if (boss_type == BOSS_TYPE_BLUE) return "MOON";
     if (boss_type == BOSS_TYPE_YELLOW) return "STAR";
     if (boss_type == BOSS_TYPE_TOWER) return "TOWER";
+    if (boss_type == BOSS_TYPE_HERMIT) return "HERMIT";
     return "EMPEROR";
 }
 
@@ -66,6 +74,7 @@ static const char *boss_intro_main_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return "TRIPLE SHOT";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STANDARD LASER";
     if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID";
+    if (g->boss_type == BOSS_TYPE_HERMIT) return "LIGHTNING";
     return "STANDARD LASER";
 }
 
@@ -77,6 +86,7 @@ static const char *boss_intro_special_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return blue_black_hole_enabled(g) ? "BLACK HOLE" : "BOMB";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "SHUFFLE";
     if (g->boss_type == BOSS_TYPE_TOWER) return "WALLS";
+    if (g->boss_type == BOSS_TYPE_HERMIT) return "DODGE";
     if (g->level >= 3) return "PLASMA HEAL";
     return "PLASMA";
 }
@@ -285,6 +295,94 @@ static void clear_boss_projectiles(game_t *g) {
     g->tower_wall_timer = 0;
     g->tower_wall_left = 0;
     g->tower_wall_right = LW;
+    for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
+        g->hermit_lightning[i].active = 0;
+        g->hermit_lightning[i].flash_timer = 0;
+        g->hermit_lightning[i].yellow_hit_applied = 0;
+    }
+}
+
+static int segment_hits_player(const game_t *g, float x0, float y0, float x1, float y1) {
+    const sprite1r_t *p = &g->PLAYER;
+    int dx = (int)(x1 - x0);
+    if (dx < 0) dx = -dx;
+    int dy = (int)(y1 - y0);
+    if (dy < 0) dy = -dy;
+    int steps = (dx > dy) ? dx : dy;
+    if (steps < 1) steps = 1;
+
+    for (int i = 0; i <= steps; i++) {
+        float t = (float)i / (float)steps;
+        int px = (int)(x0 + (x1 - x0) * t);
+        int py = (int)(y0 + (y1 - y0) * t);
+        if (px >= g->player_x && px < g->player_x + p->w &&
+            py >= g->player_y && py < g->player_y + p->h) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static float hermit_absf(float v) {
+    return (v < 0.0f) ? -v : v;
+}
+
+static float hermit_lightning_span(const hermit_lightning_t *l) {
+    float dx = hermit_absf(l->tip_x - l->start_x);
+    float dy = hermit_absf(l->tip_y - l->start_y);
+    return (dx > dy) ? dx : dy;
+}
+
+static void hermit_move_point_toward(float *x, float *y, float tx, float ty, float step) {
+    float dx = tx - *x;
+    float dy = ty - *y;
+    float adx = hermit_absf(dx);
+    float ady = hermit_absf(dy);
+    float denom = (adx > ady) ? adx : ady;
+
+    if (denom <= step || denom < 0.001f) {
+        *x = tx;
+        *y = ty;
+        return;
+    }
+
+    float s = step / denom;
+    *x += dx * s;
+    *y += dy * s;
+}
+
+static void hermit_spawn_lightning(game_t *g) {
+    int slot = -1;
+    for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
+        if (!g->hermit_lightning[i].active) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) return;
+
+    hermit_lightning_t *l = &g->hermit_lightning[slot];
+    const sprite1r_t *BS = active_boss_sprite(g);
+    l->active = 1;
+    l->flash_timer = 0;
+    l->yellow_hit_applied = 0;
+    l->start_x = (float)(g->boss_x + BS->w / 2);
+    l->start_y = (float)(g->boss_y + BS->h + 1);
+    l->tip_x = l->start_x;
+    l->tip_y = l->start_y;
+
+    float tx = (float)(g->player_x + g->PLAYER.w / 2);
+    float ty = (float)LH;
+    float dx = tx - l->start_x;
+    float dy = ty - l->start_y;
+    float adx = (dx < 0.0f) ? -dx : dx;
+    float ady = (dy < 0.0f) ? -dy : dy;
+    float denom = (adx > ady) ? adx : ady;
+    if (denom < 1.0f) denom = 1.0f;
+    float scale = HERMIT_LIGHTNING_SPEED / denom;
+    l->vx = dx * scale;
+    l->vy = dy * scale;
+
 }
 
 static void start_tower_asteroid_explosion(game_t *g, int ai) {
@@ -429,6 +527,65 @@ static void apply_reversed_bomb_explosion_effects(game_t *g, int radius) {
 
 static void render_intro_regular_shot(lfb_t *lfb, int x, int y, uint32_t color) {
     for (int i = 0; i < 5; i++) l_putpix(lfb, x, y + i, color);
+}
+
+static void draw_segment(lfb_t *lfb, int x0, int y0, int x1, int y1, uint32_t color) {
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int steps = dx;
+    if (steps < 0) steps = -steps;
+    int ay = dy;
+    if (ay < 0) ay = -ay;
+    if (ay > steps) steps = ay;
+    if (steps == 0) {
+        l_putpix(lfb, x0, y0, color);
+        return;
+    }
+
+    for (int i = 0; i <= steps; i++) {
+        int px = x0 + (dx * i) / steps;
+        int py = y0 + (dy * i) / steps;
+        l_putpix(lfb, px, py, color);
+    }
+}
+
+static void draw_zigzag_segment(lfb_t *lfb, int x0, int y0, int x1, int y1, int amplitude, int step, uint32_t color) {
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int len = dx;
+    if (len < 0) len = -len;
+    int ay = dy;
+    if (ay < 0) ay = -ay;
+    if (ay > len) len = ay;
+
+    if (len <= step || step < 1) {
+        draw_segment(lfb, x0, y0, x1, y1, color);
+        return;
+    }
+
+    float flen = (float)len;
+    int prev_x = x0;
+    int prev_y = y0;
+    int seg = 0;
+
+    for (int s = step; s < len; s += step) {
+        float t = (float)s / flen;
+        float bx = (float)x0 + (float)dx * t;
+        float by = (float)y0 + (float)dy * t;
+
+        int sign = (seg & 1) ? 1 : -1;
+        float ox = ((float)(-dy) / flen) * (float)(amplitude * sign);
+        float oy = ((float)dx / flen) * (float)(amplitude * sign);
+        int zx = (int)(bx + ox);
+        int zy = (int)(by + oy);
+
+        draw_segment(lfb, prev_x, prev_y, zx, zy, color);
+        prev_x = zx;
+        prev_y = zy;
+        seg++;
+    }
+
+    draw_segment(lfb, prev_x, prev_y, x1, y1, color);
 }
 
 static void render_intro_plasma_beam(lfb_t *lfb, int cx, int y, int beam_w, uint32_t color) {
@@ -626,6 +783,32 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
         return;
     }
 
+    if (g->boss_type == BOSS_TYPE_HERMIT) {
+        if (elapsed >= t0 && elapsed < t1) {
+            int local = elapsed - t0;
+            int y = start_y + local * 2;
+            int x = center_x + ((local & 1) ? 2 : -2);
+            render_intro_regular_shot(lfb, x, y, 0xFF8000FF);
+        } else if (elapsed >= t2 && elapsed < t3) {
+            int local = elapsed - t2;
+            int y = start_y + local * 2;
+            int x = center_x + ((local & 1) ? -2 : 2);
+            render_intro_regular_shot(lfb, x, y, 0xFF8000FF);
+        } else if (elapsed >= t4 && elapsed < t5) {
+            int target_x = LW - boss_x - BS->w / 2;
+            if (target_x < BS->w / 2) target_x = BS->w / 2;
+            if (target_x > LW - BS->w / 2) target_x = LW - BS->w / 2;
+            int y_mid = boss_y + BS->h / 2;
+            for (int i = 0; i < 8; i++) {
+                int mix = (i + 1) * 100 / 8;
+                int px = center_x + ((target_x - center_x) * mix) / 100;
+                int py = y_mid + (((i & 1) == 0) ? -1 : 1);
+                l_putpix(lfb, px, py, 0xFFD9B3FF);
+            }
+        }
+        return;
+    }
+
     // Multicolor boss preview.
     if (elapsed >= t0 && elapsed < t1) {
         int local = elapsed - t0;
@@ -659,6 +842,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
         preview_type_color = 0xFFFFFF00;
     } else if (boss_type == BOSS_TYPE_TOWER) {
         preview_type_color = 0xFF8B5A2B;
+    } else if (boss_type == BOSS_TYPE_HERMIT) {
+        preview_type_color = 0xFFB266FF;
     } else {
         if (preview.boss_intro_timer > 0) {
             uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
@@ -677,7 +862,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     l_draw_text(lfb, right_x + 34, 28, boss_intro_main_attack_text(&preview), 1,
                 (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                 (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFFFF0000);
+                (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                (boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFFFF0000);
 
     l_draw_text(lfb, right_x, 40, "SPECIAL:", 1, 0xFFFFFFFF);
     if (boss_type == BOSS_TYPE_CLASSIC && preview.level >= 3) {
@@ -708,7 +894,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     int boss_y = 84;
     if (boss_type != BOSS_TYPE_YELLOW) {
         uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                              (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
+                              (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                              (boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
         if (boss_type == BOSS_TYPE_CLASSIC) boss_color = preview_type_color;
         draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
         render_intro_boss_attack_preview(&preview, lfb, boss_x, boss_y, BS, 0);
@@ -1756,7 +1943,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_dying = 0;
     g->boss_death_timer = 0;
     g->boss_explode_points = 0;
-    g->boss_shield_active = 0;
+    g->boss_shield_active = (g->boss_type == BOSS_TYPE_HERMIT && level >= 3) ? 1 : 0;
     g->boss_frame = 0;
     g->boss_timer = 0;
     g->boss_period = BOSS_PERIOD(level); // Faster boss at higher levels
@@ -1764,7 +1951,6 @@ static void setup_level(game_t *g, int level, int reset_score) {
     clear_player_shots(g);
     g->ashot.alive = 0;
     clear_boss_projectiles(g);
-    g->boss_shield_active = 0;
     g->fire_cooldown = 0;
 
     // Initialize boss power system
@@ -1775,16 +1961,19 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_laser_last_hit_y = -1000;  // Far off screen
     g->boss_attack_type = (g->boss_type == BOSS_TYPE_BLUE) ? 2 :
                          (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE :
-                         (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK : 0;  // Current attack being executed
+                         (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK :
+                         (g->boss_type == BOSS_TYPE_HERMIT) ? 0 : 0;  // Current attack being executed
     g->next_boss_attack_type = (g->boss_type == BOSS_TYPE_BLUE) ? 2 :
                              (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE :
-                             (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK : 0;  // Next attack to be charged
+                             (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK :
+                             (g->boss_type == BOSS_TYPE_HERMIT) ? 0 : 0;  // Next attack to be charged
     g->boss_green_laser_last_hit_y = -1000;  // Far off screen
         g->tower_wall_active = 0;
         g->tower_wall_timer = 0;
         g->tower_wall_left = 0;
         g->tower_wall_right = LW;
     refill_sprite_full(&g->BOSS_SHIELD);
+    g->boss_shield_active = (g->boss_type == BOSS_TYPE_HERMIT && level >= 3) ? 1 : 0;
 
     if (level > 0 && !g->practice_run_active) {
         int to_node = level - 1;
@@ -1831,7 +2020,9 @@ void game_init(game_t *g) {
     g->BOSS2_B = make_sprite_from_ascii(boss2B_rows, 10);
     g->BOSS3_A = make_sprite_from_ascii(boss3A_rows, 10);
     g->BOSS3_B = make_sprite_from_ascii(boss3B_rows, 10);
-    g->BOSS_SHIELD = make_filled_sprite(g->BOSS_A.w, 3);
+    g->BOSS4_A = make_sprite_from_ascii(boss4A_rows, 10);
+    g->BOSS4_B = make_sprite_from_ascii(boss4B_rows, 10);
+    g->BOSS_SHIELD = make_filled_sprite(g->BOSS4_A.w, 6);
     g->SHOP_LIFE = make_sprite_from_ascii(shop_life_rows, 7);
     g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
     g->SHOP_MOVE = make_sprite_from_ascii(shop_move_rows, 7);
@@ -2335,6 +2526,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->next_boss_attack_type = 2;
             } else if (g->boss_type == BOSS_TYPE_TOWER) {
                 g->next_boss_attack_type = TOWER_WALL_ATTACK;
+            } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+                g->next_boss_attack_type = HERMIT_DODGE_ATTACK;
             } else {
                 int alive_count = 0;
                 for (int r = 0; r < AROWS; r++) {
@@ -2355,7 +2548,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->boss_power_timer >= g->boss_power_max && g->boss_power_active == 0 && g->boss_power_cooldown == 0) {
             int defer_tower_wall = 0;
             g->boss_power_active = 1;
-            g->boss_power_cooldown = (g->boss_type == BOSS_TYPE_TOWER) ? 0 : 30;
+            g->boss_power_cooldown = (g->boss_type == BOSS_TYPE_TOWER) ? 0 :
+                                     (g->boss_type == BOSS_TYPE_HERMIT) ? 20 : 30;
             
             // Use the next attack type that was determined during charging
             g->boss_attack_type = g->next_boss_attack_type;
@@ -2403,6 +2597,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_bomb.dy = BOSS_BOMB_SPEED;
                 g->boss_bomb.x = g->boss_x + boss_w / 2;
                 g->boss_bomb.y = g->boss_y + boss_h + 2;
+            } else if (g->boss_attack_type == HERMIT_DODGE_ATTACK) {
+                g->boss_laser.alive = 0;
+                g->boss_bomb.alive = 0;
+                g->boss_bomb.exploding = 0;
+                g->boss_bomb.explode_timer = 0;
+                g->boss_bomb.hit_player = 0;
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                int reflected_x = right_bound - boss_w - (g->boss_x - left_bound);
+                if (reflected_x < left_bound) reflected_x = left_bound;
+                if (reflected_x > right_bound - boss_w) reflected_x = right_bound - boss_w;
+                g->boss_x = reflected_x;
+                g->boss_dx = -g->boss_dx;
+                g->boss_power_active = 0;
             } else {
                 g->boss_laser.alive = 0;
                 g->boss_bomb.alive = 0;
@@ -2463,7 +2671,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
             }
             int total_aliens = AROWS * ACOLS;
-            if (g->boss_type != BOSS_TYPE_TOWER && alive_count <= total_aliens / 2) {
+            if (g->boss_type != BOSS_TYPE_TOWER && g->boss_type != BOSS_TYPE_HERMIT && alive_count <= total_aliens / 2) {
                 if (g->boss_timer == 0) g->boss_y += 1;
             }
         }
@@ -2682,6 +2890,59 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     }
                 }
                 g->boss_shot.alive = 0;
+                for (int i = 0; i < 3; i++) {
+                    g->boss_triple_shot[i].alive = 0;
+                }
+            } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+                int hermit_period = 150;
+
+                if ((vsync_counter % (uint32_t)hermit_period) == 0u) {
+                    hermit_spawn_lightning(g);
+                }
+
+                for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
+                    hermit_lightning_t *l = &g->hermit_lightning[i];
+                    if (!l->active) continue;
+
+                    if (l->flash_timer > 0) {
+                        l->flash_timer--;
+                        if (!l->yellow_hit_applied && !shield_power_active(g) &&
+                            segment_hits_player(g, l->start_x, l->start_y, l->tip_x, l->tip_y)) {
+                            apply_player_damage(g, 1);
+                            l->yellow_hit_applied = 1;
+                        }
+
+                        hermit_move_point_toward(&l->start_x, &l->start_y, l->tip_x, l->tip_y, HERMIT_LIGHTNING_FADE_SPEED);
+
+                        if (l->flash_timer == 0) {
+                            l->active = 0;
+                        }
+                        continue;
+                    }
+
+                    l->tip_x += l->vx;
+                    l->tip_y += l->vy;
+
+                    if (hermit_lightning_span(l) > HERMIT_LIGHTNING_MAX_TRAIL) {
+                        hermit_move_point_toward(&l->start_x, &l->start_y, l->tip_x, l->tip_y, HERMIT_LIGHTNING_TAIL_SPEED);
+                    }
+
+                    int hit_player_now = (!shield_power_active(g) &&
+                                          segment_hits_player(g, l->start_x, l->start_y, l->tip_x, l->tip_y));
+                    if (l->tip_y >= (float)LH || l->tip_x < 0.0f || l->tip_x >= (float)LW || hit_player_now) {
+                        if (l->tip_y > (float)LH) l->tip_y = (float)LH;
+                        if (l->tip_x < 0.0f) l->tip_x = 0.0f;
+                        if (l->tip_x > (float)(LW - 1)) l->tip_x = (float)(LW - 1);
+                        if (hit_player_now && !l->yellow_hit_applied) {
+                            apply_player_damage(g, 1);
+                            l->yellow_hit_applied = 1;
+                        }
+                        l->flash_timer = HERMIT_LIGHTNING_YELLOW_FRAMES;
+                    }
+                }
+
+                g->boss_shot.alive = 0;
+                g->boss_laser.alive = 0;
                 for (int i = 0; i < 3; i++) {
                     g->boss_triple_shot[i].alive = 0;
                 }
@@ -3013,6 +3274,7 @@ void game_render(game_t *g, lfb_t *lfb) {
                 boss_menu_label(BOSS_TYPE_BLUE),
                 boss_menu_label(BOSS_TYPE_YELLOW),
                 boss_menu_label(BOSS_TYPE_TOWER),
+                boss_menu_label(BOSS_TYPE_HERMIT),
                 "EXIT TO MAIN MENU"
             };
 
@@ -3181,6 +3443,10 @@ void game_render(game_t *g, lfb_t *lfb) {
             uint32_t tower_flicker_palette[4] = {0xFF6A4421, 0xFF8B5A2B, 0xFFC08A4B, 0xFF8B5A2B};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = tower_flicker_palette[flicker_idx];
+        } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+            uint32_t hermit_flicker_palette[4] = {0xFF8000FF, 0xFFB266FF, 0xFFD9B3FF, 0xFFB266FF};
+            int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
+            type_color = hermit_flicker_palette[flicker_idx];
         } else {
             uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
@@ -3199,7 +3465,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int main_x = (LW - (main_prefix_w + 6 + main_value_w)) / 2;
         uint32_t main_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                       (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                      (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFFFF0000;
+                      (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                      (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFFFF0000;
         l_draw_text(lfb, main_x, y, main_prefix, scale, 0xFFFFFFFF);
         l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, main_color);
 
@@ -3225,6 +3492,12 @@ void game_render(game_t *g, lfb_t *lfb) {
             special_text_x = special_x + special_prefix_w + 6;
             l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
             l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF4A2E12);
+        } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+            int special_value_w = text_width_5x5(special_value, scale);
+            special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
+            special_text_x = special_x + special_prefix_w + 6;
+            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFB266FF);
         } else if (g->level >= 3) {
             const char *spec1 = "PLASMA";
             const char *spec2 = "HEAL";
@@ -3252,7 +3525,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int boss_y = 68;
         if (g->boss_type != BOSS_TYPE_YELLOW) {
             uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                                  (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
+                                  (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                                  (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
             if (g->boss_type == BOSS_TYPE_CLASSIC) {
                 boss_color = type_color;
             }
@@ -3325,7 +3599,8 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->boss_alive) {
         uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                               (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
+                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             if (health_pct <= 33) boss_color = 0xFF114488;
@@ -3336,6 +3611,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
             if (health_pct <= 33) boss_color = 0xFF4A2E12;
             else if (health_pct <= 67) boss_color = 0xFF6A4421;
+        } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+            if (health_pct <= 33) boss_color = 0xFF6A2AA9;
+            else if (health_pct <= 67) boss_color = 0xFF9A4DDA;
         } else {
             if (health_pct <= 33) boss_color = 0xFFFF0000;
             else if (health_pct <= 67) boss_color = 0xFFFFFF00;
@@ -3374,6 +3652,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         else if (g->next_boss_attack_type == 2) power_color = 0xFF3399FF;  // Blue bomb
         else if (g->next_boss_attack_type == YELLOW_BOSS_ATTACK_SHUFFLE) power_color = 0xFFFFFF00;  // Yellow shuffle
         else if (g->next_boss_attack_type == TOWER_WALL_ATTACK) power_color = 0xFF8B5A2B;  // Tower walls
+        else if (g->next_boss_attack_type == HERMIT_DODGE_ATTACK) power_color = 0xFFB266FF;  // Hermit dodge
         else power_color = 0xFF808080;  // Gray (unknown)
 
         int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * power_bar_w) / g->boss_power_max : 0;
@@ -3485,13 +3764,17 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->boss_alive && !g->boss_dying && g->boss_type != BOSS_TYPE_YELLOW) {
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B : 0xFF00FF00;
+                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             if (health_pct <= 33) boss_color = 0xFF114488;
             else if (health_pct <= 67) boss_color = 0xFF1E6AD6;
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
             if (health_pct <= 33) boss_color = 0xFF4A2E12;
             else if (health_pct <= 67) boss_color = 0xFF6A4421;
+        } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+            if (health_pct <= 33) boss_color = 0xFF6A2AA9;
+            else if (health_pct <= 67) boss_color = 0xFF9A4DDA;
         } else {
             if (health_pct <= 33) boss_color = 0xFFFF0000;
             else if (health_pct <= 67) boss_color = 0xFFFFFF00;
@@ -3510,7 +3793,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
 
         if (g->boss_shield_active) {
-            draw_sprite1r(lfb, &g->BOSS_SHIELD, boss_shield_x(g), boss_shield_y(g), 0xFF00FF00);
+            uint32_t shield_color = (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFF00FF00;
+            draw_sprite1r(lfb, &g->BOSS_SHIELD, boss_shield_x(g), boss_shield_y(g), shield_color);
         }
     } else if (g->boss_dying) {
         boss_render_explosion(g, lfb);
@@ -3634,6 +3918,13 @@ void game_render(game_t *g, lfb_t *lfb) {
                 }
             }
         }
+    }
+
+    for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
+        const hermit_lightning_t *l = &g->hermit_lightning[i];
+        if (!l->active) continue;
+        uint32_t bolt_color = (l->flash_timer > 0) ? 0xFFFFFF00 : 0xFF8000FF;
+        draw_zigzag_segment(lfb, (int)l->start_x, (int)l->start_y, (int)l->tip_x, (int)l->tip_y, 3, 7, bolt_color);
     }
 
     // Exit sign when boss is killed

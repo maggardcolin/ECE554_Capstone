@@ -102,6 +102,12 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
         if ((age & 1) == 0) {
             draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFF66CCFF);
         }
+    } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF5A1E9A);
+        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF8A39D6);
+        if ((age & 1) == 0) {
+            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFD9B3FF);
+        }
     } else if (g->boss_type == BOSS_TYPE_TOWER) {
         draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF4A2E12);
         draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF8B5A2B);
@@ -123,6 +129,8 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
         uint32_t c;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             c = (i & 1) ? 0xFF66CCFF : 0xFFB8ECFF;
+        } else if (g->boss_type == BOSS_TYPE_HERMIT) {
+            c = (i & 1) ? 0xFFD9B3FF : 0xFFB266FF;
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
             c = (i & 1) ? 0xFFC08A4B : 0xFF8B5A2B;
         } else {

@@ -29,7 +29,8 @@ typedef enum {
     BOSS_TYPE_BLUE = 1,
     BOSS_TYPE_YELLOW = 2,
     BOSS_TYPE_TOWER = 3,
-    BOSS_TYPE_COUNT = 4
+    BOSS_TYPE_HERMIT = 4,
+    BOSS_TYPE_COUNT = 5
 } boss_type_t;
 
 typedef struct {
@@ -54,6 +55,18 @@ typedef struct {
     int reverse_damage_applied;
 } boss_bomb_t;
 
+typedef struct {
+    int active;
+    int flash_timer;
+    int yellow_hit_applied;
+    float start_x;
+    float start_y;
+    float tip_x;
+    float tip_y;
+    float vx;
+    float vy;
+} hermit_lightning_t;
+
 #define MAX_PSHOTS 8
 #define MAX_TOWER_ASTEROIDS 24
 #define PLAYER_LIVES 5
@@ -63,6 +76,7 @@ typedef struct {
 #define ACOLS 11
 #define AROWS 5
 #define START_LEVEL 1
+#define HERMIT_MAX_LIGHTNINGS 8
 
 #define BOSS_MAX_HEALTH(level) (\
     level == 0 ? 0 : \
@@ -109,7 +123,7 @@ typedef struct {
     int powerup_slot_timer[5];       // Duration of each powerup slot (600 ticks = 10 seconds)
     int powerup_type_slot[5];        // Type of powerup in each slot
 
-    sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B, BOSS2_A, BOSS2_B, BOSS3_A, BOSS3_B;
+    sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B, BOSS2_A, BOSS2_B, BOSS3_A, BOSS3_B, BOSS4_A, BOSS4_B;
     sprite1r_t BOSS_SHIELD;
     sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE, SHOP_DMG, SHOP_PIERCE;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
@@ -132,7 +146,7 @@ typedef struct {
 
     // Boss alien state
     int boss_alive;
-    int boss_type; // 0 = classic, 1 = blue, 2 = yellow swarm, 3 = tower
+    int boss_type; // 0 = classic, 1 = blue, 2 = yellow swarm, 3 = tower, 4 = hermit
     int boss_health; // 0-20 HP
     int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
@@ -150,13 +164,14 @@ typedef struct {
     int boss_power_active;     // 1 when special attack is happening
     int boss_power_cooldown;   // Duration of purple/frozen state (30 ticks = 0.5 seconds)
     int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
-    int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle, 4 = tower walls
+    int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle, 4 = tower walls, 5 = hermit dodge
     int next_boss_attack_type; // The attack type that will be used for the next charge
     int boss_green_laser_last_hit_y; // Last y position where green laser hit aliens
     int tower_wall_active;
     int tower_wall_timer;
     int tower_wall_left;
     int tower_wall_right;
+    hermit_lightning_t hermit_lightning[HERMIT_MAX_LIGHTNINGS];
 
     uint8_t yellow_boss_marked[AROWS][ACOLS]; // 1 for aliens that belong to the yellow boss swarm
     bullet_t yellow_beam_shot[5];             // Yellow boss synchronized beam shots

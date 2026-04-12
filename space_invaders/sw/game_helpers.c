@@ -185,6 +185,9 @@ const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
     if (g->boss_type == BOSS_TYPE_TOWER) {
         return frame ? &g->BOSS3_B : &g->BOSS3_A;
     }
+    if (g->boss_type == BOSS_TYPE_HERMIT) {
+        return frame ? &g->BOSS4_B : &g->BOSS4_A;
+    }
     return frame ? &g->BOSS_B : &g->BOSS_A;
 }
 
