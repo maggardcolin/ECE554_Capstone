@@ -39,8 +39,12 @@ static const char *boss_intro_main_attack_text(const game_t *g) {
     return (g->boss_type == BOSS_TYPE_BLUE) ? "TRIPLE SHOT" : "STANDARD LASER";
 }
 
+static int blue_black_hole_enabled(const game_t *g) {
+    return (g->boss_type == BOSS_TYPE_BLUE) && (g->level >= 3);
+}
+
 static const char *boss_intro_special_attack_text(const game_t *g) {
-    if (g->boss_type == BOSS_TYPE_BLUE) return "BOMB";
+    if (g->boss_type == BOSS_TYPE_BLUE) return blue_black_hole_enabled(g) ? "BLACK HOLE" : "BOMB";
     if (g->level >= 3) return "PLASMA BEAM, HEAL BEAM";
     return "PLASMA BEAM";
 }
@@ -1327,13 +1331,35 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     // Blue charged bomb explosion: same radius progression as boss death explosion and 2 damage to player.
-    if (g->boss_attack_type == 2 && g->boss_bomb.alive && g->boss_bomb.exploding && !g->boss_bomb.hit_player) {
+    if (g->boss_attack_type == 2 && g->boss_bomb.alive && g->boss_bomb.exploding) {
         int radius = boss_bomb_explosion_radius(g);
         int pcx = g->player_x + g->PLAYER.w / 2;
         int pcy = g->player_y + g->PLAYER.h / 2;
         int dx = pcx - g->boss_bomb.x;
         int dy = pcy - g->boss_bomb.y;
-        if ((dx * dx + dy * dy) <= (radius * radius)) {
+
+        if (blue_black_hole_enabled(g) && !g->player_dying) {
+            int pull_step = g->player_speed / 2;
+            if (pull_step < 1) pull_step = 1;
+
+            int delta_x = g->boss_bomb.x - pcx;
+            if (delta_x > 0) {
+                int step = (delta_x < pull_step) ? delta_x : pull_step;
+                g->player_x += step;
+            } else if (delta_x < 0) {
+                int step = ((-delta_x) < pull_step) ? (-delta_x) : pull_step;
+                g->player_x -= step;
+            }
+
+            if (g->player_x < 0) g->player_x = 0;
+            if (g->player_x > LW - g->PLAYER.w) g->player_x = LW - g->PLAYER.w;
+
+            // Recompute center after movement for hit test.
+            pcx = g->player_x + g->PLAYER.w / 2;
+            dx = pcx - g->boss_bomb.x;
+        }
+
+        if (!g->boss_bomb.hit_player && (dx * dx + dy * dy) <= (radius * radius)) {
             g->boss_bomb.hit_player = 1;
             g->lives -= 2;
             if (g->lives < 0) g->lives = 0;
