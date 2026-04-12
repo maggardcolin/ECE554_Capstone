@@ -124,6 +124,9 @@ typedef struct {
     int shop_anim_timer;
     int shopkeeper_frame;
     int exit_available;        // 1 when boss is killed and exit is open
+    int exit_was_available;
+    int exit_blink_timer;
+    int exit_blink_toggles_remaining;
     struct {
         int active;
         int x, y;

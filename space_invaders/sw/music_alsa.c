@@ -16,6 +16,10 @@
 #define DUTY_BASS 0.25f
 #define DUTY_HARM 0.125f
 
+#define DING_FREQ 1046.50f
+#define DING_DURATION_SAMPLES (AUDIO_RATE / 5)
+#define DING_GAIN 0.18f
+
 #define R 0.0f
 
 typedef struct {
@@ -33,6 +37,7 @@ typedef struct {
     pthread_mutex_t lock;
     int running;
     music_mode_t mode;
+    int ding_pending;
 } music_ctx_t;
 
 static music_ctx_t g_music;
@@ -190,11 +195,18 @@ static void *audio_thread(void *arg) {
     int sample_in_step = 0;
     int game_over_finished = 0;
     music_mode_t active_mode = MUSIC_MODE_MENU;
+    int ding_samples_left = 0;
+    float ding_phase = 0.0f;
 
     while (1) {
         pthread_mutex_lock(&g_music.lock);
         int running = g_music.running;
         music_mode_t mode = g_music.mode;
+        if (g_music.ding_pending) {
+            ding_samples_left = DING_DURATION_SAMPLES;
+            ding_phase = 0.0f;
+            g_music.ding_pending = 0;
+        }
         pthread_mutex_unlock(&g_music.lock);
 
         if (!running) {
@@ -230,9 +242,17 @@ static void *audio_thread(void *arg) {
             float s1 = square(&phase1, f1, DUTY_MELODY);
             float s2 = square(&phase2, f2, DUTY_BASS);
             float s3 = square(&phase3, f3, DUTY_HARM);
-            float mix = (0.10f * s1) + (0.20f * s2) + (0.10f * s3);
+            float music_mix = (0.10f * s1) + (0.20f * s2) + (0.10f * s3);
+            float ding_mix = 0.0f;
 
-            int sample = (int)(mix * pat->gain * 32767.0f);
+            if (ding_samples_left > 0) {
+                float env = (float)ding_samples_left / (float)DING_DURATION_SAMPLES;
+                float ding = square(&ding_phase, DING_FREQ, 0.50f);
+                ding_mix = ding * DING_GAIN * env;
+                ding_samples_left--;
+            }
+
+            int sample = (int)(((music_mix * pat->gain) + ding_mix) * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
             buffer[i] = (int16_t)sample;
@@ -320,6 +340,14 @@ void music_set_mode(music_mode_t mode) {
     pthread_mutex_unlock(&g_music.lock);
 }
 
+void music_play_ding(void) {
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running) {
+        g_music.ding_pending = 1;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
 void music_shutdown(void) {
     pthread_mutex_lock(&g_music.lock);
     int was_running = g_music.running;
@@ -344,6 +372,9 @@ int music_init(void) {
 
 void music_set_mode(music_mode_t mode) {
     (void)mode;
+}
+
+void music_play_ding(void) {
 }
 
 void music_shutdown(void) {

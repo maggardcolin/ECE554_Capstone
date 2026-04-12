@@ -12,4 +12,5 @@ typedef enum {
 
 int music_init(void);
 void music_set_mode(music_mode_t mode);
+void music_play_ding(void);
 void music_shutdown(void);

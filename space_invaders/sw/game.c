@@ -1,10 +1,14 @@
 #include "game.h"
 #include "../hw_contract.h"
 #include "font.h"
+#include "music_alsa.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+
+#define EXIT_BLINK_INTERVAL_FRAMES 8
+#define EXIT_BLINK_TOGGLES 6
 
 static int digit_count(uint32_t v)
 {
@@ -54,6 +58,12 @@ static int text_width_5x5(const char *text, int scale) {
     for (const char *p = text; *p; p++) count++;
     if (count == 0) return 0;
     return (count * 6 - 1) * scale; // (w=5 + spacing=1) * n - spacing
+}
+
+static int exit_sign_visible(const game_t *g) {
+    if (!g->exit_available) return 0;
+    if (g->exit_blink_toggles_remaining <= 0) return 1;
+    return (g->exit_blink_toggles_remaining % 2) == 0;
 }
 
 static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
@@ -601,6 +611,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->player_x = 5;  // Spawn on left side
     g->player_y = LH - 30;
     g->exit_available = 0;
+    g->exit_was_available = 0;
+    g->exit_blink_timer = 0;
+    g->exit_blink_toggles_remaining = 0;
 
     // Level 0: tutorial level - only one alien in center
     if (level == 0) {
@@ -774,6 +787,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->in_shop) {
         shop_update(g, buttons, vsync_counter);
         return;
+    }
+
+    if (g->exit_blink_toggles_remaining > 0) {
+        g->exit_blink_timer--;
+        if (g->exit_blink_timer <= 0) {
+            g->exit_blink_timer = EXIT_BLINK_INTERVAL_FRAMES;
+            g->exit_blink_toggles_remaining--;
+        }
     }
 
     // Decrement score every 0.33 seconds (20 ticks at 60 FPS)
@@ -1140,6 +1161,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
         
     }
+
+    if (g->exit_available && !g->exit_was_available) {
+        g->exit_blink_timer = EXIT_BLINK_INTERVAL_FRAMES;
+        g->exit_blink_toggles_remaining = EXIT_BLINK_TOGGLES;
+        music_play_ding();
+    }
+    g->exit_was_available = g->exit_available;
 }
 
 void game_render(game_t *g, lfb_t *lfb) {
@@ -1459,7 +1487,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     // Exit sign when boss is killed
-    if (g->exit_available) {
+    if (exit_sign_visible(g)) {
         const char *exit_label = "EXIT";
         int exit_w = text_width_5x5(exit_label, 1);
         int exit_x = LW - exit_w - 4;
