@@ -51,7 +51,9 @@ int sw_sim_main(void) {
             else if (game.in_shop) mode = MUSIC_MODE_SHOP;
             else if (game.boss_intro_active) mode = MUSIC_MODE_BOSS_INTRO;
             else if (game.boss_alive) {
-                mode = (game.boss_type == BOSS_TYPE_BLUE) ? MUSIC_MODE_BOSS_BLUE : MUSIC_MODE_BOSS;
+                if (game.boss_type == BOSS_TYPE_BLUE) mode = MUSIC_MODE_BOSS_BLUE;
+                else if (game.boss_type == BOSS_TYPE_YELLOW) mode = MUSIC_MODE_BOSS_YELLOW;
+                else mode = MUSIC_MODE_BOSS;
             }
             music_set_mode(mode);
         }
