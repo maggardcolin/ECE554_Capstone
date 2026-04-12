@@ -164,6 +164,24 @@ static const pattern_t PATTERN_GAME_OVER = {
     .gain = 0.20f,
 };
 
+static const pattern_t PATTERN_WIN = {
+    .melody = {
+        523.25f, R, 659.25f, R, 783.99f, R, 1046.50f, R,
+        987.77f, R, 1174.66f, R, 1318.51f, R, 1567.98f, R
+    },
+    .bass = {
+        130.81f, R, 164.81f, R, 196.00f, R, 261.63f, R,
+        246.94f, R, 293.66f, R, 329.63f, R, 392.00f, R
+    },
+    .harm = {
+        261.63f, R, 329.63f, R, 392.00f, R, 523.25f, R,
+        493.88f, R, 587.33f, R, 659.25f, R, 783.99f, R
+    },
+    .len = 16,
+    .bpm = 128,
+    .gain = 0.20f,
+};
+
 static const pattern_t PATTERN_PAUSED = {
     .melody = {523.25f, R, R, R, 523.25f, R, R, R,
                659.25f, R, R, R, 659.25f, R, R, R},
@@ -190,6 +208,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:
         return &PATTERN_GAME_OVER;
+    case MUSIC_MODE_WIN:
+        return &PATTERN_WIN;
     case MUSIC_MODE_PAUSED:
         return &PATTERN_PAUSED;
     default:
@@ -286,7 +306,7 @@ static void *audio_thread(void *arg) {
             float f1 = 0.0f;
             float f2 = 0.0f;
             float f3 = 0.0f;
-            if (!(mode == MUSIC_MODE_GAME_OVER && game_over_finished)) {
+            if (!((mode == MUSIC_MODE_GAME_OVER || mode == MUSIC_MODE_WIN) && game_over_finished)) {
                 f1 = pat->melody[step];
                 f2 = pat->bass[step];
                 f3 = pat->harm[step];
@@ -351,10 +371,10 @@ static void *audio_thread(void *arg) {
             sample_in_step++;
             if (sample_in_step >= samples_per_step) {
                 sample_in_step = 0;
-                if (!(mode == MUSIC_MODE_GAME_OVER && game_over_finished)) {
+                if (!((mode == MUSIC_MODE_GAME_OVER || mode == MUSIC_MODE_WIN) && game_over_finished)) {
                     step++;
                     if (step >= pat->len) {
-                        if (mode == MUSIC_MODE_GAME_OVER) {
+                        if (mode == MUSIC_MODE_GAME_OVER || mode == MUSIC_MODE_WIN) {
                             step = pat->len - 1;
                             game_over_finished = 1;
                         } else {

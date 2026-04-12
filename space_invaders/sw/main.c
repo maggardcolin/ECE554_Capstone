@@ -45,6 +45,7 @@ int sw_sim_main(void) {
             music_mode_t mode = MUSIC_MODE_GAMEPLAY;
             if (game.start_screen) mode = MUSIC_MODE_MENU;
             else if (game.game_over) mode = MUSIC_MODE_GAME_OVER;
+            else if (game.win_screen) mode = MUSIC_MODE_WIN;
             else if (game.level == 0 && !game.level_complete) mode = MUSIC_MODE_SILENT;
             else if (game.paused) mode = MUSIC_MODE_PAUSED;
             else if (game.in_shop) mode = MUSIC_MODE_SHOP;

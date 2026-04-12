@@ -7,6 +7,7 @@ typedef enum {
     MUSIC_MODE_BOSS,
     MUSIC_MODE_SHOP,
     MUSIC_MODE_GAME_OVER,
+    MUSIC_MODE_WIN,
     MUSIC_MODE_PAUSED
 } music_mode_t;
 

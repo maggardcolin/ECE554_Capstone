@@ -13,6 +13,9 @@
 #define PLAYER_DEATH_DELAY_FRAMES 60
 #define BOSS_DEATH_DELAY_FRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
+#define WIN_LEVEL 8
+#define WIN_RING_ALIENS 6
+#define WIN_EXPLOSION_DELAY_FRAMES 10
 
 static int digit_count(uint32_t v)
 {
@@ -304,6 +307,16 @@ static void render_boss_explosion(const game_t *g, lfb_t *lfb) {
         int dy = ((i * 17 + age * 5) % (spark_r * 2 + 1)) - spark_r;
         uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         l_putpix(lfb, cx + dx, cy + dy, c);
+    }
+}
+
+static void reset_win_state(game_t *g) {
+    g->win_screen = 0;
+    g->win_explosion_index = 0;
+    g->win_explosion_delay_timer = WIN_EXPLOSION_DELAY_FRAMES;
+    g->win_prompt_ready = 0;
+    for (int i = 0; i < WIN_RING_ALIENS; i++) {
+        g->win_alien_explode_timer[i] = 0;
     }
 }
 
@@ -911,6 +924,24 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->exit_was_available = 0;
     g->exit_blink_timer = 0;
     g->exit_blink_toggles_remaining = 0;
+    reset_win_state(g);
+
+    if (level == WIN_LEVEL) {
+        g->boss_alive = 0;
+        g->boss_dying = 0;
+        g->boss_shot.alive = 0;
+        g->boss_laser.alive = 0;
+        g->ashot.alive = 0;
+        clear_player_shots(g);
+        memset(g->alien_alive, 0, sizeof(g->alien_alive));
+        memset(g->alien_health, 0, sizeof(g->alien_health));
+        memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
+        memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
+        g->win_screen = 1;
+        g->player_x = (LW - g->PLAYER.w) / 2;
+        g->player_y = LH / 2 - g->PLAYER.h / 2;
+        return;
+    }
 
     // Level 0: tutorial level - only one alien in center
     if (level == 0) {
@@ -1030,6 +1061,7 @@ void game_reset(game_t *g) {
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
     g->paused = 0;
+    reset_win_state(g);
     reset_player_progression(g);
 
     setup_level(g, 0, 1);
@@ -1044,7 +1076,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
     
     // Handle pause toggle (only in active gameplay)
-    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop) {
+    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen) {
         if ((buttons & BTN_PAUSE) && !(prev_buttons & BTN_PAUSE)) {
             g->paused = !g->paused;
         }
@@ -1083,6 +1115,46 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         if (g->game_over_delay_timer == 0 && (buttons & BTN_FIRE)) {
             g->game_over = 0;
             g->game_over_score = 0;
+            g->start_screen = 1;
+            g->start_screen_delay_timer = 30;
+            reset_player_progression(g);
+            setup_level(g, 0, 1);
+        }
+        return;
+    }
+
+    if (g->win_screen) {
+        g->alien_frame = (int)((vsync_counter / 20u) & 1u);
+
+        for (int i = 0; i < WIN_RING_ALIENS; i++) {
+            if (g->win_alien_explode_timer[i] > 0) {
+                g->win_alien_explode_timer[i]--;
+            }
+        }
+
+        if (g->win_explosion_index < WIN_RING_ALIENS) {
+            if (g->win_explosion_delay_timer > 0) {
+                g->win_explosion_delay_timer--;
+            }
+            if (g->win_explosion_delay_timer == 0) {
+                g->win_alien_explode_timer[g->win_explosion_index] = ALIEN_EXPLOSION_FRAMES;
+                g->win_explosion_index++;
+                g->win_explosion_delay_timer = WIN_EXPLOSION_DELAY_FRAMES;
+            }
+        } else {
+            int any_active = 0;
+            for (int i = 0; i < WIN_RING_ALIENS; i++) {
+                if (g->win_alien_explode_timer[i] > 0) {
+                    any_active = 1;
+                    break;
+                }
+            }
+            if (!any_active) {
+                g->win_prompt_ready = 1;
+            }
+        }
+
+        if (g->win_prompt_ready && (buttons & BTN_FIRE)) {
             g->start_screen = 1;
             g->start_screen_delay_timer = 30;
             reset_player_progression(g);
@@ -1577,6 +1649,58 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_score(lfb, label_x + label_w + 6, label_y, g->game_over_score, 0xFFFFFFFF);
 
         if (g->game_over_delay_timer == 0) {
+            const char *prompt = "PRESS SPACE TO CONTINUE";
+            int prompt_scale = 2;
+            int prompt_w = text_width_5x5(prompt, prompt_scale);
+            int prompt_x = (LW - prompt_w) / 2;
+            int prompt_y = label_y + 25;
+            l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
+        }
+        return;
+    }
+
+    if (g->win_screen) {
+        l_clear(lfb, 0xFF000000);
+
+        const char *title = "YOU WIN";
+        int title_scale = 4;
+        int title_w = text_width_5x5(title, title_scale);
+        int title_x = (LW - title_w) / 2;
+        int title_y = 10;
+        l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
+
+        int cx = LW / 2;
+        int cy = LH / 2 - 10;
+
+        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int a_w = AS->w;
+        int a_h = AS->h;
+        int p_w = g->PLAYER.w;
+        int p_h = g->PLAYER.h;
+
+        uint32_t player_color = triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00;
+        draw_sprite1r(lfb, &g->PLAYER, cx - p_w / 2, cy - p_h / 2, player_color);
+
+        int r = 22;
+        int hx[WIN_RING_ALIENS] = { cx, cx + r, cx + r, cx, cx - r, cx - r };
+        int hy[WIN_RING_ALIENS] = { cy - r, cy - r/2, cy + r/2, cy + r, cy + r/2, cy - r/2 };
+        for (int i = 0; i < WIN_RING_ALIENS; i++) {
+            if (g->win_alien_explode_timer[i] > 0) {
+                render_alien_explosion(lfb, hx[i], hy[i], g->win_alien_explode_timer[i]);
+            } else if (i >= g->win_explosion_index) {
+                draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
+            }
+        }
+
+        const char *score_label = "FINAL SCORE:";
+        int label_scale = 1;
+        int label_w = text_width_5x5(score_label, label_scale);
+        int label_x = (LW - label_w) / 2 - 12;
+        int label_y = cy + r + 15;
+        l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
+        l_draw_score(lfb, label_x + label_w + 6, label_y, g->score, 0xFFFFFFFF);
+
+        if (g->win_prompt_ready) {
             const char *prompt = "PRESS SPACE TO CONTINUE";
             int prompt_scale = 2;
             int prompt_w = text_width_5x5(prompt, prompt_scale);

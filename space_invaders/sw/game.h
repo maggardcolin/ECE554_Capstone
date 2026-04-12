@@ -116,6 +116,11 @@ typedef struct {
     int game_over;
     int game_over_score;
     int game_over_delay_timer;
+    int win_screen;
+    int win_explosion_index;
+    int win_explosion_delay_timer;
+    int win_alien_explode_timer[6];
+    int win_prompt_ready;
     int player_dying;
     int player_death_timer;
 
