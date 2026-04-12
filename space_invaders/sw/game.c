@@ -12,6 +12,7 @@
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
 #define PLAYER_DEATH_DELAY_FRAMES 60
+#define PLAYER_IFRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
 #define BOSS_BOMB_EXPLOSION_FRAMES 60
 #define BOSS_INTRO_FRAMES 180
@@ -445,6 +446,33 @@ static void reset_win_state(game_t *g) {
     }
 }
 
+static int player_invulnerable(const game_t *g) {
+    return (g->player_iframe_timer > 0) && !g->player_dying;
+}
+
+static int player_visible_with_iframes(const game_t *g) {
+    if (!player_invulnerable(g)) return 1;
+    return ((g->player_iframe_timer / 4) & 1) == 0;
+}
+
+static void trigger_player_death(game_t *g);
+
+static void apply_player_damage(game_t *g, int damage) {
+    if (damage <= 0) return;
+    if (player_invulnerable(g)) return;
+
+    g->lives -= damage;
+    if (g->lives < 0) g->lives = 0;
+    if (g->lives > 0) {
+        g->player_iframe_timer = PLAYER_IFRAMES;
+        music_play_boom();
+    }
+    clear_player_shots(g);
+    if (g->lives <= 0) {
+        trigger_player_death(g);
+    }
+}
+
 static void trigger_player_death(game_t *g) {
     if (g->player_dying || g->game_over) return;
     g->player_dying = 1;
@@ -612,15 +640,12 @@ static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
     if (!shot->alive) return;
     if (g->player_dying) return;
     if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, shot->x, shot->y)) {
-        g->lives--;
-        if (g->lives > 0) {
-            music_play_boom();
+        if (player_invulnerable(g)) {
+            shot->alive = 0;
+            return;
         }
-        clear_player_shots(g);
+        apply_player_damage(g, 1);
         shot->alive = 0;
-        if (g->lives <= 0) {
-            trigger_player_death(g);
-        }
     } else {
         handle_bunker_bullet_collisions(g, shot, 3);
     }
@@ -1059,6 +1084,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     // If paused, skip all game logic
     if (g->paused) {
         return;
+    }
+
+    if (g->player_iframe_timer > 0) {
+        g->player_iframe_timer--;
     }
 
     if (g->start_screen) {
@@ -1633,14 +1662,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (laser_left < player_right && laser_right > player_left &&
                 g->boss_laser.y + 1 >= g->player_y && g->boss_laser.y <= g->player_y + p->h &&
                 (g->boss_laser.y - g->boss_laser_last_hit_y) > 5) {  // Only hit once per 5 pixels
-                g->lives--;
-                if (g->lives > 0) {
-                    music_play_boom();
-                }
-                g->boss_laser_last_hit_y = g->boss_laser.y;  // Track where we hit
-                clear_player_shots(g);
-                if (g->lives <= 0) {
-                    trigger_player_death(g);
+                if (player_invulnerable(g)) {
+                    g->boss_laser_last_hit_y = g->boss_laser.y;
+                } else {
+                    g->boss_laser_last_hit_y = g->boss_laser.y;  // Track where we hit
+                    apply_player_damage(g, 1);
                 }
                 // Laser continues through player (not destroyed)
             }
@@ -1715,15 +1741,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
         if (!g->boss_bomb.hit_player && (dx * dx + dy * dy) <= (radius * radius)) {
             g->boss_bomb.hit_player = 1;
-            g->lives -= 2;
-            if (g->lives < 0) g->lives = 0;
-            if (g->lives > 0) {
-                music_play_boom();
-            }
-            clear_player_shots(g);
-            if (g->lives <= 0) {
-                trigger_player_death(g);
-            }
+            apply_player_damage(g, 2);
         }
     }
 
@@ -2260,7 +2278,7 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     if (g->player_dying) {
         render_player_explosion(g, lfb);
-    } else {
+    } else if (player_visible_with_iframes(g)) {
         render_player(g, lfb);
     }
 

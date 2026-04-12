@@ -150,6 +150,7 @@ typedef struct {
     int win_prompt_ready;
     int player_dying;
     int player_death_timer;
+    int player_iframe_timer;
 
     int paused;
 
