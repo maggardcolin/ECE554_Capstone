@@ -1296,6 +1296,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         int boss_h = g->BOSS_A.h;
 
         // Boss power charging system
+        int prev_power_timer = g->boss_power_timer;
         int health_pct = (g->boss_health * 100) / g->boss_max_health;
         if (health_pct <= 33) g->boss_power_timer += 3 + (g->level / 6);
         else if (health_pct <= 67) g->boss_power_timer += 2 + (g->level / 6);
@@ -1304,8 +1305,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->boss_power_timer = g->boss_power_max;
         }
         
-        // Determine next attack type when charging starts
-        if (g->boss_power_timer == 1) {
+        // Determine next attack type when a new charging cycle starts.
+        // Level 7 can increment by >1 per frame, so checking ==1 can be skipped.
+        if (prev_power_timer == 0 && g->boss_power_timer > 0) {
             int alive_count = 0;
             for (int r = 0; r < AROWS; r++) {
                 for (int c = 0; c < ACOLS; c++) {
