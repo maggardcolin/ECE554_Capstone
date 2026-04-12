@@ -91,6 +91,36 @@ static const char *boss_intro_special_attack_text(const game_t *g) {
     return "PLASMA";
 }
 
+static const char *boss_intro_desc_line1(const game_t *g) {
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        return (g->level >= 3) ? "SHOOTS A BLACK HOLE WHICH PULLS YOU IN." :
+                                 "FIRES WIDE TRIPLE SHOTS.";
+    }
+    if (g->boss_type == BOSS_TYPE_YELLOW) return "CONTROLS REGULAR ALIENS.";
+    if (g->boss_type == BOSS_TYPE_TOWER) return "CONSTRAINS THE ARENA AND THROWS ASTEROIDS.";
+    if (g->boss_type == BOSS_TYPE_HERMIT) {
+        return (g->level >= 3) ? "HOMING LIGHTNING AND DODGING." :
+                                 "HOMING LIGHTNING ATTACKS.";
+    }
+    return (g->level >= 3) ? "EMPEROR ENTERS PHASE TWO PLASMA PATTERNS." :
+                             "FIGHTS WITH HEAVY PLASMA FIRE.";
+}
+
+static const char *boss_intro_desc_line2(const game_t *g) {
+    if (g->boss_type == BOSS_TYPE_BLUE) {
+        return (g->level >= 3) ? "GETS STRONGER ONCE HALF OF THE ALIENS ARE GONE." :
+                                 "SHOOTING THE BOMB REVERSES ITS COURSE.";
+    }
+    if (g->boss_type == BOSS_TYPE_YELLOW) return "BEST TO TAKE OUT COLUMNS.";
+    if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID EXPLOSIONS HURT IT.";
+    if (g->boss_type == BOSS_TYPE_HERMIT) {
+        return (g->level >= 3) ? "TRY TO BREAK ITS SHIELD." :
+                                 "DODGES OCCASIONALLY.";
+    }
+    return (g->level >= 3) ? "GREEN PLASMA NOW HEALS DURING THE FIGHT." :
+                             "DESCENDS ONCE HALF THE ALIENS ARE GONE.";
+}
+
 static int movement_left_bound(const game_t *g) {
     return g->tower_wall_active ? g->tower_wall_left : 0;
 }
@@ -3461,6 +3491,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         const char *main_value = boss_intro_main_attack_text(g);
         const char *special_prefix = "SPECIAL ATTACK:";
         const char *special_value = boss_intro_special_attack_text(g);
+        const char *desc_line1 = boss_intro_desc_line1(g);
+        const char *desc_line2 = boss_intro_desc_line2(g);
 
         int scale = 1;
         int y = 18;
@@ -3568,6 +3600,19 @@ void game_render(game_t *g, lfb_t *lfb) {
             draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
         }
         render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS, 1);
+
+        uint32_t desc_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
+                              (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF99 :
+                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFFC08A4B :
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFD9B3FF : 0xFF99FF99;
+        int desc1_w = text_width_5x5(desc_line1, 1);
+        int desc2_w = text_width_5x5(desc_line2, 1);
+        int desc1_x = (LW - desc1_w) / 2;
+        int desc2_x = (LW - desc2_w) / 2;
+        int desc1_y = LH - 30;
+        int desc2_y = LH - 18;
+        l_draw_text(lfb, desc1_x, desc1_y, desc_line1, 1, desc_color);
+        l_draw_text(lfb, desc2_x, desc2_y, desc_line2, 1, desc_color);
         return;
     }
 
