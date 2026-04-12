@@ -1463,9 +1463,13 @@ void game_render(game_t *g, lfb_t *lfb) {
         int a_w = AS->w;
         int a_h = AS->h;
 
+        const int game_over_ship_hold_frames = 30;
         int game_over_age = 90 - g->game_over_delay_timer;
-        if (game_over_age <= PLAYER_DEATH_DELAY_FRAMES) {
-            render_player_explosion_at(lfb, cx, cy, game_over_age);
+        if (game_over_age < game_over_ship_hold_frames) {
+            uint32_t player_color = triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00;
+            draw_sprite1r(lfb, &g->PLAYER, cx - g->PLAYER.w / 2, cy - g->PLAYER.h / 2, player_color);
+        } else if (game_over_age < game_over_ship_hold_frames + PLAYER_DEATH_DELAY_FRAMES) {
+            render_player_explosion_at(lfb, cx, cy, game_over_age - game_over_ship_hold_frames);
         }
 
         int r = 22;
