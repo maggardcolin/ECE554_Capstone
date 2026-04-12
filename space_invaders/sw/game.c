@@ -23,6 +23,12 @@
 #define WIN_LEVEL 8
 #define WIN_RING_ALIENS 6
 #define WIN_EXPLOSION_DELAY_FRAMES 10
+#define OVERWORLD_LEVEL_COUNT 7
+#define OVERWORLD_FLY_FRAMES 120
+#define OVERWORLD_HOLD_FRAMES 36
+#define OVERWORLD_PIXELATE_FRAMES 36
+
+#define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
 static const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
     if (g->boss_type == BOSS_TYPE_BLUE) {
@@ -396,6 +402,127 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
     } else if (g->level >= 3 && elapsed >= t5 && elapsed < t6) {
         int local = elapsed - t5;
         render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, 0xFF00FF00);
+    }
+}
+
+static void overworld_node_position(int idx, int *x, int *y) {
+    static const int nx[OVERWORLD_LEVEL_COUNT] = {38, 74, 108, 145, 186, 228, 274};
+    static const int ny[OVERWORLD_LEVEL_COUNT] = {140, 123, 104, 88, 71, 54, 36};
+
+    if (idx < 0) idx = 0;
+    if (idx >= OVERWORLD_LEVEL_COUNT) idx = OVERWORLD_LEVEL_COUNT - 1;
+    *x = nx[idx];
+    *y = ny[idx];
+}
+
+static void render_overworld_background(lfb_t *lfb, int elapsed) {
+    l_clear(lfb, 0xFF02070E);
+
+    for (int y = 0; y < LH; y += 18) {
+        for (int x = 0; x < LW; x += 18) {
+            int seed = (x * 1103 + y * 917 + elapsed * 7) & 63;
+            if (seed < 5) {
+                uint32_t c = (seed & 1) ? 0xFF35567A : 0xFF5D85B4;
+                l_putpix(lfb, x, y, c);
+                if (x + 1 < LW) l_putpix(lfb, x + 1, y, c);
+            }
+        }
+    }
+}
+
+static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
+    int elapsed = OVERWORLD_TOTAL_FRAMES - g->overworld_cutscene_timer;
+    if (elapsed < 0) elapsed = 0;
+    if (elapsed > OVERWORLD_TOTAL_FRAMES) elapsed = OVERWORLD_TOTAL_FRAMES;
+
+    render_overworld_background(lfb, elapsed);
+
+    const char *title = "DEFEAT THE ALIENS";
+    int title_w = text_width_5x5(title, 1);
+    l_draw_text(lfb, (LW - title_w) / 2, 8, title, 1, 0xFFFFFFFF);
+
+    for (int i = 0; i < OVERWORLD_LEVEL_COUNT - 1; i++) {
+        int x0, y0, x1, y1;
+        overworld_node_position(i, &x0, &y0);
+        overworld_node_position(i + 1, &x1, &y1);
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+        int steps = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
+        if (steps < 1) steps = 1;
+        for (int s = 0; s <= steps; s++) {
+            int px = x0 + (dx * s) / steps;
+            int py = y0 + (dy * s) / steps;
+            l_putpix(lfb, px, py, 0xFF1A3556);
+        }
+    }
+
+    int completed_count = g->level - 1;
+    if (completed_count < 0) completed_count = 0;
+    if (completed_count > OVERWORLD_LEVEL_COUNT) completed_count = OVERWORLD_LEVEL_COUNT;
+
+    int pulse = (elapsed / 3) & 7;
+    int pulse_r = (pulse < 4) ? pulse : (7 - pulse);
+
+    for (int i = 0; i < OVERWORLD_LEVEL_COUNT; i++) {
+        int x, y;
+        overworld_node_position(i, &x, &y);
+        int completed = i < completed_count;
+
+        if (completed) {
+            draw_filled_circle(lfb, x, y, 4, 0xFF0A5A1A);
+            draw_filled_circle(lfb, x, y, 2, 0xFF3CFF68);
+        } else {
+            int r = 3 + pulse_r;
+            draw_filled_circle(lfb, x, y, r, 0xFF4C1010);
+            draw_filled_circle(lfb, x, y, 3, 0xFFFF3A3A);
+        }
+
+        char label[4];
+        snprintf(label, sizeof(label), "%d", i + 1);
+        l_draw_text(lfb, x - 2, y - 10, label, 1, 0xFFFFFFFF);
+    }
+
+    int to_x, to_y;
+    int from_x = 12;
+    int from_y = LH + 10;
+    overworld_node_position(g->overworld_cutscene_to_node, &to_x, &to_y);
+    if (g->overworld_cutscene_from_node >= 0) {
+        overworld_node_position(g->overworld_cutscene_from_node, &from_x, &from_y);
+    }
+
+    int ship_x = to_x;
+    int ship_y = to_y;
+    if (elapsed < OVERWORLD_FLY_FRAMES) {
+        ship_x = from_x + ((to_x - from_x) * elapsed) / OVERWORLD_FLY_FRAMES;
+        ship_y = from_y + ((to_y - from_y) * elapsed) / OVERWORLD_FLY_FRAMES;
+    }
+
+    draw_sprite1r(lfb, &g->PLAYER, ship_x - g->PLAYER.w / 2, ship_y - g->PLAYER.h / 2, 0xFF00FF00);
+
+    if (elapsed >= OVERWORLD_FLY_FRAMES) {
+        int ring_r = 6 + pulse_r;
+        render_intro_ring_points(lfb, to_x, to_y, ring_r, 0xFFFF8A8A);
+    }
+
+    int transition_start = OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES;
+    if (elapsed >= transition_start) {
+        int t = elapsed - transition_start;
+        if (t > OVERWORLD_PIXELATE_FRAMES) t = OVERWORLD_PIXELATE_FRAMES;
+        int density = (t * 100) / OVERWORLD_PIXELATE_FRAMES;
+
+        int cell = 6;
+        int threshold = (density * 255) / 100;
+        for (int y = 0; y < LH; y += cell) {
+            for (int x = 0; x < LW; x += cell) {
+                int seed = (x * 37 + y * 73 + 19) & 255;
+                if (seed > threshold) continue;
+                for (int yy = y; yy < y + cell && yy < LH; yy++) {
+                    for (int xx = x; xx < x + cell && xx < LW; xx++) {
+                        l_putpix(lfb, xx, yy, 0xFF000000);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -997,6 +1124,10 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->level_just_completed = 0;
     g->boss_intro_active = 0;
     g->boss_intro_timer = 0;
+    g->overworld_cutscene_active = 0;
+    g->overworld_cutscene_timer = 0;
+    g->overworld_cutscene_from_node = -1;
+    g->overworld_cutscene_to_node = 0;
 
     g->powerup_active = 0;
     g->powerup_timer = 0;
@@ -1105,8 +1236,17 @@ static void setup_level(game_t *g, int level, int reset_score) {
     refill_sprite_full(&g->BOSS_SHIELD);
 
     if (level > 0) {
-        g->boss_intro_active = 1;
-        g->boss_intro_timer = BOSS_INTRO_FRAMES;
+        int to_node = level - 1;
+        int from_node = level - 2;
+
+        if (to_node >= OVERWORLD_LEVEL_COUNT) to_node = OVERWORLD_LEVEL_COUNT - 1;
+        if (from_node >= OVERWORLD_LEVEL_COUNT) from_node = OVERWORLD_LEVEL_COUNT - 1;
+        if (from_node < 0) from_node = -1;
+
+        g->overworld_cutscene_active = 1;
+        g->overworld_cutscene_timer = OVERWORLD_TOTAL_FRAMES;
+        g->overworld_cutscene_from_node = from_node;
+        g->overworld_cutscene_to_node = to_node;
     }
 
     bunkers_rebuild(g);
@@ -1179,7 +1319,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
     
     // Handle pause toggle (only in active gameplay)
-    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen && !g->boss_intro_active) {
+    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen && !g->boss_intro_active && !g->overworld_cutscene_active) {
         if ((buttons & BTN_PAUSE) && !(prev_buttons & BTN_PAUSE)) {
             g->paused = !g->paused;
         }
@@ -1284,6 +1424,18 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (g->in_shop) {
         shop_update(g, buttons, vsync_counter);
+        return;
+    }
+
+    if (g->overworld_cutscene_active) {
+        if (g->overworld_cutscene_timer > 0) {
+            g->overworld_cutscene_timer--;
+        }
+        if (g->overworld_cutscene_timer <= 0) {
+            g->overworld_cutscene_active = 0;
+            g->boss_intro_active = 1;
+            g->boss_intro_timer = BOSS_INTRO_FRAMES;
+        }
         return;
     }
 
@@ -2046,6 +2198,11 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     if (g->in_shop) {
         shop_render(g, lfb);
+        return;
+    }
+
+    if (g->overworld_cutscene_active) {
+        render_overworld_cutscene(g, lfb);
         return;
     }
 

@@ -72,6 +72,10 @@ typedef struct {
     int level_just_completed;
     int boss_intro_active;
     int boss_intro_timer;
+    int overworld_cutscene_active;
+    int overworld_cutscene_timer;
+    int overworld_cutscene_from_node;
+    int overworld_cutscene_to_node;
 
     // Powerup system
     int powerup_active;
