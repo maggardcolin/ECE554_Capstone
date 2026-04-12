@@ -84,6 +84,8 @@ typedef struct {
     int practice_run_active;
     int practice_return_delay_timer;
     int forced_boss_type;      // -1 random, otherwise one of boss_type_t
+    int boss_pick_count[BOSS_TYPE_COUNT]; // Random mode history, max 2 picks per boss type
+    int last_random_boss_type; // Last randomly selected boss type, -1 if none yet
     int lives;
     int level_complete;
     int level_complete_timer;

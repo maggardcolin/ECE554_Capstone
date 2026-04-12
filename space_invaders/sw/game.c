@@ -1315,6 +1315,50 @@ static void reset_player_progression(game_t *g) {
     reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
 }
 
+static void reset_boss_selection_history(game_t *g) {
+    for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
+        g->boss_pick_count[i] = 0;
+    }
+    g->last_random_boss_type = -1;
+}
+
+static int pick_random_boss_type(game_t *g) {
+    int pool[BOSS_TYPE_COUNT];
+    int pool_count = 0;
+
+    // First pass: types still under the cap and not matching the previous pick.
+    for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
+        if (g->boss_pick_count[i] >= 2) continue;
+        if (i == g->last_random_boss_type) continue;
+        pool[pool_count++] = i;
+    }
+
+    // Fallback: if needed, allow repeating the last type but still enforce max-two cap.
+    if (pool_count == 0) {
+        for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
+            if (g->boss_pick_count[i] < 2) {
+                pool[pool_count++] = i;
+            }
+        }
+    }
+
+    // Final fallback (should be rare): if every type hit cap, pick any type.
+    if (pool_count == 0) {
+        for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
+            pool[pool_count++] = i;
+        }
+    }
+
+    int picked = pool[rand() % pool_count];
+    if (picked >= 0 && picked < BOSS_TYPE_COUNT) {
+        if (g->boss_pick_count[picked] < 2) {
+            g->boss_pick_count[picked]++;
+        }
+        g->last_random_boss_type = picked;
+    }
+    return picked;
+}
+
 static void destroy_bunkers_on_overlap(game_t *g, int x, int y, int w, int h) {
     for (int i = 0; i < 4; i++) {
         sprite1r_t *b = g->bunkers[i];
@@ -1634,7 +1678,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
         if (g->forced_boss_type >= 0 && g->forced_boss_type < BOSS_TYPE_COUNT) {
             g->boss_type = g->forced_boss_type;
         } else {
-            g->boss_type = rand() % BOSS_TYPE_COUNT;
+            g->boss_type = pick_random_boss_type(g);
         }
     } else {
         g->boss_type = BOSS_TYPE_CLASSIC;
@@ -1752,6 +1796,7 @@ void game_init(game_t *g) {
     g->practice_run_active = 0;
     g->practice_return_delay_timer = 0;
     g->forced_boss_type = -1;
+    reset_boss_selection_history(g);
     reset_player_progression(g);
 
     setup_level(g, 0, 1);
@@ -1770,6 +1815,7 @@ void game_reset(game_t *g) {
     g->practice_run_active = 0;
     g->practice_return_delay_timer = 0;
     g->forced_boss_type = -1;
+    reset_boss_selection_history(g);
     g->paused = 0;
     reset_win_state(g);
     reset_player_progression(g);
