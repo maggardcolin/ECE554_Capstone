@@ -10,6 +10,7 @@
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
 #define PLAYER_DEATH_DELAY_FRAMES 60
+#define BOSS_DEATH_DELAY_FRAMES 60
 
 static int digit_count(uint32_t v)
 {
@@ -133,6 +134,28 @@ static void render_player_explosion(const game_t *g, lfb_t *lfb) {
     }
 }
 
+static void render_boss_explosion(const game_t *g, lfb_t *lfb) {
+    int cx = g->boss_x + g->BOSS_A.w / 2;
+    int cy = g->boss_y + g->BOSS_A.h / 2;
+    int age = BOSS_DEATH_DELAY_FRAMES - g->boss_death_timer;
+    int frame = age / 10;
+    int base_r = 6 + frame * 3;
+
+    draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFFFF4500);
+    draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFFFF8C00);
+    if ((age & 1) == 0) {
+        draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00);
+    }
+
+    int spark_r = base_r + 6;
+    for (int i = 0; i < 14; i++) {
+        int dx = ((i * 13 + age * 4) % (spark_r * 2 + 1)) - spark_r;
+        int dy = ((i * 17 + age * 5) % (spark_r * 2 + 1)) - spark_r;
+        uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
+        l_putpix(lfb, cx + dx, cy + dy, c);
+    }
+}
+
 static void trigger_player_death(game_t *g) {
     if (g->player_dying || g->game_over) return;
     g->player_dying = 1;
@@ -142,6 +165,16 @@ static void trigger_player_death(game_t *g) {
     g->boss_shot.alive = 0;
     g->boss_laser.alive = 0;
     clear_player_shots(g);
+    music_play_boom_long();
+}
+
+static void trigger_boss_death(game_t *g) {
+    if (g->boss_dying || !g->boss_alive) return;
+    g->boss_dying = 1;
+    g->boss_death_timer = BOSS_DEATH_DELAY_FRAMES;
+    g->boss_laser.alive = 0;
+    g->boss_shot.alive = 0;
+    g->ashot.alive = 0;
     music_play_boom_long();
 }
 
@@ -321,7 +354,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
         }
         if (!shots[si].alive) continue;
 
-        if (g->boss_alive) {
+        if (g->boss_alive && !g->boss_dying) {
             int boss_hit = 0;
             for (int bi = 0; bi < 5 && !boss_hit; bi++) {
                 if (bullet_hits_sprite(g->boss_frame ? &g->BOSS_B : &g->BOSS_A,
@@ -334,8 +367,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 g->boss_health -= g->player_damage;
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
-                    g->boss_alive = 0;
-                    g->boss_laser.alive = 0;  // Clear laser when boss dies
+                    trigger_boss_death(g);
                     g->score += double_shot_active(g) ? 1000 : 500;
                 }
                 shots[si].alive = 0;
@@ -690,6 +722,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_x = (LW - g->BOSS_A.w) / 2;
     g->boss_y = 15;
     g->boss_dx = 1;
+    g->boss_dying = 0;
+    g->boss_death_timer = 0;
     g->boss_frame = 0;
     g->boss_timer = 0;
     g->boss_period = BOSS_PERIOD(level); // Faster boss at higher levels
@@ -840,6 +874,18 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         return;
     }
 
+    if (g->boss_dying) {
+        g->boss_shot.alive = 0;
+        g->boss_laser.alive = 0;
+        if (g->boss_death_timer > 0) {
+            g->boss_death_timer--;
+        }
+        if (g->boss_death_timer <= 0) {
+            g->boss_dying = 0;
+            g->boss_alive = 0;
+        }
+    }
+
     if (g->exit_blink_toggles_remaining > 0) {
         g->exit_blink_timer--;
         if (g->exit_blink_timer <= 0) {
@@ -930,7 +976,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     // Boss movement and animation (separate from grid)
-    if (g->boss_alive) {
+    if (g->boss_alive && !g->boss_dying) {
         int boss_w = g->BOSS_A.w;
         int boss_h = g->BOSS_A.h;
 
@@ -1078,7 +1124,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     // Boss shooting logic (rate depends on health)
-    if (g->boss_alive) {
+    if (g->boss_alive && !g->boss_dying) {
         int health_pct = (g->boss_health * 100) / 20;
         int period = 90; // slow when green
         if (health_pct <= 10) period = 15;       // fast when red
@@ -1481,7 +1527,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     // boss (drawn behind regular aliens)
-    if (g->boss_alive) {
+    if (g->boss_alive && !g->boss_dying) {
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         uint32_t boss_color = 0xFF00FF00;
         if (health_pct <= 33) boss_color = 0xFFFF0000;
@@ -1496,6 +1542,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
         draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
+    } else if (g->boss_dying) {
+        render_boss_explosion(g, lfb);
     }
 
     // aliens

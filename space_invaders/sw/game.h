@@ -83,6 +83,8 @@ typedef struct {
     int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
     int boss_dx;
+        int boss_dying;
+        int boss_death_timer;
     int boss_frame;
     int boss_timer;
     int boss_period;
