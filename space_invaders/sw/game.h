@@ -8,7 +8,8 @@ typedef enum {
     POWERUP_DOUBLE_SHOT = 0,  // Double damage (20 points per kill instead of 10)
     POWERUP_TRIPLE_SHOT = 1,  // Triple bullet spread (main + ±15 degrees)
     POWERUP_RAPID_FIRE = 2,   // Rapid fire (changes fire cooldown)
-    POWERUP_COUNT = 3         // Total number of powerup types (update when adding new powerups)
+    POWERUP_EXPLOSIVE = 3,    // Explosive kills can chain to nearby aliens
+    POWERUP_COUNT = 4         // Total number of powerup types (update when adding new powerups)
 } powerup_type_t;
 
 /// Shop item types - extend to add more items later
@@ -69,6 +70,7 @@ typedef struct {
 
     uint8_t alien_alive[AROWS][ACOLS];
     int alien_health[AROWS][ACOLS];  // Hit points per alien (1 = one hit, 2 = two hits, etc.)
+    int alien_explode_timer[AROWS][ACOLS];
 
     int alien_origin_x, alien_origin_y;
     int alien_dx;

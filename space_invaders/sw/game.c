@@ -12,6 +12,7 @@
 #define EXIT_BLINK_TOGGLES 6
 #define PLAYER_DEATH_DELAY_FRAMES 60
 #define BOSS_DEATH_DELAY_FRAMES 60
+#define ALIEN_EXPLOSION_FRAMES 18
 
 static int digit_count(uint32_t v)
 {
@@ -109,6 +110,14 @@ static void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
         draw_filled_circle(lfb, x0, y0, r, 0xFF0000FF);
         // Draw vertical line (white, center)
         for (int i = -4; i <= 4; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
+    } else if (type == POWERUP_EXPLOSIVE) {
+        int r = 6;
+        draw_filled_circle(lfb, x0, y0, r, 0xFFFF0000);
+        l_putpix(lfb, x0, y0, 0xFFFFFF00);
+        l_putpix(lfb, x0 - 2, y0, 0xFFFFFF00);
+        l_putpix(lfb, x0 + 2, y0, 0xFFFFFF00);
+        l_putpix(lfb, x0, y0 - 2, 0xFFFFFF00);
+        l_putpix(lfb, x0, y0 + 2, 0xFFFFFF00);
     } else {
         // Rapid-fire: orange circle with bullet icon
         int r = 6;
@@ -137,6 +146,10 @@ static int triple_shot_active(const game_t *g) {
 
 static int rapid_fire_active(const game_t *g) {
     return is_powerup_active(g, POWERUP_RAPID_FIRE);
+}
+
+static int explosive_shot_active(const game_t *g) {
+    return is_powerup_active(g, POWERUP_EXPLOSIVE);
 }
 
 static void clear_player_shots(game_t *g);
@@ -203,6 +216,17 @@ static void render_player_explosion(const game_t *g, lfb_t *lfb) {
         int dy = ((i * 11 + age * 5) % (spark_r * 2 + 1)) - spark_r;
         uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         l_putpix(lfb, cx + dx, cy + dy, c);
+    }
+}
+
+static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer) {
+    int age = ALIEN_EXPLOSION_FRAMES - timer;
+    int base_r = 2 + (age / 3);
+
+    draw_filled_circle(lfb, cx, cy, base_r + 2, 0xFFFF4500);
+    draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
+    if ((age & 1) == 0) {
+        draw_filled_circle(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00);
     }
 }
 
@@ -399,6 +423,34 @@ static int count_aliens_remaining(const game_t *g) {
     return remaining;
 }
 
+static void award_alien_kill_points(game_t *g) {
+    int remaining = count_aliens_remaining(g);
+    int points;
+    if (remaining == 0) points = double_shot_active(g) ? 200 : 100;
+    else points = double_shot_active(g) ? 20 : 10;
+    g->score += points;
+}
+
+static void kill_alien_with_explosion(game_t *g, int r, int c) {
+    if (!g->alien_alive[r][c]) return;
+    g->alien_alive[r][c] = 0;
+    g->alien_health[r][c] = 0;
+    g->alien_explode_timer[r][c] = ALIEN_EXPLOSION_FRAMES;
+    award_alien_kill_points(g);
+}
+
+static void trigger_explosive_chain(game_t *g, int seed_r, int seed_c) {
+    int chained = 0;
+    for (int r = seed_r - 1; r >= 0 && chained < 2; r--) {
+        if (!g->alien_alive[r][seed_c]) continue;
+        g->alien_health[r][seed_c] -= 1;
+        if (g->alien_health[r][seed_c] <= 0) {
+            kill_alien_with_explosion(g, r, seed_c);
+        }
+        chained++;
+    }
+}
+
 static int bullet_x_with_spread(const bullet_t *shot, int bi, int spread_dir) {
     return shot->x + (spread_dir * (bi / 2));
 }
@@ -466,12 +518,10 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 if (bullet_hit) {
                     g->alien_health[r][c] -= g->player_damage;
                     if (g->alien_health[r][c] <= 0) {
-                        g->alien_alive[r][c] = 0;
-                        int remaining = count_aliens_remaining(g);
-                        int points;
-                        if (remaining == 0) points = double_shot_active(g) ? 200 : 100;
-                        else points = double_shot_active(g) ? 20 : 10;
-                        g->score += points;
+                        kill_alien_with_explosion(g, r, c);
+                        if (explosive_shot_active(g)) {
+                            trigger_explosive_chain(g, r, c);
+                        }
                     }
                     shots[si].alive = 0;
                     hit = 1;
@@ -758,11 +808,13 @@ static void setup_level(game_t *g, int level, int reset_score) {
     if (level == 0) {
         memset(g->alien_alive, 0, sizeof(g->alien_alive));
         memset(g->alien_health, 0, sizeof(g->alien_health));
+        memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
         // Put one alien in center (row 4, column 5)
         g->alien_alive[4][5] = 1;
         g->alien_health[4][5] = 1;
     } else {
         memset(g->alien_alive, 1, sizeof(g->alien_alive));
+        memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
         // Level 1: aliens have 1 HP, Level 3+: aliens have 2 HP (green -> white -> dead)
         int hp = (level >= 5) ? 3 : (level >= 3) ? 2 : 1;
         for (int r = 0; r < AROWS; r++) {
@@ -973,6 +1025,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     for (int i = 0; i < 5; i++) {
         if (g->powerup_slot_timer[i] > 0) g->powerup_slot_timer[i]--;
+    }
+
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (g->alien_explode_timer[r][c] > 0) {
+                g->alien_explode_timer[r][c]--;
+            }
+        }
     }
 
     // No powerups on level 0 (tutorial)
@@ -1564,6 +1624,8 @@ void game_render(game_t *g, lfb_t *lfb) {
                         icon_color = 0xFF0000FF;  // Blue
                     } else if (g->powerup_type_slot[slot] == POWERUP_RAPID_FIRE) {
                         icon_color = 0xFFFFA500;  // Orange
+                    } else if (g->powerup_type_slot[slot] == POWERUP_EXPLOSIVE) {
+                        icon_color = 0xFFFF0000;  // Red
                     }
                     
                     // Draw "POWER:" label
@@ -1628,6 +1690,15 @@ void game_render(game_t *g, lfb_t *lfb) {
             // Red if 3+, Green if 2, white if 1
             uint32_t alien_color = (g->alien_health[r][c] >= 3) ? 0xFFFF0000 : (g->alien_health[r][c] == 2) ? 0xFF00FF00 : 0xFFFFFFFF;
             draw_sprite1r(lfb, AS, ax, ay, alien_color);
+        }
+    }
+
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (g->alien_explode_timer[r][c] <= 0) continue;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x) + AS->w / 2;
+            int ay = g->alien_origin_y + r * (AS->h + spacing_y) + AS->h / 2;
+            render_alien_explosion(lfb, ax, ay, g->alien_explode_timer[r][c]);
         }
     }
 
