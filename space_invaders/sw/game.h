@@ -24,7 +24,8 @@ typedef enum {
 typedef enum {
     BOSS_TYPE_CLASSIC = 0,
     BOSS_TYPE_BLUE = 1,
-    BOSS_TYPE_COUNT = 2
+    BOSS_TYPE_YELLOW = 2,
+    BOSS_TYPE_COUNT = 3
 } boss_type_t;
 
 typedef struct { int x,y; int alive; } bullet_t;
@@ -101,7 +102,7 @@ typedef struct {
 
     // Boss alien state
     int boss_alive;
-    int boss_type; // 0 = classic, 1 = blue
+    int boss_type; // 0 = classic, 1 = blue, 2 = yellow swarm
     int boss_health; // 0-20 HP
     int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
@@ -118,9 +119,12 @@ typedef struct {
     int boss_power_active;     // 1 when special attack is happening
     int boss_power_cooldown;   // Duration of purple/frozen state (30 ticks = 0.5 seconds)
     int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
-    int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb
+    int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle
     int next_boss_attack_type; // The attack type that will be used for the next charge
     int boss_green_laser_last_hit_y; // Last y position where green laser hit aliens
+
+    uint8_t yellow_boss_marked[AROWS][ACOLS]; // 1 for aliens that belong to the yellow boss swarm
+    bullet_t yellow_beam_shot[5];             // Yellow boss synchronized beam shots
 
     bullet_t pshot[MAX_PSHOTS];       // Center shots
     bullet_t pshot_left[MAX_PSHOTS];  // Triple-shot: -15 degree angle
