@@ -109,7 +109,16 @@ static void render_player_explosion(const game_t *g, lfb_t *lfb) {
     render_player_explosion_at(lfb, cx, cy, age);
 }
 
-static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer) {
+static void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
+    if (points <= 0) return;
+
+    char points_text[16];
+    snprintf(points_text, sizeof(points_text), "%d", points);
+    int text_w = text_width_5x5(points_text, 1);
+    l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
+}
+
+static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int points) {
     int age = ALIEN_EXPLOSION_FRAMES - timer;
     int base_r = 2 + (age / 3);
 
@@ -117,6 +126,10 @@ static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer) {
     draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
     if ((age & 1) == 0) {
         draw_filled_circle(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00);
+    }
+
+    if (timer > 0) {
+        render_explosion_points(lfb, cx, cy, points);
     }
 }
 
@@ -139,6 +152,10 @@ static void render_boss_explosion(const game_t *g, lfb_t *lfb) {
         int dy = ((i * 17 + age * 5) % (spark_r * 2 + 1)) - spark_r;
         uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         l_putpix(lfb, cx + dx, cy + dy, c);
+    }
+
+    if (g->boss_death_timer > 0) {
+        render_explosion_points(lfb, cx, cy, g->boss_explode_points);
     }
 }
 
@@ -164,10 +181,14 @@ static void trigger_player_death(game_t *g) {
     music_play_boom_long();
 }
 
-static void trigger_boss_death(game_t *g) {
+static void trigger_boss_death(game_t *g, int points_awarded) {
     if (g->boss_dying || !g->boss_alive) return;
     g->boss_dying = 1;
     g->boss_death_timer = BOSS_DEATH_DELAY_FRAMES;
+    g->boss_explode_points = points_awarded;
+    if (points_awarded > 0) {
+        g->score += points_awarded;
+    }
     g->boss_laser.alive = 0;
     g->boss_shot.alive = 0;
     g->boss_shield_active = 0;
@@ -197,7 +218,7 @@ static void apply_alien_explosions_to_boss(game_t *g) {
                 g->boss_health -= 1;
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
-                    trigger_boss_death(g);
+                    trigger_boss_death(g, 0);
                     return;
                 }
             }
@@ -215,12 +236,13 @@ static int count_aliens_remaining(const game_t *g) {
     return remaining;
 }
 
-static void award_alien_kill_points(game_t *g) {
+static int award_alien_kill_points(game_t *g) {
     int remaining = count_aliens_remaining(g);
     int points;
     if (remaining == 0) points = double_shot_active(g) ? 200 : 100;
     else points = double_shot_active(g) ? 20 : 10;
     g->score += points;
+    return points;
 }
 
 static void kill_alien_with_explosion(game_t *g, int r, int c) {
@@ -229,7 +251,7 @@ static void kill_alien_with_explosion(game_t *g, int r, int c) {
     g->alien_health[r][c] = 0;
     g->alien_explode_timer[r][c] = ALIEN_EXPLOSION_FRAMES;
     g->alien_explode_hit_boss[r][c] = 0;
-    award_alien_kill_points(g);
+    g->alien_explode_points[r][c] = award_alien_kill_points(g);
 }
 
 static void trigger_explosive_chain(game_t *g, int seed_r, int seed_c) {
@@ -306,8 +328,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 g->boss_health -= g->player_damage;
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
-                    trigger_boss_death(g);
-                    g->score += double_shot_active(g) ? 1000 : 500;
+                    trigger_boss_death(g, double_shot_active(g) ? 1000 : 500);
                 }
                 shots[si].alive = 0;
             }
@@ -629,7 +650,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
         memset(g->alien_alive, 0, sizeof(g->alien_alive));
         memset(g->alien_health, 0, sizeof(g->alien_health));
         memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
+        memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
         memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
+        g->boss_explode_points = 0;
         g->win_screen = 1;
         g->player_x = (LW - g->PLAYER.w) / 2;
         g->player_y = LH / 2 - g->PLAYER.h / 2;
@@ -641,6 +664,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
         memset(g->alien_alive, 0, sizeof(g->alien_alive));
         memset(g->alien_health, 0, sizeof(g->alien_health));
         memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
+        memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
         memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
         // Put one alien in center (row 4, column 5)
         g->alien_alive[4][5] = 1;
@@ -648,6 +672,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     } else {
         memset(g->alien_alive, 1, sizeof(g->alien_alive));
         memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
+        memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
         memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
         // Level 1: aliens have 1 HP, Level 3+: aliens have 2 HP (green -> white -> dead)
         int hp = (level >= 5) ? 3 : (level >= 3) ? 2 : 1;
@@ -678,6 +703,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_dx = 1;
     g->boss_dying = 0;
     g->boss_death_timer = 0;
+    g->boss_explode_points = 0;
     g->boss_shield_active = 0;
     g->boss_frame = 0;
     g->boss_timer = 0;
@@ -910,6 +936,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         for (int c = 0; c < ACOLS; c++) {
             if (g->alien_explode_timer[r][c] > 0) {
                 g->alien_explode_timer[r][c]--;
+                if (g->alien_explode_timer[r][c] == 0) {
+                    g->alien_explode_points[r][c] = 0;
+                }
             }
         }
     }
@@ -1385,7 +1414,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int hy[WIN_RING_ALIENS] = { cy - r, cy - r/2, cy + r/2, cy + r, cy + r/2, cy - r/2 };
         for (int i = 0; i < WIN_RING_ALIENS; i++) {
             if (g->win_alien_explode_timer[i] > 0) {
-                render_alien_explosion(lfb, hx[i], hy[i], g->win_alien_explode_timer[i]);
+                render_alien_explosion(lfb, hx[i], hy[i], g->win_alien_explode_timer[i], 0);
             } else if (i >= g->win_explosion_index) {
                 draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
             }
@@ -1646,7 +1675,7 @@ void game_render(game_t *g, lfb_t *lfb) {
             if (g->alien_explode_timer[r][c] <= 0) continue;
             int ax = g->alien_origin_x + c * (AS->w + spacing_x) + AS->w / 2;
             int ay = g->alien_origin_y + r * (AS->h + spacing_y) + AS->h / 2;
-            render_alien_explosion(lfb, ax, ay, g->alien_explode_timer[r][c]);
+            render_alien_explosion(lfb, ax, ay, g->alien_explode_timer[r][c], g->alien_explode_points[r][c]);
         }
     }
 
