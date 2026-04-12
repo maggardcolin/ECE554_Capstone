@@ -46,15 +46,15 @@ static const sprite1r_t *active_boss_sprite(const game_t *g) {
 }
 
 static const char *boss_intro_type_text(const game_t *g) {
-    if (g->boss_type == BOSS_TYPE_BLUE) return "BLUE";
-    if (g->boss_type == BOSS_TYPE_YELLOW) return "YELLOW";
-    return "MULTICOLOR";
+    if (g->boss_type == BOSS_TYPE_BLUE) return "MOON";
+    if (g->boss_type == BOSS_TYPE_YELLOW) return "STAR";
+    return "EMPEROR";
 }
 
 static const char *boss_menu_label(int boss_type) {
-    if (boss_type == BOSS_TYPE_BLUE) return "BLUE BOSS";
-    if (boss_type == BOSS_TYPE_YELLOW) return "YELLOW SWARM";
-    return "MULTICOLOR BOSS";
+    if (boss_type == BOSS_TYPE_BLUE) return "MOON";
+    if (boss_type == BOSS_TYPE_YELLOW) return "STAR";
+    return "EMPEROR";
 }
 
 static const char *boss_intro_main_attack_text(const game_t *g) {
