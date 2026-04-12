@@ -1,4 +1,5 @@
 #include "game.h"
+#include "boss.h"
 #include "game_helpers.h"
 #include "game_player.h"
 #include "../hw_contract.h"
@@ -12,7 +13,6 @@
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
 #define PLAYER_DEATH_DELAY_FRAMES 60
-#define BOSS_DEATH_DELAY_FRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
 #define WIN_LEVEL 8
 #define WIN_RING_ALIENS 6
@@ -57,27 +57,6 @@ static int sprite_has_any_bits(const sprite1r_t *s) {
         }
     }
     return 0;
-}
-
-static void apply_boss_explosion_to_aliens(game_t *g) {
-    if (!g->boss_dying) return;
-
-    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-    int spacing_x = 6, spacing_y = 5;
-    int cx = g->boss_x + g->BOSS_A.w / 2;
-    int cy = g->boss_y + g->BOSS_A.h / 2;
-    int radius = boss_explosion_radius(g);
-
-    for (int r = 0; r < AROWS; r++) {
-        for (int c = 0; c < ACOLS; c++) {
-            if (!g->alien_alive[r][c]) continue;
-            int ax = g->alien_origin_x + c * (AS->w + spacing_x);
-            int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-            if (circle_intersects_rect(cx, cy, radius, ax, ay, AS->w, AS->h)) {
-                g->alien_alive[r][c] = 0;
-            }
-        }
-    }
 }
 
 static void render_player_explosion_at(lfb_t *lfb, int cx, int cy, int age) {
@@ -133,32 +112,6 @@ static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int po
     }
 }
 
-static void render_boss_explosion(const game_t *g, lfb_t *lfb) {
-    int cx = g->boss_x + g->BOSS_A.w / 2;
-    int cy = g->boss_y + g->BOSS_A.h / 2;
-    int age = BOSS_DEATH_DELAY_FRAMES - g->boss_death_timer;
-    int frame = age / 10;
-    int base_r = 6 + frame * 3;
-
-    draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFFFF4500);
-    draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFFFF8C00);
-    if ((age & 1) == 0) {
-        draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00);
-    }
-
-    int spark_r = base_r + 6;
-    for (int i = 0; i < 14; i++) {
-        int dx = ((i * 13 + age * 4) % (spark_r * 2 + 1)) - spark_r;
-        int dy = ((i * 17 + age * 5) % (spark_r * 2 + 1)) - spark_r;
-        uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
-        l_putpix(lfb, cx + dx, cy + dy, c);
-    }
-
-    if (g->boss_death_timer > 0) {
-        render_explosion_points(lfb, cx, cy, g->boss_explode_points);
-    }
-}
-
 static void reset_win_state(game_t *g) {
     g->win_screen = 0;
     g->win_explosion_index = 0;
@@ -179,51 +132,6 @@ static void trigger_player_death(game_t *g) {
     g->boss_laser.alive = 0;
     clear_player_shots(g);
     music_play_boom_long();
-}
-
-static void trigger_boss_death(game_t *g, int points_awarded) {
-    if (g->boss_dying || !g->boss_alive) return;
-    g->boss_dying = 1;
-    g->boss_death_timer = BOSS_DEATH_DELAY_FRAMES;
-    g->boss_explode_points = points_awarded;
-    if (points_awarded > 0) {
-        g->score += points_awarded;
-    }
-    g->boss_laser.alive = 0;
-    g->boss_shot.alive = 0;
-    g->boss_shield_active = 0;
-    g->ashot.alive = 0;
-    music_play_boom_long();
-}
-
-static void apply_alien_explosions_to_boss(game_t *g) {
-    if (!g->boss_alive || g->boss_dying) return;
-
-    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-    const sprite1r_t *BS = g->boss_frame ? &g->BOSS_B : &g->BOSS_A;
-    int spacing_x = 6, spacing_y = 5;
-
-    for (int r = 0; r < AROWS; r++) {
-        for (int c = 0; c < ACOLS; c++) {
-            int timer = g->alien_explode_timer[r][c];
-            if (timer <= 0) continue;
-            if (g->alien_explode_hit_boss[r][c]) continue;
-
-            int cx = g->alien_origin_x + c * (AS->w + spacing_x) + AS->w / 2;
-            int cy = g->alien_origin_y + r * (AS->h + spacing_y) + AS->h / 2;
-            int radius = alien_explosion_radius(timer);
-
-            if (circle_intersects_rect(cx, cy, radius, g->boss_x, g->boss_y, BS->w, BS->h)) {
-                g->alien_explode_hit_boss[r][c] = 1;
-                g->boss_health -= 1;
-                if (g->boss_health <= 0) {
-                    g->boss_health = 0;
-                    trigger_boss_death(g, 0);
-                    return;
-                }
-            }
-        }
-    }
 }
 
 static int count_aliens_remaining(const game_t *g) {
@@ -328,7 +236,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 g->boss_health -= g->player_damage;
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
-                    trigger_boss_death(g, double_shot_active(g) ? 1000 : 500);
+                    boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
                 }
                 shots[si].alive = 0;
             }
@@ -902,7 +810,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->boss_dying) {
         g->boss_shot.alive = 0;
         g->boss_laser.alive = 0;
-        apply_boss_explosion_to_aliens(g);
+        boss_apply_explosion_to_aliens(g);
         if (g->boss_death_timer > 0) {
             g->boss_death_timer--;
         }
@@ -1195,7 +1103,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     handle_player_shot_collisions(g, g->pshot_left, -1, 0);
     handle_player_shot_collisions(g, g->pshot_right, 1, 0);
 
-    apply_alien_explosions_to_boss(g);
+    boss_apply_alien_explosions_to_boss(g);
 
     // collisions: alien and boss shots
     handle_enemy_shot_collisions(g, &g->ashot);
@@ -1652,7 +1560,7 @@ void game_render(game_t *g, lfb_t *lfb) {
             draw_sprite1r(lfb, &g->BOSS_SHIELD, boss_shield_x(g), boss_shield_y(g), 0xFF00FF00);
         }
     } else if (g->boss_dying) {
-        render_boss_explosion(g, lfb);
+        boss_render_explosion(g, lfb);
     }
 
     // aliens

@@ -27,7 +27,7 @@ hardware:
 	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
 
 software:
-	gcc -D__HW_SIM__ sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
+	gcc -D__HW_SIM__ sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/boss.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
 
 else
 
@@ -40,7 +40,7 @@ hardware:
 	gcc fb_sim.c -o fb_sim $(GCCFLAGS) -levdev
 
 software:
-	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
+	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/boss.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
 
 endif
 
