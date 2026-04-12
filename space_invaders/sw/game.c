@@ -1563,26 +1563,67 @@ void game_render(game_t *g, lfb_t *lfb) {
         int scale = 1;
         int y = 18;
 
+        uint32_t type_color = 0xFFFF55AA;
+        if (g->boss_type == BOSS_TYPE_BLUE) {
+            uint32_t blue_flicker_palette[4] = {0xFF1E6AD6, 0xFF3399FF, 0xFF66CCFF, 0xFF3399FF};
+            int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
+            type_color = blue_flicker_palette[flicker_idx];
+        } else {
+            uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
+            int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
+            type_color = flicker_palette[flicker_idx];
+        }
+
         int type_prefix_w = text_width_5x5(type_prefix, scale);
         int type_value_w = text_width_5x5(type_value, scale);
         int type_x = (LW - (type_prefix_w + 6 + type_value_w)) / 2;
         l_draw_text(lfb, type_x, y, type_prefix, scale, 0xFFFFFFFF);
-        l_draw_text(lfb, type_x + type_prefix_w + 6, y, type_value, scale,
-                    (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFFFF55AA);
+        l_draw_text(lfb, type_x + type_prefix_w + 6, y, type_value, scale, type_color);
 
         y += 14;
         int main_prefix_w = text_width_5x5(main_prefix, scale);
         int main_value_w = text_width_5x5(main_value, scale);
         int main_x = (LW - (main_prefix_w + 6 + main_value_w)) / 2;
+        uint32_t main_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFFFF0000;
         l_draw_text(lfb, main_x, y, main_prefix, scale, 0xFFFFFFFF);
-        l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, main_color);
 
         y += 14;
         int special_prefix_w = text_width_5x5(special_prefix, scale);
-        int special_value_w = text_width_5x5(special_value, scale);
-        int special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
-        l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-        l_draw_text(lfb, special_x + special_prefix_w + 6, y, special_value, scale, 0xFFFFFFFF);
+        int special_x = 0;
+        int special_text_x = 0;
+        if (g->boss_type == BOSS_TYPE_BLUE) {
+            int special_value_w = text_width_5x5(special_value, scale);
+            special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
+            special_text_x = special_x + special_prefix_w + 6;
+            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF3399FF);
+        } else if (g->level >= 3) {
+            const char *spec1 = "PLASMA BEAM";
+            const char *spec2 = "HEAL BEAM";
+            int spec1_w = text_width_5x5(spec1, scale);
+            int spec2_w = text_width_5x5(spec2, scale);
+            int comma_w = 4;
+            int value_total_w = spec1_w + comma_w + spec2_w;
+
+            special_x = (LW - (special_prefix_w + 6 + value_total_w)) / 2;
+            special_text_x = special_x + special_prefix_w + 6;
+            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+            l_draw_text(lfb, special_text_x, y, spec1, scale, 0xFF8000FF);
+
+            int comma_x = special_text_x + spec1_w + 1;
+            // Manual comma glyph to avoid unsupported punctuation in 5x5 font.
+            l_putpix(lfb, comma_x, y + 4, 0xFFFFFFFF);
+            l_putpix(lfb, comma_x + 1, y + 5, 0xFFFFFFFF);
+
+            l_draw_text(lfb, special_text_x + spec1_w + comma_w, y, spec2, scale, 0xFF00FF00);
+        } else {
+            int special_value_w = text_width_5x5(special_value, scale);
+            special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
+            special_text_x = special_x + special_prefix_w + 6;
+            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF8000FF);
+        }
 
         const sprite1r_t *BS = active_boss_sprite(g);
         int boss_x = (LW - BS->w) / 2;
