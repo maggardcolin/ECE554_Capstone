@@ -97,13 +97,28 @@ static const pattern_t PATTERN_GAMEPLAY = {
     .gain = 0.20f,
 };
 
+static const pattern_t PATTERN_BOSS_INTRO = {
+    .melody = {},
+    .bass = {
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, R, R
+    },
+    .harm = {},
+    .len = 32,
+    .bpm = 128,
+    .gain = 0.22f,
+};
+
 static const pattern_t PATTERN_BOSS = {
     .melody = {
         349.23f, R, 349.23f, 415.30f, 466.16f, R, 466.16f, 523.25f,
         349.23f, R, 349.23f, 415.30f, R, R, R, R,
 
         349.23f, R, 349.23f, 415.30f, 466.16f, R, 466.16f, 523.25f,
-        349.23f, R, 349.23f, 415.30f, R, R, R, R,
+        349.23f, R, 349.23f, 415.30f, R, R, 349.23f, R,
 
         R, R, R, R, R, R, R, R,
         R, R, R, R, R, R, R, R,
@@ -145,10 +160,10 @@ static const pattern_t PATTERN_BOSS = {
 static const pattern_t PATTERN_BOSS_BLUE = {
     .melody = {
         349.23f, R, 349.23f, 415.30f, 466.16f, R, 466.16f, 523.25f,
-        349.23f, R, 349.23f, 415.30f, R, R, R, R,
+        349.23f, R, 392.00f, 415.30f, R, 466.16f, 415.30f, R,
 
         349.23f, R, 349.23f, 415.30f, 466.16f, R, 466.16f, 523.25f,
-        349.23f, R, 349.23f, 415.30f, R, R, R, R,
+        349.23f, R, 392.00f, 415.30f, R, R, R, R,
 
         R, R, R, R, R, R, R, R,
         R, R, R, R, R, R, R, R,
@@ -247,6 +262,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_SILENT;
     case MUSIC_MODE_GAMEPLAY:
         return &PATTERN_GAMEPLAY;
+    case MUSIC_MODE_BOSS_INTRO:
+        return &PATTERN_BOSS_INTRO;
     case MUSIC_MODE_BOSS:
         return &PATTERN_BOSS;
     case MUSIC_MODE_BOSS_BLUE:
