@@ -9,6 +9,7 @@
 
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
+#define PLAYER_DEATH_DELAY_FRAMES 60
 
 static int digit_count(uint32_t v)
 {
@@ -106,6 +107,42 @@ static int triple_shot_active(const game_t *g) {
 
 static int rapid_fire_active(const game_t *g) {
     return is_powerup_active(g, POWERUP_RAPID_FIRE);
+}
+
+static void clear_player_shots(game_t *g);
+
+static void render_player_explosion(const game_t *g, lfb_t *lfb) {
+    int cx = g->player_x + g->PLAYER.w / 2;
+    int cy = g->player_y + g->PLAYER.h / 2;
+    int age = PLAYER_DEATH_DELAY_FRAMES - g->player_death_timer;
+    int frame = age / 12;
+    int base_r = 3 + frame * 2;
+
+    draw_filled_circle(lfb, cx, cy, base_r + 2, 0xFFFF4500);
+    draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
+    if ((age & 1) == 0) {
+        draw_filled_circle(lfb, cx, cy, (base_r > 2) ? (base_r - 2) : 1, 0xFFFFFF00);
+    }
+
+    int spark_r = base_r + 3;
+    for (int i = 0; i < 8; i++) {
+        int dx = ((i * 7 + age * 3) % (spark_r * 2 + 1)) - spark_r;
+        int dy = ((i * 11 + age * 5) % (spark_r * 2 + 1)) - spark_r;
+        uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
+        l_putpix(lfb, cx + dx, cy + dy, c);
+    }
+}
+
+static void trigger_player_death(game_t *g) {
+    if (g->player_dying || g->game_over) return;
+    g->player_dying = 1;
+    g->player_death_timer = PLAYER_DEATH_DELAY_FRAMES;
+    g->game_over_score = g->score;
+    g->ashot.alive = 0;
+    g->boss_shot.alive = 0;
+    g->boss_laser.alive = 0;
+    clear_player_shots(g);
+    music_play_boom_long();
 }
 
 static void clear_player_shots(game_t *g) {
@@ -344,14 +381,16 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 
 static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot) {
     if (!shot->alive) return;
+    if (g->player_dying) return;
     if (bullet_hits_sprite(&g->PLAYER, g->player_x, g->player_y, shot->x, shot->y)) {
         g->lives--;
+        if (g->lives > 0) {
+            music_play_boom();
+        }
         clear_player_shots(g);
         shot->alive = 0;
         if (g->lives <= 0) {
-            g->game_over = 1;
-            g->game_over_score = g->score;
-            g->game_over_delay_timer = 90;
+            trigger_player_death(g);
         }
     } else {
         handle_bunker_bullet_collisions(g, shot, 3);
@@ -784,6 +823,18 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         return;
     }
 
+    if (g->player_dying) {
+        if (g->player_death_timer > 0) {
+            g->player_death_timer--;
+        }
+        if (g->player_death_timer <= 0) {
+            g->player_dying = 0;
+            g->game_over = 1;
+            g->game_over_delay_timer = 90;
+        }
+        return;
+    }
+
     if (g->in_shop) {
         shop_update(g, buttons, vsync_counter);
         return;
@@ -1073,12 +1124,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_laser.y + 1 >= g->player_y && g->boss_laser.y <= g->player_y + p->h &&
                 (g->boss_laser.y - g->boss_laser_last_hit_y) > 5) {  // Only hit once per 5 pixels
                 g->lives--;
+                if (g->lives > 0) {
+                    music_play_boom();
+                }
                 g->boss_laser_last_hit_y = g->boss_laser.y;  // Track where we hit
                 clear_player_shots(g);
                 if (g->lives <= 0) {
-                    g->game_over = 1;
-                    g->game_over_score = g->score;
-                    g->game_over_delay_timer = 90;
+                    trigger_player_death(g);
                 }
                 // Laser continues through player (not destroyed)
             }
@@ -1461,7 +1513,11 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
     }
 
-    render_player(g, lfb);
+    if (g->player_dying) {
+        render_player_explosion(g, lfb);
+    } else {
+        render_player(g, lfb);
+    }
 
     if (g->powerup_active) {
         draw_powerup_icon(lfb, g->powerup_x, g->powerup_y, g->powerup_type);

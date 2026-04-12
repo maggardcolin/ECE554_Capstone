@@ -20,6 +20,16 @@
 #define DING_DURATION_SAMPLES (AUDIO_RATE / 5)
 #define DING_GAIN 0.18f
 
+#define BOOM_FREQ_START 180.0f
+#define BOOM_FREQ_END 70.0f
+#define BOOM_DURATION_SAMPLES (AUDIO_RATE / 4)
+#define BOOM_GAIN 0.24f
+
+#define BOOM_LONG_FREQ_START 160.0f
+#define BOOM_LONG_FREQ_END 45.0f
+#define BOOM_LONG_DURATION_SAMPLES (AUDIO_RATE * 2 / 3)
+#define BOOM_LONG_GAIN 0.28f
+
 #define R 0.0f
 
 typedef struct {
@@ -38,6 +48,8 @@ typedef struct {
     int running;
     music_mode_t mode;
     int ding_pending;
+    int boom_pending;
+    int boom_long_pending;
 } music_ctx_t;
 
 static music_ctx_t g_music;
@@ -197,6 +209,10 @@ static void *audio_thread(void *arg) {
     music_mode_t active_mode = MUSIC_MODE_MENU;
     int ding_samples_left = 0;
     float ding_phase = 0.0f;
+    int boom_samples_left = 0;
+    float boom_phase = 0.0f;
+    int boom_long_samples_left = 0;
+    float boom_long_phase = 0.0f;
 
     while (1) {
         pthread_mutex_lock(&g_music.lock);
@@ -206,6 +222,17 @@ static void *audio_thread(void *arg) {
             ding_samples_left = DING_DURATION_SAMPLES;
             ding_phase = 0.0f;
             g_music.ding_pending = 0;
+        }
+        if (g_music.boom_pending) {
+            boom_samples_left = BOOM_DURATION_SAMPLES;
+            boom_phase = 0.0f;
+            g_music.boom_pending = 0;
+        }
+        if (g_music.boom_long_pending) {
+            boom_long_samples_left = BOOM_LONG_DURATION_SAMPLES;
+            boom_long_phase = 0.0f;
+            g_music.boom_long_pending = 0;
+            boom_samples_left = 0;
         }
         pthread_mutex_unlock(&g_music.lock);
 
@@ -244,6 +271,8 @@ static void *audio_thread(void *arg) {
             float s3 = square(&phase3, f3, DUTY_HARM);
             float music_mix = (0.10f * s1) + (0.20f * s2) + (0.10f * s3);
             float ding_mix = 0.0f;
+            float boom_mix = 0.0f;
+            float boom_long_mix = 0.0f;
 
             if (ding_samples_left > 0) {
                 float env = (float)ding_samples_left / (float)DING_DURATION_SAMPLES;
@@ -252,7 +281,23 @@ static void *audio_thread(void *arg) {
                 ding_samples_left--;
             }
 
-            int sample = (int)(((music_mix * pat->gain) + ding_mix) * 32767.0f);
+            if (boom_samples_left > 0) {
+                float env = (float)boom_samples_left / (float)BOOM_DURATION_SAMPLES;
+                float freq = BOOM_FREQ_END + (BOOM_FREQ_START - BOOM_FREQ_END) * env;
+                float boom = square(&boom_phase, freq, 0.50f);
+                boom_mix = boom * BOOM_GAIN * env;
+                boom_samples_left--;
+            }
+
+            if (boom_long_samples_left > 0) {
+                float env = (float)boom_long_samples_left / (float)BOOM_LONG_DURATION_SAMPLES;
+                float freq = BOOM_LONG_FREQ_END + (BOOM_LONG_FREQ_START - BOOM_LONG_FREQ_END) * env;
+                float boom_long = square(&boom_long_phase, freq, 0.50f);
+                boom_long_mix = boom_long * BOOM_LONG_GAIN * env;
+                boom_long_samples_left--;
+            }
+
+            int sample = (int)(((music_mix * pat->gain) + ding_mix + boom_mix + boom_long_mix) * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
             buffer[i] = (int16_t)sample;
@@ -348,6 +393,22 @@ void music_play_ding(void) {
     pthread_mutex_unlock(&g_music.lock);
 }
 
+void music_play_boom(void) {
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running) {
+        g_music.boom_pending = 1;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
+void music_play_boom_long(void) {
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running) {
+        g_music.boom_long_pending = 1;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
 void music_shutdown(void) {
     pthread_mutex_lock(&g_music.lock);
     int was_running = g_music.running;
@@ -375,6 +436,12 @@ void music_set_mode(music_mode_t mode) {
 }
 
 void music_play_ding(void) {
+}
+
+void music_play_boom(void) {
+}
+
+void music_play_boom_long(void) {
 }
 
 void music_shutdown(void) {

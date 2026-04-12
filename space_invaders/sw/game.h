@@ -109,6 +109,8 @@ typedef struct {
     int game_over;
     int game_over_score;
     int game_over_delay_timer;
+    int player_dying;
+    int player_death_timer;
 
     int paused;
 
