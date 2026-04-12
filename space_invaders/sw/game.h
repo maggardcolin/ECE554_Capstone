@@ -112,6 +112,7 @@ typedef struct {
     int overworld_cutscene_timer;
     int overworld_cutscene_from_node;
     int overworld_cutscene_to_node;
+    int overworld_current_node;
 
     // Powerup system
     int powerup_active;

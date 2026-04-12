@@ -37,7 +37,7 @@
 #define WIN_LEVEL 8
 #define WIN_RING_ALIENS 6
 #define WIN_EXPLOSION_DELAY_FRAMES 10
-#define OVERWORLD_LEVEL_COUNT 7
+#define OVERWORLD_LEVEL_COUNT 10
 #define OVERWORLD_FLY_FRAMES 120
 #define OVERWORLD_HOLD_FRAMES 36
 #define OVERWORLD_PIXELATE_FRAMES 36
@@ -973,9 +973,53 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     }
 }
 
+static int overworld_node_for_level(int level) {
+    switch (level) {
+        case 1: return 0;
+        case 2: return 1;
+        case 3: return 3;
+        case 4: return 4;
+        case 5: return 6;
+        case 6: return 7;
+        case 7: return 9;
+        default: return OVERWORLD_LEVEL_COUNT - 1;
+    }
+}
+
+static int overworld_shop_node_after_level(int level) {
+    if (level == 2) return 2;
+    if (level == 4) return 5;
+    if (level == 6) return 8;
+    return -1;
+}
+
+static int overworld_node_is_shop(int idx) {
+    return idx == 2 || idx == 5 || idx == 8;
+}
+
+static int overworld_shop_order_from_node(int idx) {
+    if (idx == 2) return 0;
+    if (idx == 5) return 1;
+    if (idx == 8) return 2;
+    return -1;
+}
+
+static int overworld_node_level_label(int idx) {
+    switch (idx) {
+        case 0: return 1;
+        case 1: return 2;
+        case 3: return 3;
+        case 4: return 4;
+        case 6: return 5;
+        case 7: return 6;
+        case 9: return 7;
+        default: return 0;
+    }
+}
+
 static void overworld_node_position(int idx, int *x, int *y) {
-    static const int nx[OVERWORLD_LEVEL_COUNT] = {38, 74, 108, 145, 186, 228, 274};
-    static const int ny[OVERWORLD_LEVEL_COUNT] = {140, 123, 104, 88, 71, 54, 36};
+    static const int nx[OVERWORLD_LEVEL_COUNT] = {36, 61, 87, 111, 136, 161, 188, 216, 245, 274};
+    static const int ny[OVERWORLD_LEVEL_COUNT] = {140, 126, 116, 104, 92, 82, 70, 58, 46, 36};
 
     if (idx < 0) idx = 0;
     if (idx >= OVERWORLD_LEVEL_COUNT) idx = OVERWORLD_LEVEL_COUNT - 1;
@@ -1024,9 +1068,18 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
         }
     }
 
-    int completed_count = g->level - 1;
-    if (completed_count < 0) completed_count = 0;
-    if (completed_count > OVERWORLD_LEVEL_COUNT) completed_count = OVERWORLD_LEVEL_COUNT;
+    int current_level_node = (g->level > 0) ? overworld_node_for_level(g->level) : -1;
+    if (g->overworld_current_node >= 0) {
+        current_level_node = g->overworld_current_node;
+    }
+    if (current_level_node >= OVERWORLD_LEVEL_COUNT) current_level_node = OVERWORLD_LEVEL_COUNT - 1;
+
+    int shops_cleared = g->shop_count;
+    if (g->in_shop && shops_cleared > 0) {
+        shops_cleared--;
+    }
+    if (shops_cleared < 0) shops_cleared = 0;
+    if (shops_cleared > 3) shops_cleared = 3;
 
     int pulse = (elapsed / 3) & 7;
     int pulse_r = (pulse < 4) ? pulse : (7 - pulse);
@@ -1034,20 +1087,37 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
     for (int i = 0; i < OVERWORLD_LEVEL_COUNT; i++) {
         int x, y;
         overworld_node_position(i, &x, &y);
-        int completed = i < completed_count;
+        int is_shop = overworld_node_is_shop(i);
 
-        if (completed) {
-            draw_filled_circle(lfb, x, y, 4, 0xFF0A5A1A);
-            draw_filled_circle(lfb, x, y, 2, 0xFF3CFF68);
+        if (is_shop) {
+            int shop_order = overworld_shop_order_from_node(i);
+            int completed = (shop_order >= 0) ? (shop_order < shops_cleared) : 0;
+            if (completed) {
+                draw_filled_circle(lfb, x, y, 4, 0xFF0A5A1A);
+                draw_filled_circle(lfb, x, y, 2, 0xFF3CFF68);
+            } else {
+                int r = 3 + pulse_r;
+                draw_filled_circle(lfb, x, y, r, 0xFF2A0E3C);
+                draw_filled_circle(lfb, x, y, 3, 0xFFC56BFF);
+            }
+            l_draw_text(lfb, x - 2, y - 10, "S", 1, 0xFFFFFFFF);
         } else {
-            int r = 3 + pulse_r;
-            draw_filled_circle(lfb, x, y, r, 0xFF4C1010);
-            draw_filled_circle(lfb, x, y, 3, 0xFFFF3A3A);
-        }
+            int level_label = overworld_node_level_label(i);
+            int completed = (level_label > 0 && current_level_node > i);
 
-        char label[4];
-        snprintf(label, sizeof(label), "%d", i + 1);
-        l_draw_text(lfb, x - 2, y - 10, label, 1, 0xFFFFFFFF);
+            if (completed) {
+                draw_filled_circle(lfb, x, y, 4, 0xFF0A5A1A);
+                draw_filled_circle(lfb, x, y, 2, 0xFF3CFF68);
+            } else {
+                int r = 3 + pulse_r;
+                draw_filled_circle(lfb, x, y, r, 0xFF4C1010);
+                draw_filled_circle(lfb, x, y, 3, 0xFFFF3A3A);
+            }
+
+            char label[4];
+            snprintf(label, sizeof(label), "%d", level_label);
+            l_draw_text(lfb, x - 2, y - 10, label, 1, 0xFFFFFFFF);
+        }
     }
 
     int to_x, to_y;
@@ -1677,6 +1747,19 @@ static void enter_shop(game_t *g) {
     g->shop_next_level = g->level + 1;
     g->shop_count++;
 
+    int to_node = overworld_shop_node_after_level(g->level);
+    if (to_node >= 0) {
+        int from_node = g->overworld_current_node;
+        if (from_node >= OVERWORLD_LEVEL_COUNT) from_node = OVERWORLD_LEVEL_COUNT - 1;
+        if (from_node < 0) from_node = -1;
+
+        g->overworld_cutscene_active = 1;
+        g->overworld_cutscene_timer = OVERWORLD_TOTAL_FRAMES;
+        g->overworld_cutscene_from_node = from_node;
+        g->overworld_cutscene_to_node = to_node;
+        g->overworld_current_node = to_node;
+    }
+
     shop_item_type_t shop_pool[5];
     int shop_pool_count = 0;
     shop_pool[shop_pool_count++] = SHOP_ITEM_FIRE_SPEED;
@@ -1886,6 +1969,7 @@ static void setup_practice_run(game_t *g, int boss_type) {
     g->start_screen = 0;
     g->practice_menu_active = 0;
     g->practice_run_active = 1;
+    g->overworld_current_node = -1;
     g->practice_return_delay_timer = 0;
     g->forced_boss_type = boss_type;
     reset_win_state(g);
@@ -1906,6 +1990,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->overworld_cutscene_timer = 0;
     g->overworld_cutscene_from_node = -1;
     g->overworld_cutscene_to_node = 0;
+    if (level <= 0 || g->practice_run_active) {
+        g->overworld_current_node = -1;
+    }
 
     g->powerup_active = 0;
     g->powerup_timer = 0;
@@ -2030,8 +2117,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_shield_active = (g->boss_type == BOSS_TYPE_HERMIT && level >= 3) ? 1 : 0;
 
     if (level > 0 && !g->practice_run_active) {
-        int to_node = level - 1;
-        int from_node = level - 2;
+        int to_node = overworld_node_for_level(level);
+        int from_node = g->overworld_current_node;
 
         if (to_node >= OVERWORLD_LEVEL_COUNT) to_node = OVERWORLD_LEVEL_COUNT - 1;
         if (from_node >= OVERWORLD_LEVEL_COUNT) from_node = OVERWORLD_LEVEL_COUNT - 1;
@@ -2041,6 +2128,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
         g->overworld_cutscene_timer = OVERWORLD_TOTAL_FRAMES;
         g->overworld_cutscene_from_node = from_node;
         g->overworld_cutscene_to_node = to_node;
+        g->overworld_current_node = to_node;
     }
 
     bunkers_rebuild(g);
@@ -2341,20 +2429,22 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         return;
     }
 
-    if (g->in_shop) {
-        shop_update(g, buttons, vsync_counter);
-        return;
-    }
-
     if (g->overworld_cutscene_active) {
         if (g->overworld_cutscene_timer > 0) {
             g->overworld_cutscene_timer--;
         }
         if (g->overworld_cutscene_timer <= 0) {
             g->overworld_cutscene_active = 0;
-            g->boss_intro_active = 1;
-            g->boss_intro_timer = BOSS_INTRO_FRAMES;
+            if (!g->in_shop) {
+                g->boss_intro_active = 1;
+                g->boss_intro_timer = BOSS_INTRO_FRAMES;
+            }
         }
+        return;
+    }
+
+    if (g->in_shop) {
+        shop_update(g, buttons, vsync_counter);
         return;
     }
 
@@ -3472,13 +3562,13 @@ void game_render(game_t *g, lfb_t *lfb) {
         return;
     }
 
-    if (g->in_shop) {
-        shop_render(g, lfb);
+    if (g->overworld_cutscene_active) {
+        render_overworld_cutscene(g, lfb);
         return;
     }
 
-    if (g->overworld_cutscene_active) {
-        render_overworld_cutscene(g, lfb);
+    if (g->in_shop) {
+        shop_render(g, lfb);
         return;
     }
 
