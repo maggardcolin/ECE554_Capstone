@@ -18,7 +18,8 @@ typedef enum {
     SHOP_ITEM_MOVE_SPEED = 1,
     SHOP_ITEM_LIFE = 2,
     SHOP_ITEM_DAMAGE = 3,
-    SHOP_ITEM_COUNT = 4
+    SHOP_ITEM_PIERCE = 4,
+    SHOP_ITEM_COUNT = 5
 } shop_item_type_t;
 
 typedef enum {
@@ -28,7 +29,14 @@ typedef enum {
     BOSS_TYPE_COUNT = 3
 } boss_type_t;
 
-typedef struct { int x,y; int alive; } bullet_t;
+typedef struct {
+    int x, y;
+    int alive;
+    int damage_remaining;
+    int pierce_active;
+    int last_hit_r;
+    int last_hit_c;
+} bullet_t;
 
 typedef struct {
     int x;
@@ -44,7 +52,7 @@ typedef struct {
 } boss_bomb_t;
 
 #define MAX_PSHOTS 8
-#define PLAYER_LIVES 3
+#define PLAYER_LIVES 5
 #define PLAYER_BASE_SPEED 2
 #define PLAYER_BASE_DAMAGE 1
 #define MAX_SHOP_ITEMS 3
@@ -97,7 +105,7 @@ typedef struct {
 
     sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B, BOSS2_A, BOSS2_B;
     sprite1r_t BOSS_SHIELD;
-    sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE, SHOP_DMG;
+    sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE, SHOP_DMG, SHOP_PIERCE;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
     sprite1r_t *bunkers[4];
 
@@ -175,6 +183,7 @@ typedef struct {
     int player_speed;          // Base 2, increased by shop item
     int fire_speed_bonus;      // Each point reduces cooldown
     int player_damage;         // Base 1, increased by shop item
+    int pierce_unlocked;       // Permanent shop upgrade
 
     // Shop state
     int in_shop;

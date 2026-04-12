@@ -863,6 +863,25 @@ static int bullet_x_with_spread(const bullet_t *shot, int bi, int spread_dir) {
     return shot->x + (spread_dir * (bi / 2));
 }
 
+static int player_shot_damage_for_hit(game_t *g, bullet_t *shot) {
+    if (shot->pierce_active) {
+        int dmg = shot->damage_remaining;
+        if (dmg < 0) dmg = 0;
+        return dmg;
+    }
+    return g->player_damage;
+}
+
+static void consume_player_shot_damage(bullet_t *shot, int consumed) {
+    if (!shot->pierce_active) return;
+    if (consumed < 0) consumed = 0;
+    shot->damage_remaining -= consumed;
+    if (shot->damage_remaining <= 0) {
+        shot->damage_remaining = 0;
+        shot->alive = 0;
+    }
+}
+
 static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int damage_radius);
 
 static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread_dir, int can_collect_powerup) {
@@ -941,7 +960,8 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
             }
             if (boss_hit) {
-                g->boss_health -= g->player_damage;
+                int dmg = player_shot_damage_for_hit(g, &shots[si]);
+                g->boss_health -= dmg;
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
@@ -967,15 +987,35 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     }
                 }
                 if (bullet_hit) {
-                    g->alien_health[r][c] -= g->player_damage;
+                    if (shots[si].pierce_active && shots[si].last_hit_r == r && shots[si].last_hit_c == c) {
+                        continue;
+                    }
+
+                    int hp_before = g->alien_health[r][c];
+                    int dmg = player_shot_damage_for_hit(g, &shots[si]);
+                    if (dmg <= 0) {
+                        shots[si].alive = 0;
+                        hit = 1;
+                        continue;
+                    }
+
+                    g->alien_health[r][c] -= dmg;
                     if (g->alien_health[r][c] <= 0) {
                         kill_alien_with_explosion(g, r, c);
                         if (explosive_shot_active(g)) {
                             trigger_explosive_chain(g, r, c);
                         }
                     }
-                    shots[si].alive = 0;
-                    hit = 1;
+
+                    if (shots[si].pierce_active) {
+                        shots[si].last_hit_r = r;
+                        shots[si].last_hit_c = c;
+                        consume_player_shot_damage(&shots[si], hp_before);
+                        hit = shots[si].alive ? 0 : 1;
+                    } else {
+                        shots[si].alive = 0;
+                        hit = 1;
+                    }
                 }
             }
         }
@@ -1035,6 +1075,7 @@ static void reset_player_progression(game_t *g) {
     g->player_speed = PLAYER_BASE_SPEED;
     g->fire_speed_bonus = 0;
     g->player_damage = PLAYER_BASE_DAMAGE;
+    g->pierce_unlocked = 0;
     reset_shop_state(g);
     reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
 }
@@ -1057,6 +1098,7 @@ static const char *shop_item_label(shop_item_type_t type) {
         case SHOP_ITEM_MOVE_SPEED: return "MOVE";
         case SHOP_ITEM_LIFE:       return "LIFE";
         case SHOP_ITEM_DAMAGE:     return "DMG";
+        case SHOP_ITEM_PIERCE:     return "PIERCE";
         default:                   return "ITEM";
     }
 }
@@ -1066,13 +1108,36 @@ static void enter_shop(game_t *g) {
     g->shop_next_level = g->level + 1;
     g->shop_count++;
 
+    shop_item_type_t shop_pool[4];
+    int shop_pool_count = 0;
+    shop_pool[shop_pool_count++] = SHOP_ITEM_FIRE_SPEED;
+    shop_pool[shop_pool_count++] = SHOP_ITEM_LIFE;
+    shop_pool[shop_pool_count++] = SHOP_ITEM_DAMAGE;
+    if (!g->pierce_unlocked) {
+        shop_pool[shop_pool_count++] = SHOP_ITEM_PIERCE;
+    }
+
     int price_multiplier = g->shop_count; // Base * shops seen
     int spacing = 60;
     int start_x = LW / 2 - spacing;
     int y = LH / 2;
+    int pierce_added = 0;
     for (int i = 0; i < MAX_SHOP_ITEMS; i++) {
+        shop_item_type_t picked = shop_pool[rand() % shop_pool_count];
+        if (!g->pierce_unlocked && picked == SHOP_ITEM_PIERCE && pierce_added) {
+            static const shop_item_type_t non_pierce_pool[] = {
+                SHOP_ITEM_FIRE_SPEED,
+                SHOP_ITEM_LIFE,
+                SHOP_ITEM_DAMAGE
+            };
+            picked = non_pierce_pool[rand() % 3];
+        }
+
         g->shop_items[i].active = 1;
-        g->shop_items[i].type = (shop_item_type_t)(rand() % SHOP_ITEM_COUNT);
+        g->shop_items[i].type = picked;
+        if (picked == SHOP_ITEM_PIERCE) {
+            pierce_added = 1;
+        }
         g->shop_items[i].price = 500 * price_multiplier;
         g->shop_items[i].x = start_x + i * spacing;
         g->shop_items[i].y = y;
@@ -1122,6 +1187,7 @@ static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         else if (g->shop_items[it].type == SHOP_ITEM_MOVE_SPEED) g->player_speed++;
                         else if (g->shop_items[it].type == SHOP_ITEM_LIFE) g->lives++;
                         else if (g->shop_items[it].type == SHOP_ITEM_DAMAGE) g->player_damage++;
+                        else if (g->shop_items[it].type == SHOP_ITEM_PIERCE) g->pierce_unlocked = 1;
                         g->shop_items[it].active = 0;
                     }
                     if (bi == 0) g->pshot[si].alive = 0;
@@ -1182,6 +1248,9 @@ static void shop_render(game_t *g, lfb_t *lfb) {
         } else if (g->shop_items[i].type == SHOP_ITEM_DAMAGE) {
             icon = &g->SHOP_DMG;
             icon_color = 0xFFFF0000;
+        } else if (g->shop_items[i].type == SHOP_ITEM_PIERCE) {
+            icon = &g->SHOP_PIERCE;
+            icon_color = 0xFF66CCFF;
         }
         if (icon) {
             int icon_x = center_x - icon->w / 2;
@@ -1421,6 +1490,7 @@ void game_init(game_t *g) {
     g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
     g->SHOP_MOVE = make_sprite_from_ascii(shop_move_rows, 7);
     g->SHOP_DMG  = make_sprite_from_ascii(shop_dmg_rows, 7);
+    g->SHOP_PIERCE = make_sprite_from_ascii(shop_pierce_rows, 7);
 
     bunkers_rebuild(g);
 

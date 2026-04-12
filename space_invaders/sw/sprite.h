@@ -138,6 +138,16 @@ static const char *shop_dmg_rows[] = {
     ".......",
 };
 
+static const char *shop_pierce_rows[] = {
+    "...X...",
+    "..XXX..",
+    "..XXX..",
+    "..XXX..",
+    "..XXX..",
+    "...X...",
+    ".......",
+};
+
 typedef struct {
     int w, h;
     int stride;    // bytes per row
