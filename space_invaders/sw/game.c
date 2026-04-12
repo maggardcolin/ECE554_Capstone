@@ -2292,6 +2292,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         int boss_y = 68;
         if (g->boss_type != BOSS_TYPE_YELLOW) {
             uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF : 0xFF00FF00;
+            if (g->boss_type == BOSS_TYPE_CLASSIC) {
+                boss_color = type_color;
+            }
             draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
         }
         render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS);
