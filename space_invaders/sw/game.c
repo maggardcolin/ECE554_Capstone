@@ -353,6 +353,33 @@ static int segment_hits_player(const game_t *g, float x0, float y0, float x1, fl
     return 0;
 }
 
+static void destroy_bunkers_along_segment(game_t *g, float x0, float y0, float x1, float y1) {
+    if (g->level == 0) return;
+
+    int dx = (int)(x1 - x0);
+    if (dx < 0) dx = -dx;
+    int dy = (int)(y1 - y0);
+    if (dy < 0) dy = -dy;
+    int steps = (dx > dy) ? dx : dy;
+    if (steps < 1) steps = 1;
+
+    for (int i = 0; i <= steps; i++) {
+        float t = (float)i / (float)steps;
+        int px = (int)(x0 + (x1 - x0) * t);
+        int py = (int)(y0 + (y1 - y0) * t);
+
+        for (int bi = 0; bi < 4; bi++) {
+            sprite1r_t *b = g->bunkers[bi];
+            int bx = g->bunker_x[bi];
+            int by = g->bunker_y;
+
+            if (bullet_hits_sprite(b, bx, by, px, py)) {
+                bunker_damage(b, px - bx, py - by, 1);
+            }
+        }
+    }
+}
+
 static float hermit_absf(float v) {
     return (v < 0.0f) ? -v : v;
 }
@@ -1501,7 +1528,7 @@ static void consume_player_shot_damage(bullet_t *shot, int consumed) {
     }
 }
 
-static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int damage_radius);
+static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int x_drift, int y_dir, int damage_radius);
 
 static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread_dir, int can_collect_powerup) {
     for (int si = 0; si < MAX_PSHOTS; si++) {
@@ -1670,12 +1697,12 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             }
         }
         if (!hit && shots[si].alive) {
-            handle_bunker_bullet_collisions(g, &shots[si], 3);
+            handle_bunker_bullet_collisions(g, &shots[si], spread_dir, -1, 3);
         }
     }
 }
 
-static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot, int shield_blockable) {
+static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot, int x_drift, int shield_blockable) {
     if (!shot->alive) return;
     if (g->player_dying) return;
 
@@ -1692,20 +1719,24 @@ static void handle_enemy_shot_collisions(game_t *g, bullet_t *shot, int shield_b
         apply_player_damage(g, 1);
         shot->alive = 0;
     } else {
-        handle_bunker_bullet_collisions(g, shot, 3);
+        handle_bunker_bullet_collisions(g, shot, x_drift, 1, 3);
     }
 }
 
-static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int damage_radius) {
+static void handle_bunker_bullet_collisions(game_t *g, bullet_t *shot, int x_drift, int y_dir, int damage_radius) {
     if (!shot->alive) return;
     // No bunker collisions on level 0 (tutorial)
     if (g->level == 0) return;
     for (int i = 0; i < 4 && shot->alive; i++) {
         sprite1r_t *b = g->bunkers[i];
         int bx = g->bunker_x[i], by = g->bunker_y;
-        if (bullet_hits_sprite(b, bx, by, shot->x, shot->y)) {
-            bunker_damage(b, shot->x - bx, shot->y - by, damage_radius);
-            shot->alive = 0;
+        for (int bi = 0; bi < 5 && shot->alive; bi++) {
+            int px = shot->x + (x_drift * (bi / 2));
+            int py = shot->y + (y_dir * bi);
+            if (bullet_hits_sprite(b, bx, by, px, py)) {
+                bunker_damage(b, px - bx, py - by, damage_radius);
+                shot->alive = 0;
+            }
         }
     }
 }
@@ -3192,6 +3223,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                             l->yellow_hit_applied = 1;
                         }
 
+                        destroy_bunkers_along_segment(g, l->start_x, l->start_y, l->tip_x, l->tip_y);
+
                         hermit_move_point_toward(&l->start_x, &l->start_y, l->tip_x, l->tip_y, HERMIT_LIGHTNING_FADE_SPEED);
 
                         if (l->flash_timer == 0) {
@@ -3206,6 +3239,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     if (hermit_lightning_span(l) > HERMIT_LIGHTNING_MAX_TRAIL) {
                         hermit_move_point_toward(&l->start_x, &l->start_y, l->tip_x, l->tip_y, HERMIT_LIGHTNING_TAIL_SPEED);
                     }
+
+                    destroy_bunkers_along_segment(g, l->start_x, l->start_y, l->tip_x, l->tip_y);
 
                     int hit_player_now = (!shield_power_active(g) &&
                                           segment_hits_player(g, l->start_x, l->start_y, l->tip_x, l->tip_y));
@@ -3320,13 +3355,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     // collisions: alien and boss shots
-    handle_enemy_shot_collisions(g, &g->ashot, 1);
-    handle_enemy_shot_collisions(g, &g->boss_shot, 1);
+    handle_enemy_shot_collisions(g, &g->ashot, 0, 1);
+    handle_enemy_shot_collisions(g, &g->boss_shot, 0, 1);
     for (int i = 0; i < 3; i++) {
-        handle_enemy_shot_collisions(g, &g->boss_triple_shot[i], 1);
+        handle_enemy_shot_collisions(g, &g->boss_triple_shot[i], g->boss_triple_shot_dx[i], 1);
     }
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
-        handle_enemy_shot_collisions(g, &g->yellow_beam_shot[i], 1);
+        handle_enemy_shot_collisions(g, &g->yellow_beam_shot[i], 0, 1);
     }
 
     for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
