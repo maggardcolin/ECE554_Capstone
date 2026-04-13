@@ -88,7 +88,7 @@ static const char *boss_intro_special_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return blue_black_hole_enabled(g) ? "BLACK HOLE" : "BOMB";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "SHUFFLE";
     if (g->boss_type == BOSS_TYPE_TOWER) return "WALLS";
-    if (g->boss_type == BOSS_TYPE_HERMIT) return "DODGE";
+    if (g->boss_type == BOSS_TYPE_HERMIT) return "SUMMON";
     if (g->level >= 3) return "PLASMA HEAL";
     return "PLASMA";
 }
@@ -116,8 +116,8 @@ static const char *boss_intro_desc_line2(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_YELLOW) return "BEST TO TAKE OUT COLUMNS.";
     if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID EXPLOSIONS HURT IT.";
     if (g->boss_type == BOSS_TYPE_HERMIT) {
-        return (g->level >= 3) ? "TRY TO BREAK ITS SHIELD." :
-                                 "JUMPS AROUND A BIT.";
+        return (g->level >= 3) ? "TRY TO BREAK ITS SHIELD. SUMMONS ALIENS." :
+                                 "JUMPS AROUND A BIT. SUMMONS ALIENS.";
     }
     return (g->level >= 3) ? "GREEN PLASMA NOW HEALS DURING THE FIGHT." :
                              "DESCENDS ONCE HALF THE ALIENS ARE GONE.";
@@ -883,24 +883,35 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
     if (g->boss_type == BOSS_TYPE_HERMIT) {
         if (elapsed >= t0 && elapsed < t1) {
             int local = elapsed - t0;
-            int y = start_y + local * 2;
-            int x = center_x + ((local & 1) ? 2 : -2);
-            render_intro_regular_shot(lfb, x, y, 0xFF8000FF);
+            int travel_frames = 16;
+            int local_clamped = (local < travel_frames) ? local : travel_frames;
+            int tip_x = center_x + (((local_clamped & 1) == 0) ? -2 : 2);
+            int tip_y = start_y + local_clamped * 2;
+            uint32_t bolt_color = (local >= travel_frames) ? 0xFFFFFF00 : 0xFF8000FF;
+            draw_zigzag_segment(lfb, center_x, start_y, tip_x, tip_y, 2, 6, bolt_color);
         } else if (elapsed >= t2 && elapsed < t3) {
             int local = elapsed - t2;
-            int y = start_y + local * 2;
-            int x = center_x + ((local & 1) ? -2 : 2);
-            render_intro_regular_shot(lfb, x, y, 0xFF8000FF);
+            int travel_frames = 16;
+            int local_clamped = (local < travel_frames) ? local : travel_frames;
+            int tip_x = center_x + (((local_clamped & 1) == 0) ? 2 : -2);
+            int tip_y = start_y + local_clamped * 2;
+            uint32_t bolt_color = (local >= travel_frames) ? 0xFFFFFF00 : 0xFF8000FF;
+            draw_zigzag_segment(lfb, center_x, start_y, tip_x, tip_y, 2, 6, bolt_color);
         } else if (elapsed >= t4 && elapsed < t5) {
-            int target_x = LW - boss_x - BS->w / 2;
-            if (target_x < BS->w / 2) target_x = BS->w / 2;
-            if (target_x > LW - BS->w / 2) target_x = LW - BS->w / 2;
-            int y_mid = boss_y + BS->h / 2;
-            for (int i = 0; i < 8; i++) {
-                int mix = (i + 1) * 100 / 8;
-                int px = center_x + ((target_x - center_x) * mix) / 100;
-                int py = y_mid + (((i & 1) == 0) ? -1 : 1);
-                l_putpix(lfb, px, py, 0xFFD9B3FF);
+            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+            int spawn_count = (g->level >= 3) ? 2 : 1;
+            int local = elapsed - t4;
+            int spawn_y = boss_y + BS->h + 10;
+            int rise = (local < 10) ? (10 - local) : 0;
+
+            if (spawn_count == 1) {
+                draw_sprite1r(lfb, AS, center_x - AS->w / 2, spawn_y - rise, 0xFFB266FF);
+            } else {
+                int spacing = AS->w + 10;
+                int left_x = center_x - spacing / 2 - AS->w / 2;
+                int right_x = center_x + spacing / 2 - AS->w / 2;
+                draw_sprite1r(lfb, AS, left_x, spawn_y - rise, 0xFFB266FF);
+                draw_sprite1r(lfb, AS, right_x, spawn_y - rise, 0xFFB266FF);
             }
         }
         return;
