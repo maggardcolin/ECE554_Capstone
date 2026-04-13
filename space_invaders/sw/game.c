@@ -1094,6 +1094,35 @@ static void render_overworld_background(lfb_t *lfb, int elapsed) {
     }
 }
 
+static void render_ship_with_vertical_thruster(const game_t *g,
+                                               lfb_t *lfb,
+                                               int ship_x,
+                                               int ship_y,
+                                               int moving_vertically,
+                                               int elapsed) {
+    int draw_x = ship_x - g->PLAYER.w / 2;
+    int draw_y = ship_y - g->PLAYER.h / 2;
+    draw_sprite1r(lfb, &g->PLAYER, draw_x, draw_y, 0xFF00FF00);
+
+    if (!moving_vertically) return;
+
+    int flame_x = ship_x;
+    int flame_y = draw_y + g->PLAYER.h;
+    int flicker = elapsed & 3;
+    uint32_t core_color = 0xFFFFFF66;
+    uint32_t flame_color = (flicker == 0 || flicker == 2) ? 0xFFFFA500 : 0xFFFF6A00;
+    int flame_len = 2 + ((elapsed >> 1) & 1);
+
+    l_putpix(lfb, flame_x, flame_y, core_color);
+    for (int i = 1; i <= flame_len; i++) {
+        l_putpix(lfb, flame_x, flame_y + i, flame_color);
+    }
+    if ((flicker & 1) == 0) {
+        l_putpix(lfb, flame_x - 1, flame_y + 1, flame_color);
+        l_putpix(lfb, flame_x + 1, flame_y + 1, flame_color);
+    }
+}
+
 static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
     int elapsed = OVERWORLD_TOTAL_FRAMES - g->overworld_cutscene_timer;
     if (elapsed < 0) elapsed = 0;
@@ -1182,12 +1211,14 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
 
     int ship_x = to_x;
     int ship_y = to_y;
+    int prev_ship_y = ship_y;
     if (elapsed < OVERWORLD_FLY_FRAMES) {
+        int prev_elapsed = elapsed > 0 ? (elapsed - 1) : 0;
         ship_x = from_x + ((to_x - from_x) * elapsed) / OVERWORLD_FLY_FRAMES;
         ship_y = from_y + ((to_y - from_y) * elapsed) / OVERWORLD_FLY_FRAMES;
+        prev_ship_y = from_y + ((to_y - from_y) * prev_elapsed) / OVERWORLD_FLY_FRAMES;
     }
-
-    draw_sprite1r(lfb, &g->PLAYER, ship_x - g->PLAYER.w / 2, ship_y - g->PLAYER.h / 2, 0xFF00FF00);
+    render_ship_with_vertical_thruster(g, lfb, ship_x, ship_y, ship_y != prev_ship_y, elapsed);
 
     if (elapsed >= OVERWORLD_FLY_FRAMES) {
         int ring_r = 6 + pulse_r;
@@ -4309,7 +4340,14 @@ void game_render(game_t *g, lfb_t *lfb) {
     if (g->player_dying) {
         render_player_explosion(g, lfb);
     } else if (player_visible_with_iframes(g)) {
-        render_player(g, lfb);
+        int post_boss_exit_fly = g->player_exit_fly_active && !g->boss_alive;
+        if (post_boss_exit_fly) {
+            int cx = g->player_x + g->PLAYER.w / 2;
+            int cy = g->player_y + g->PLAYER.h / 2;
+            render_ship_with_vertical_thruster(g, lfb, cx, cy, 1, g->powerup_spawn_timer);
+        } else {
+            render_player(g, lfb);
+        }
     }
 
     render_player_shield_ring(g, lfb);
