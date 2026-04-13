@@ -108,7 +108,8 @@ void render_fps_counter(lfb_t *lfb) {
     snprintf(fps_text, sizeof(fps_text), "FPS:%d", fps);
     int x = LW - text_width_5x5(fps_text, 1) - 80;
     int y = LH - 12;
-    l_draw_text(lfb, x, y, fps_text, 1, 0xFFFFFFFF);
+    // Keep FPS tracking live but suppress on-screen rendering.
+    if (0) l_draw_text(lfb, x, y, fps_text, 1, 0xFFFFFFFF);
 }
 
 void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
