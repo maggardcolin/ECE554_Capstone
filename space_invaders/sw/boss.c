@@ -18,6 +18,9 @@ void boss_trigger_death(game_t *g, int points_awarded) {
     for (int i = 0; i < 3; i++) {
         g->boss_triple_shot[i].alive = 0;
     }
+    for (int i = 0; i < 9; i++) {
+        g->boss_arc_shot[i].alive = 0;
+    }
     for (int i = 0; i < MAX_TOWER_ASTEROIDS; i++) {
         g->tower_asteroid[i].alive = 0;
         g->tower_asteroid_exploding[i] = 0;
@@ -117,6 +120,13 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
             draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00,
                                          GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         }
+    } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 4, 0xFFFF6A00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 1, 0xFFFF9A2E, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        if ((age & 1) == 0) {
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFD08A,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        }
     } else {
         draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 4, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 1, 0xFFFF8C00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
@@ -137,6 +147,8 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
             c = (i & 1) ? 0xFFD9B3FF : 0xFFB266FF;
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
             c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
+        } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+            c = (i & 1) ? 0xFFFFA500 : 0xFFFFD08A;
         } else {
             c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         }

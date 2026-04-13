@@ -24,6 +24,14 @@
 #define YELLOW_BOSS_ATTACK_SHUFFLE 3
 #define TOWER_WALL_ATTACK 4
 #define HERMIT_DODGE_ATTACK 5
+#define CHARIOT_CHARGE_ATTACK 6
+#define CHARIOT_ARC_SHOT_COUNT 9
+#define CHARIOT_ARC_MIDDLE_SHOT_COUNT 5
+#define CHARIOT_ARC_SHOT_DELAY 8
+#define CHARIOT_CHARGE_SPEED_Y 4
+#define CHARIOT_CHARGE_SPEED_X 3
+#define CHARIOT_CHARGE_EXPLOSION_FRAMES 30
+#define CHARIOT_CHARGE_EXPLOSION_RADIUS 20
 #define HERMIT_LIGHTNING_SPEED 1.5f
 #define HERMIT_LIGHTNING_YELLOW_FRAMES 30
 #define HERMIT_LIGHTNING_MAX_TRAIL 42.0f
@@ -61,6 +69,7 @@ static const char *boss_intro_type_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STAR";
     if (g->boss_type == BOSS_TYPE_TOWER) return "TOWER";
     if (g->boss_type == BOSS_TYPE_HERMIT) return "HERMIT";
+    if (g->boss_type == BOSS_TYPE_CHARIOT) return "CHARIOT";
     return "EMPEROR";
 }
 
@@ -69,6 +78,7 @@ static const char *boss_menu_label(int boss_type) {
     if (boss_type == BOSS_TYPE_YELLOW) return "STAR";
     if (boss_type == BOSS_TYPE_TOWER) return "TOWER";
     if (boss_type == BOSS_TYPE_HERMIT) return "HERMIT";
+    if (boss_type == BOSS_TYPE_CHARIOT) return "CHARIOT";
     return "EMPEROR";
 }
 
@@ -77,6 +87,7 @@ static const char *boss_intro_main_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STANDARD LASER";
     if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID";
     if (g->boss_type == BOSS_TYPE_HERMIT) return "LIGHTNING";
+    if (g->boss_type == BOSS_TYPE_CHARIOT) return "ARC";
     return "STANDARD LASER";
 }
 
@@ -89,6 +100,7 @@ static const char *boss_intro_special_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_YELLOW) return "SHUFFLE";
     if (g->boss_type == BOSS_TYPE_TOWER) return "WALLS";
     if (g->boss_type == BOSS_TYPE_HERMIT) return "SUMMON";
+    if (g->boss_type == BOSS_TYPE_CHARIOT) return "CHARGE";
     if (g->level >= 3) return "PLASMA HEAL";
     return "PLASMA";
 }
@@ -104,6 +116,7 @@ static const char *boss_intro_desc_line1(const game_t *g) {
         return (g->level >= 3) ? "HOMING LIGHTNING AND DODGING." :
                                  "HOMING LIGHTNING ATTACKS.";
     }
+    if (g->boss_type == BOSS_TYPE_CHARIOT) return "SHOOTS IN AN ARC.";
     return (g->level >= 3) ? "EMPEROR ENTERS PHASE TWO PLASMA PATTERNS." :
                              "FIGHTS WITH HEAVY PLASMA FIRE.";
 }
@@ -119,6 +132,7 @@ static const char *boss_intro_desc_line2(const game_t *g) {
         return (g->level >= 3) ? "TRY TO BREAK ITS SHIELD. SUMMONS ALIENS." :
                                  "JUMPS AROUND A BIT. SUMMONS ALIENS.";
     }
+    if (g->boss_type == BOSS_TYPE_CHARIOT) return "RUSHES TOWARDS THE PLAYER.";
     return (g->level >= 3) ? "GREEN PLASMA NOW HEALS DURING THE FIGHT." :
                              "DESCENDS ONCE HALF THE ALIENS ARE GONE.";
 }
@@ -303,6 +317,10 @@ static void clear_boss_projectiles(game_t *g) {
     for (int i = 0; i < 3; i++) {
         g->boss_triple_shot[i].alive = 0;
     }
+    for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
+        g->boss_arc_shot[i].alive = 0;
+        g->boss_arc_shot_dx[i] = 0;
+    }
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
         g->yellow_beam_shot[i].alive = 0;
     }
@@ -323,6 +341,16 @@ static void clear_boss_projectiles(game_t *g) {
     g->boss_bomb.hits_taken = 0;
     g->boss_bomb.reversed = 0;
     g->boss_bomb.reverse_damage_applied = 0;
+    g->boss_special_x = 0;
+    g->boss_special_y = 0;
+    g->boss_special_timer = 0;
+    g->boss_special_hit_applied = 0;
+    g->chariot_arc_active = 0;
+    g->chariot_arc_next_index = 0;
+    g->chariot_arc_step = 1;
+    g->chariot_arc_delay = 0;
+    g->chariot_charge_damage = 0;
+    g->chariot_charge_target_x = 0;
     g->tower_wall_active = 0;
     g->tower_wall_timer = 0;
     g->tower_wall_left = 0;
@@ -604,6 +632,42 @@ static void apply_reversed_bomb_explosion_effects(game_t *g, int radius) {
     }
 }
 
+static void apply_chariot_charge_explosion_to_aliens(game_t *g, int cx, int cy, int radius) {
+    const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+    int spacing_x = 6, spacing_y = 5;
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[r][c]) continue;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+            int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+            if (circle_intersects_rect(cx, cy, radius, ax, ay, AS->w, AS->h)) {
+                kill_alien_with_explosion(g, r, c);
+            }
+        }
+    }
+}
+
+static int rects_overlap(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh) {
+    return (ax < bx + bw) && (ax + aw > bx) && (ay < by + bh) && (ay + ah > by);
+}
+
+static void spawn_chariot_arc_shot(game_t *g, int index, int x, int y) {
+    // Approximate 15-degree spacing from -60 to +60 degrees.
+    static const int arc_dx[CHARIOT_ARC_SHOT_COUNT] = {-4, -3, -2, -1, 0, 1, 2, 3, 4};
+    if (index < 0 || index >= CHARIOT_ARC_SHOT_COUNT) return;
+    g->boss_arc_shot[index].alive = 1;
+    g->boss_arc_shot[index].x = x;
+    g->boss_arc_shot[index].y = y;
+    g->boss_arc_shot_dx[index] = arc_dx[index];
+}
+
+static int any_chariot_arc_shot_alive(const game_t *g) {
+    for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
+        if (g->boss_arc_shot[i].alive) return 1;
+    }
+    return 0;
+}
+
 static void render_intro_regular_shot(lfb_t *lfb, int x, int y, uint32_t color) {
     for (int i = 0; i < 5; i++) l_putpix(lfb, x, y + i, color);
 }
@@ -772,6 +836,25 @@ static void render_tower_walls(lfb_t *lfb, const game_t *g) {
     }
 }
 
+static int chariot_intro_charge_anim_active(const game_t *g) {
+    if (g->boss_type != BOSS_TYPE_CHARIOT) return 0;
+
+    int elapsed = BOSS_INTRO_FRAMES - g->boss_intro_timer;
+    const int intro_hold = 10;
+    const int regular_dur = 24;
+    const int gap_dur = 8;
+    const int special_dur = 44;
+
+    int t0 = intro_hold;
+    int t1 = t0 + regular_dur;
+    int t2 = t1 + gap_dur;
+    int t3 = t2 + regular_dur;
+    int t4 = t3 + gap_dur;
+    int t5 = t4 + special_dur;
+
+    return elapsed >= t4 && elapsed < t5;
+}
+
 static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int boss_x, int boss_y, const sprite1r_t *BS, int allow_tower_walls) {
     int elapsed = BOSS_INTRO_FRAMES - g->boss_intro_timer;
     int start_y = boss_y + BS->h + 2;
@@ -917,6 +1000,40 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
         return;
     }
 
+    if (g->boss_type == BOSS_TYPE_CHARIOT) {
+        if (elapsed >= t0 && elapsed < t1) {
+            int local = elapsed - t0;
+            int y = start_y + local * 2;
+            render_intro_regular_shot(lfb, center_x - 8 - local / 2, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x - 4 - local / 3, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 3, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x + 8 + local / 2, y, 0xFFFF8C00);
+        } else if (elapsed >= t2 && elapsed < t3) {
+            int local = elapsed - t2;
+            int y = start_y + local * 2;
+            render_intro_regular_shot(lfb, center_x - 8 - local / 2, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x - 4 - local / 3, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 3, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x + 8 + local / 2, y, 0xFFFF8C00);
+        } else if (elapsed >= t4 && elapsed < t5) {
+            int local = elapsed - t4;
+            int rush_y = boss_y + local * 3;
+            if (rush_y < LH - 30) {
+                draw_sprite1r(lfb, BS, boss_x, rush_y, 0xFFFF8C00);
+            } else {
+                int ex = center_x;
+                int ey = LH - 30;
+                int r = 8 + ((local - 18) > 0 ? (local - 18) : 0) / 2;
+                if (r > 22) r = 22;
+                draw_filled_circle(lfb, ex, ey, r, 0xFFFF4500);
+                draw_filled_circle(lfb, ex, ey, r - 3, 0xFFFFA500);
+            }
+        }
+        return;
+    }
+
     // Multicolor boss preview.
     if (elapsed >= t0 && elapsed < t1) {
         int local = elapsed - t0;
@@ -952,6 +1069,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
         preview_type_color = 0xFF8B5A2B;
     } else if (boss_type == BOSS_TYPE_HERMIT) {
         preview_type_color = 0xFFB266FF;
+    } else if (boss_type == BOSS_TYPE_CHARIOT) {
+        preview_type_color = 0xFFFF8C00;
     } else {
         if (preview.boss_intro_timer > 0) {
             uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
@@ -971,7 +1090,8 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
                 (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                 (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
                 (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                (boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFFFF0000);
+                (boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF :
+                (boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFFFF0000);
 
     l_draw_text(lfb, right_x, 40, "SPECIAL:", 1, 0xFFFFFFFF);
     if (boss_type == BOSS_TYPE_CLASSIC && preview.level >= 3) {
@@ -985,7 +1105,9 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
         l_draw_text(lfb, right_x + 46, 40, boss_intro_special_attack_text(&preview), 1,
                     (boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
                     (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                    (boss_type == BOSS_TYPE_TOWER) ? 0xFF4A2E12 : 0xFF8000FF);
+                    (boss_type == BOSS_TYPE_TOWER) ? 0xFF4A2E12 :
+                    (boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF :
+                    (boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFF8000FF);
     }
 
     char level_text[20];
@@ -1003,9 +1125,12 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     if (boss_type != BOSS_TYPE_YELLOW) {
         uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                               (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                              (boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
+                              (boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
+                              (boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFF00FF00;
         if (boss_type == BOSS_TYPE_CLASSIC) boss_color = preview_type_color;
-        draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+        if (!chariot_intro_charge_anim_active(&preview)) {
+            draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+        }
         render_intro_boss_attack_preview(&preview, lfb, boss_x, boss_y, BS, 0);
     } else {
         const sprite1r_t *AS = preview.alien_frame ? &preview.ALIEN_B : &preview.ALIEN_A;
@@ -1702,6 +1827,8 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
         if (g->boss_alive && !g->boss_dying && g->boss_type != BOSS_TYPE_YELLOW) {
             const sprite1r_t *BS = active_boss_sprite(g);
             int boss_hit = 0;
+            int chariot_descending = (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active &&
+                                      g->boss_attack_type == CHARIOT_CHARGE_ATTACK && g->boss_special_timer <= 0);
             for (int bi = 0; bi < 5 && !boss_hit; bi++) {
                 if (bullet_hits_sprite(BS,
                                        g->boss_x, g->boss_y,
@@ -1715,6 +1842,21 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 if (g->boss_health <= 0) {
                     g->boss_health = 0;
                     boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
+                } else if (chariot_descending) {
+                    g->chariot_charge_damage += 1;
+                    if (g->chariot_charge_damage >= 3) {
+                        // Interrupt charge: explode where hit, then reset to top.
+                        g->boss_special_x = g->boss_x;
+                        g->boss_special_y = g->boss_y;
+                        g->boss_special_timer = CHARIOT_CHARGE_EXPLOSION_FRAMES;
+                        g->boss_special_hit_applied = 1;
+                        apply_chariot_charge_explosion_to_aliens(
+                            g,
+                            g->boss_x + BS->w / 2,
+                            g->boss_y + BS->h / 2,
+                            CHARIOT_CHARGE_EXPLOSION_RADIUS
+                        );
+                    }
                 }
                 shots[si].alive = 0;
             }
@@ -2353,11 +2495,13 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_attack_type = (g->boss_type == BOSS_TYPE_BLUE) ? 2 :
                          (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE :
                          (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK :
-                         (g->boss_type == BOSS_TYPE_HERMIT) ? 0 : 0;  // Current attack being executed
+                         (g->boss_type == BOSS_TYPE_HERMIT) ? 0 :
+                         (g->boss_type == BOSS_TYPE_CHARIOT) ? CHARIOT_CHARGE_ATTACK : 0;  // Current attack being executed
     g->next_boss_attack_type = (g->boss_type == BOSS_TYPE_BLUE) ? 2 :
                              (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW_BOSS_ATTACK_SHUFFLE :
                              (g->boss_type == BOSS_TYPE_TOWER) ? TOWER_WALL_ATTACK :
-                             (g->boss_type == BOSS_TYPE_HERMIT) ? 0 : 0;  // Next attack to be charged
+                             (g->boss_type == BOSS_TYPE_HERMIT) ? 0 :
+                             (g->boss_type == BOSS_TYPE_CHARIOT) ? CHARIOT_CHARGE_ATTACK : 0;  // Next attack to be charged
     g->boss_green_laser_last_hit_y = -1000;  // Far off screen
         g->tower_wall_active = 0;
         g->tower_wall_timer = 0;
@@ -2414,6 +2558,8 @@ void game_init(game_t *g) {
     g->BOSS3_B = make_sprite_from_ascii(boss3B_rows, 10);
     g->BOSS4_A = make_sprite_from_ascii(boss4A_rows, 10);
     g->BOSS4_B = make_sprite_from_ascii(boss4B_rows, 10);
+    g->BOSS5_A = make_sprite_from_ascii(boss5A_rows, 10);
+    g->BOSS5_B = make_sprite_from_ascii(boss5B_rows, 10);
     g->BOSS_SHIELD = make_filled_sprite(g->BOSS4_A.w, 6);
     g->SHOP_LIFE = make_sprite_from_ascii(shop_life_rows, 7);
     g->SHOP_FIRE = make_sprite_from_ascii(shop_fire_rows, 7);
@@ -3032,6 +3178,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->next_boss_attack_type = TOWER_WALL_ATTACK;
             } else if (g->boss_type == BOSS_TYPE_HERMIT) {
                 g->next_boss_attack_type = HERMIT_DODGE_ATTACK;
+            } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+                g->next_boss_attack_type = CHARIOT_CHARGE_ATTACK;
             } else {
                 int alive_count = 0;
                 for (int r = 0; r < AROWS; r++) {
@@ -3053,7 +3201,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             int defer_tower_wall = 0;
             g->boss_power_active = 1;
             g->boss_power_cooldown = (g->boss_type == BOSS_TYPE_TOWER) ? 0 :
-                                     (g->boss_type == BOSS_TYPE_HERMIT) ? 20 : 30;
+                                     (g->boss_type == BOSS_TYPE_HERMIT) ? 20 :
+                                     (g->boss_type == BOSS_TYPE_CHARIOT) ? 0 : 30;
             
             // Use the next attack type that was determined during charging
             g->boss_attack_type = g->next_boss_attack_type;
@@ -3116,6 +3265,27 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_x = reflected_x;
                 g->boss_dx = -g->boss_dx;
                 g->boss_power_active = 0;
+            } else if (g->boss_attack_type == CHARIOT_CHARGE_ATTACK) {
+                g->boss_laser.alive = 0;
+                g->boss_bomb.alive = 0;
+                g->boss_bomb.exploding = 0;
+                g->boss_bomb.explode_timer = 0;
+                g->boss_bomb.hit_player = 0;
+                g->chariot_arc_active = 0;
+                g->boss_special_x = g->boss_x;
+                g->boss_special_y = g->boss_y;
+                g->boss_special_timer = 0;
+                g->boss_special_hit_applied = 0;
+                g->chariot_charge_damage = 0;
+
+                {
+                    int left_bound = movement_left_bound(g);
+                    int right_bound = movement_right_bound(g);
+                    int target_x = g->player_x + g->PLAYER.w / 2 - boss_w / 2;
+                    if (target_x < left_bound) target_x = left_bound;
+                    if (target_x > right_bound - boss_w) target_x = right_bound - boss_w;
+                    g->chariot_charge_target_x = target_x;
+                }
             } else {
                 g->boss_laser.alive = 0;
                 g->boss_bomb.alive = 0;
@@ -3152,37 +3322,111 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
 
         if (!freeze_boss) {
-            // Normal movement
-            g->boss_timer++;
-            if (g->boss_timer >= g->boss_period) {
-                g->boss_timer = 0;
-                g->boss_frame ^= 1;
-            }
+            if (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active && g->boss_attack_type == CHARIOT_CHARGE_ATTACK) {
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                int target_x = g->chariot_charge_target_x;
+                if (target_x < left_bound) target_x = left_bound;
+                if (target_x > right_bound - boss_w) target_x = right_bound - boss_w;
 
-            int next_bx = g->boss_x + g->boss_dx;
-            int left_bound = movement_left_bound(g);
-            int right_bound = movement_right_bound(g);
-            if (next_bx < left_bound || next_bx > right_bound - boss_w) {
-                g->boss_dx = -g->boss_dx;
-                next_bx = g->boss_x + g->boss_dx;
-            }
-            g->boss_x = next_bx;
+                if (g->boss_special_timer <= 0) {
+                    if (g->boss_special_x < target_x) {
+                        g->boss_special_x += CHARIOT_CHARGE_SPEED_X;
+                        if (g->boss_special_x > target_x) g->boss_special_x = target_x;
+                    } else if (g->boss_special_x > target_x) {
+                        g->boss_special_x -= CHARIOT_CHARGE_SPEED_X;
+                        if (g->boss_special_x < target_x) g->boss_special_x = target_x;
+                    }
 
-            // Descend once more than half of regular aliens are dead
-            int alive_count = 0;
-            for (int r = 0; r < AROWS; r++) {
-                for (int c = 0; c < ACOLS; c++) {
-                    alive_count += g->alien_alive[r][c] ? 1 : 0;
+                    g->boss_special_y += CHARIOT_CHARGE_SPEED_Y;
+                    g->boss_x = g->boss_special_x;
+                    g->boss_y = g->boss_special_y;
+
+                    if (!g->boss_special_hit_applied &&
+                        rects_overlap(g->boss_x, g->boss_y, boss_w, boss_h,
+                                      g->player_x, g->player_y, g->PLAYER.w, g->PLAYER.h)) {
+                        apply_player_damage(g, 1);
+                        g->boss_special_hit_applied = 1;
+                    }
+
+                    if (g->boss_special_y + boss_h >= BOTTOM_HUD_SEPARATOR_Y - 1) {
+                        g->boss_special_y = BOTTOM_HUD_SEPARATOR_Y - 1 - boss_h;
+                        g->boss_y = g->boss_special_y;
+                        g->boss_special_timer = CHARIOT_CHARGE_EXPLOSION_FRAMES;
+                        apply_chariot_charge_explosion_to_aliens(
+                            g,
+                            g->boss_x + boss_w / 2,
+                            g->boss_y + boss_h / 2,
+                            CHARIOT_CHARGE_EXPLOSION_RADIUS
+                        );
+
+                        if (!g->boss_special_hit_applied) {
+                            int pcx = g->player_x + g->PLAYER.w / 2;
+                            int pcy = g->player_y + g->PLAYER.h / 2;
+                            int ecx = g->boss_x + boss_w / 2;
+                            int ecy = g->boss_y + boss_h / 2;
+                            int dx = pcx - ecx;
+                            int dy = pcy - ecy;
+                            if ((dx * dx + dy * dy) <= (CHARIOT_CHARGE_EXPLOSION_RADIUS * CHARIOT_CHARGE_EXPLOSION_RADIUS)) {
+                                apply_player_damage(g, 1);
+                            }
+                            g->boss_special_hit_applied = 1;
+                        }
+                    }
+                } else {
+                    int age = CHARIOT_CHARGE_EXPLOSION_FRAMES - g->boss_special_timer;
+                    int radius = 8 + age / 2;
+                    if (radius > CHARIOT_CHARGE_EXPLOSION_RADIUS) radius = CHARIOT_CHARGE_EXPLOSION_RADIUS;
+                    if (circle_intersects_rect(g->boss_x + boss_w / 2, g->boss_y + boss_h / 2, radius,
+                                               g->player_x, g->player_y, g->PLAYER.w, g->PLAYER.h)) {
+                        apply_player_damage(g, 1);
+                    }
+
+                    g->boss_special_timer--;
+                    if (g->boss_special_timer <= 0) {
+                        g->boss_special_y = g->boss_start_y;
+                        g->boss_y = g->boss_start_y;
+                        g->boss_x = g->boss_special_x;
+                        if (g->boss_x < left_bound) g->boss_x = left_bound;
+                        if (g->boss_x > right_bound - boss_w) g->boss_x = right_bound - boss_w;
+                        g->boss_power_active = 0;
+                    }
                 }
-            }
-            int total_aliens = AROWS * ACOLS;
-            if (g->boss_type != BOSS_TYPE_BLUE && g->boss_type != BOSS_TYPE_TOWER && g->boss_type != BOSS_TYPE_HERMIT && alive_count <= total_aliens / 2) {
-                if (g->boss_timer == 0) g->boss_y += 1;
+            } else {
+                // Normal movement
+                g->boss_timer++;
+                if (g->boss_timer >= g->boss_period) {
+                    g->boss_timer = 0;
+                    g->boss_frame ^= 1;
+                }
+
+                int next_bx = g->boss_x + g->boss_dx;
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                if (next_bx < left_bound || next_bx > right_bound - boss_w) {
+                    g->boss_dx = -g->boss_dx;
+                    next_bx = g->boss_x + g->boss_dx;
+                }
+                g->boss_x = next_bx;
+
+                // Descend once more than half of regular aliens are dead
+                int alive_count = 0;
+                for (int r = 0; r < AROWS; r++) {
+                    for (int c = 0; c < ACOLS; c++) {
+                        alive_count += g->alien_alive[r][c] ? 1 : 0;
+                    }
+                }
+                int total_aliens = AROWS * ACOLS;
+                if (g->boss_type != BOSS_TYPE_BLUE && g->boss_type != BOSS_TYPE_TOWER && g->boss_type != BOSS_TYPE_HERMIT && g->boss_type != BOSS_TYPE_CHARIOT && alive_count <= total_aliens / 2) {
+                    if (g->boss_timer == 0) g->boss_y += 1;
+                }
             }
         }
 
         // Game over if boss reaches player's y position
-        if (!g->player_exit_fly_active && g->boss_y + boss_h >= g->player_y) {
+        int chariot_diving = (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active &&
+                              g->boss_attack_type == CHARIOT_CHARGE_ATTACK);
+        if (!g->player_exit_fly_active && !chariot_diving && g->boss_y + boss_h >= g->player_y) {
             g->game_over = 1;
             g->game_over_score = g->score;
             g->game_over_delay_timer = 90;
@@ -3318,6 +3562,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             if (health_pct <= 10) period = 15;       // fast when red
             else if (health_pct <= 50) period = 30;  // medium when yellow
 
+            if (g->boss_type != BOSS_TYPE_CHARIOT) {
+                g->chariot_arc_active = 0;
+                for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
+                    g->boss_arc_shot[i].alive = 0;
+                }
+            }
+
             if (g->boss_type == BOSS_TYPE_TOWER) {
                 int total_aliens = AROWS * ACOLS;
                 int remaining_aliens = count_aliens_remaining(g);
@@ -3444,6 +3695,71 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 for (int i = 0; i < 3; i++) {
                     g->boss_triple_shot[i].alive = 0;
                 }
+            } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+                if (!g->boss_power_active || g->boss_attack_type != CHARIOT_CHARGE_ATTACK) {
+                    if (!any_chariot_arc_shot_alive(g) && !g->chariot_arc_active &&
+                        (vsync_counter % (uint32_t)period) == 0u) {
+                        const sprite1r_t *BS = active_boss_sprite(g);
+                        int cx = g->boss_x + BS->w / 2;
+                        int cy = g->boss_y + BS->h + 1;
+                        int center_x = g->boss_x + BS->w / 2;
+                        int left_third = LW / 3;
+                        int right_third = (LW * 2) / 3;
+
+                        if (center_x < left_third) {
+                            g->chariot_arc_active = 1;
+                            g->chariot_arc_next_index = 1;
+                            g->chariot_arc_step = 1;
+                            g->chariot_arc_delay = CHARIOT_ARC_SHOT_DELAY;
+                            spawn_chariot_arc_shot(g, 0, cx, cy);
+                        } else if (center_x > right_third) {
+                            g->chariot_arc_active = 1;
+                            g->chariot_arc_next_index = CHARIOT_ARC_SHOT_COUNT - 2;
+                            g->chariot_arc_step = -1;
+                            g->chariot_arc_delay = CHARIOT_ARC_SHOT_DELAY;
+                            spawn_chariot_arc_shot(g, CHARIOT_ARC_SHOT_COUNT - 1, cx, cy);
+                        } else {
+                            g->chariot_arc_active = 0;
+                            int middle_start = (CHARIOT_ARC_SHOT_COUNT - CHARIOT_ARC_MIDDLE_SHOT_COUNT) / 2;
+                            int middle_end = middle_start + CHARIOT_ARC_MIDDLE_SHOT_COUNT;
+                            for (int i = middle_start; i < middle_end; i++) {
+                                spawn_chariot_arc_shot(g, i, cx, cy);
+                            }
+                        }
+                    }
+
+                    if (g->chariot_arc_active) {
+                        if (g->chariot_arc_delay > 0) g->chariot_arc_delay--;
+                        if (g->chariot_arc_delay <= 0) {
+                            if (g->chariot_arc_next_index >= 0 &&
+                                g->chariot_arc_next_index < CHARIOT_ARC_SHOT_COUNT) {
+                                const sprite1r_t *BS = active_boss_sprite(g);
+                                int cx = g->boss_x + BS->w / 2;
+                                int cy = g->boss_y + BS->h + 1;
+                                spawn_chariot_arc_shot(g, g->chariot_arc_next_index, cx, cy);
+                                g->chariot_arc_next_index += g->chariot_arc_step;
+                                g->chariot_arc_delay = CHARIOT_ARC_SHOT_DELAY;
+                            } else {
+                                g->chariot_arc_active = 0;
+                            }
+                        }
+                    }
+                }
+
+                for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
+                    if (!g->boss_arc_shot[i].alive) continue;
+                    g->boss_arc_shot[i].x += g->boss_arc_shot_dx[i];
+                    g->boss_arc_shot[i].y += 2;
+                    if (g->boss_arc_shot[i].y > LH || g->boss_arc_shot[i].x < 0 || g->boss_arc_shot[i].x >= LW) {
+                        g->boss_arc_shot[i].alive = 0;
+                    }
+                }
+
+                g->boss_shot.alive = 0;
+                g->boss_laser.alive = 0;
+                for (int i = 0; i < 3; i++) {
+                    g->boss_triple_shot[i].alive = 0;
+                }
             } else if (g->boss_type == BOSS_TYPE_BLUE) {
             int any_triple_alive = 0;
             for (int i = 0; i < 3; i++) {
@@ -3510,6 +3826,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->boss_triple_shot[i].alive = 0;
         }
     }
+    for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
+        if (g->boss_arc_shot[i].alive && g->boss_arc_shot[i].y >= BOTTOM_HUD_SEPARATOR_Y) {
+            g->boss_arc_shot[i].alive = 0;
+        }
+    }
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
         if (g->yellow_beam_shot[i].alive && g->yellow_beam_shot[i].y >= BOTTOM_HUD_SEPARATOR_Y) {
             g->yellow_beam_shot[i].alive = 0;
@@ -3542,6 +3863,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     handle_enemy_shot_collisions(g, &g->boss_shot, 0, 1);
     for (int i = 0; i < 3; i++) {
         handle_enemy_shot_collisions(g, &g->boss_triple_shot[i], g->boss_triple_shot_dx[i], 1);
+    }
+    for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
+        handle_enemy_shot_collisions(g, &g->boss_arc_shot[i], g->boss_arc_shot_dx[i], 1);
     }
     for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
         handle_enemy_shot_collisions(g, &g->yellow_beam_shot[i], 0, 1);
@@ -3810,6 +4134,7 @@ void game_render(game_t *g, lfb_t *lfb) {
                 boss_menu_label(BOSS_TYPE_YELLOW),
                 boss_menu_label(BOSS_TYPE_TOWER),
                 boss_menu_label(BOSS_TYPE_HERMIT),
+                boss_menu_label(BOSS_TYPE_CHARIOT),
                 "EXIT TO MAIN MENU"
             };
 
@@ -3976,6 +4301,10 @@ void game_render(game_t *g, lfb_t *lfb) {
             uint32_t hermit_flicker_palette[4] = {0xFF8000FF, 0xFFB266FF, 0xFFD9B3FF, 0xFFB266FF};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = hermit_flicker_palette[flicker_idx];
+        } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+            uint32_t chariot_flicker_palette[4] = {0xFFFF6A00, 0xFFFF8C00, 0xFFFFB347, 0xFFFF8C00};
+            int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
+            type_color = chariot_flicker_palette[flicker_idx];
         } else {
             uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
@@ -3995,7 +4324,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         uint32_t main_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                       (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
                       (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                      (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFFFF0000;
+                      (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF :
+                      (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFFFF0000;
         l_draw_text(lfb, main_x, y, main_prefix, scale, 0xFFFFFFFF);
         l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, main_color);
 
@@ -4027,6 +4357,12 @@ void game_render(game_t *g, lfb_t *lfb) {
             special_text_x = special_x + special_prefix_w + 6;
             l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
             l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFB266FF);
+        } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+            int special_value_w = text_width_5x5(special_value, scale);
+            special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
+            special_text_x = special_x + special_prefix_w + 6;
+            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFFF8C00);
         } else if (g->level >= 3) {
             const char *spec1 = "PLASMA";
             const char *spec2 = "HEAL";
@@ -4055,18 +4391,22 @@ void game_render(game_t *g, lfb_t *lfb) {
         if (g->boss_type != BOSS_TYPE_YELLOW) {
             uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                                   (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                                  (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
+                                  (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
+                                  (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFF00FF00;
             if (g->boss_type == BOSS_TYPE_CLASSIC) {
                 boss_color = type_color;
             }
-            draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+            if (!chariot_intro_charge_anim_active(g)) {
+                draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+            }
         }
         render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS, 1);
 
         uint32_t desc_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
                               (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF99 :
                               (g->boss_type == BOSS_TYPE_TOWER) ? 0xFFC08A4B :
-                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFD9B3FF : 0xFF99FF99;
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFD9B3FF :
+                              (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFFC080 : 0xFF99FF99;
         int desc1_w = text_width_5x5(desc_line1, 1);
         int desc2_w = text_width_5x5(desc_line2, 1);
         int desc1_x = (LW - desc1_w) / 2;
@@ -4107,7 +4447,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                               (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
                               (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
+                              (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFF00FF00;
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             if (health_pct <= 33) boss_color = 0xFF114488;
@@ -4121,6 +4462,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
             if (health_pct <= 33) boss_color = 0xFF6A2AA9;
             else if (health_pct <= 67) boss_color = 0xFF9A4DDA;
+        } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+            if (health_pct <= 33) boss_color = 0xFFCC5C00;
+            else if (health_pct <= 67) boss_color = 0xFFE67700;
         } else {
             if (health_pct <= 33) boss_color = 0xFFFF0000;
             else if (health_pct <= 67) boss_color = 0xFFFFFF00;
@@ -4160,6 +4504,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         else if (g->next_boss_attack_type == YELLOW_BOSS_ATTACK_SHUFFLE) power_color = 0xFFFFFF00;  // Yellow shuffle
         else if (g->next_boss_attack_type == TOWER_WALL_ATTACK) power_color = 0xFF8B5A2B;  // Tower walls
         else if (g->next_boss_attack_type == HERMIT_DODGE_ATTACK) power_color = 0xFFB266FF;  // Hermit dodge
+        else if (g->next_boss_attack_type == CHARIOT_CHARGE_ATTACK) power_color = 0xFFFF8C00;  // Chariot charge
         else power_color = 0xFF808080;  // Gray (unknown)
 
         int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * power_bar_w) / g->boss_power_max : 0;
@@ -4272,7 +4617,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
                               (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF : 0xFF00FF00;
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
+                              (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 : 0xFF00FF00;
         if (g->boss_type == BOSS_TYPE_BLUE) {
             if (health_pct <= 33) boss_color = 0xFF114488;
             else if (health_pct <= 67) boss_color = 0xFF1E6AD6;
@@ -4282,6 +4628,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
             if (health_pct <= 33) boss_color = 0xFF6A2AA9;
             else if (health_pct <= 67) boss_color = 0xFF9A4DDA;
+        } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
+            if (health_pct <= 33) boss_color = 0xFFCC5C00;
+            else if (health_pct <= 67) boss_color = 0xFFE67700;
         } else {
             if (health_pct <= 33) boss_color = 0xFFFF0000;
             else if (health_pct <= 67) boss_color = 0xFFFFFF00;
@@ -4297,7 +4646,23 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
 
         const sprite1r_t *BS = active_boss_sprite(g);
-        draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
+        int hide_for_chariot_explosion = (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active &&
+                                          g->boss_attack_type == CHARIOT_CHARGE_ATTACK && g->boss_special_timer > 0);
+        if (!hide_for_chariot_explosion) {
+            draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
+        }
+
+        if (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active && g->boss_attack_type == CHARIOT_CHARGE_ATTACK) {
+            if (g->boss_special_timer > 0) {
+                int cx = g->boss_x + BS->w / 2;
+                int cy = g->boss_y + BS->h / 2;
+                int age = CHARIOT_CHARGE_EXPLOSION_FRAMES - g->boss_special_timer;
+                int r = 8 + age / 2;
+                if (r > CHARIOT_CHARGE_EXPLOSION_RADIUS) r = CHARIOT_CHARGE_EXPLOSION_RADIUS;
+                draw_filled_circle_clipped_y(lfb, cx, cy, r, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+                draw_filled_circle_clipped_y(lfb, cx, cy, r - 3, 0xFFFFA500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+            }
+        }
 
         if (g->boss_shield_active) {
             uint32_t shield_color = (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFF00FF00;
@@ -4370,6 +4735,15 @@ void game_render(game_t *g, lfb_t *lfb) {
             int x = g->boss_triple_shot[s].x + ((x_dir * i) / 2);
             int y = g->boss_triple_shot[s].y + i;
             l_putpix(lfb, x, y, 0xFF3399FF);
+        }
+    }
+    for (int s = 0; s < CHARIOT_ARC_SHOT_COUNT; s++) {
+        if (!g->boss_arc_shot[s].alive) continue;
+        int x_dir = g->boss_arc_shot_dx[s];
+        for (int i = 0; i < 5; i++) {
+            int x = g->boss_arc_shot[s].x + ((x_dir * i) / 2);
+            int y = g->boss_arc_shot[s].y + i;
+            l_putpix(lfb, x, y, 0xFFFF8C00);
         }
     }
     for (int s = 0; s < YELLOW_BOSS_ALIENS; s++) {

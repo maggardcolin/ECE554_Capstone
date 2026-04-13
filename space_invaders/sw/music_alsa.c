@@ -337,6 +337,51 @@ static const pattern_t PATTERN_BOSS_HERMIT = {
     .gain = 0.22f,
 };
 
+static const pattern_t PATTERN_BOSS_CHARIOT = {
+    .melody = {
+        349.23f, R, R, R, R, R, R, R,
+        349.23f, R, R, R, R, R, R, R,
+
+        349.23f, R, R, R, R, R, R, R,
+        369.99f, R, R, R, R, R, R, R,
+
+        349.23f, R, R, R, R, R, R, R,
+        349.23f, R, R, R, R, R, R, R,
+
+        349.23f, R, R, R, R, R, R, R,
+        369.99f, R, R, R, R, R, R, R,
+    },
+    .bass = {
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R,
+
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R,
+
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R,
+
+        77.78f, 77.78f, R, 77.78f, 92.50f, 92.50f, R, 92.50f,
+        69.30f, 69.30f, R, 69.30f, 77.78f, 77.78f, 92.50f, R
+    },
+    .harm = {
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R,
+
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R,
+
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R,
+
+        174.61f, R, R, R, 261.63f, R, R, R,
+        174.61f, R, R, R, 261.63f, R, R, R
+    },
+    .len = 64,
+    .bpm = 128,
+    .gain = 0.22f,
+};
+
 static const pattern_t PATTERN_SHOP = {
     .melody = {},
     .bass = {164.81f, R, 196.00f, R, 220.00f, R, 196.00f, R,
@@ -409,6 +454,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_BOSS_TOWER;
     case MUSIC_MODE_BOSS_HERMIT:
         return &PATTERN_BOSS_HERMIT;
+    case MUSIC_MODE_BOSS_CHARIOT:
+        return &PATTERN_BOSS_CHARIOT;
     case MUSIC_MODE_SHOP:
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:
