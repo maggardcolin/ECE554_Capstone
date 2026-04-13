@@ -153,6 +153,30 @@ static const char *boss5B_rows[] = {
     "....XXXXXXXX....XXXXXXXX....",
     "........XX..XX..XX..XX......",
 };
+static const char *boss6A_rows[] = {
+    "....XX....XXXXXX....XX......",
+    "..XXXX..XXXXXXXXXX..XXXX....",
+    ".XXXX..XXXX.XX.XXXX..XXXX...",
+    "XXXX..XXXX......XXXX..XXXX..",
+    "XXXXXX..XXXXXXXXXXXX..XXXXXX",
+    "XXXXXXXX..XXXXXXXX..XXXXXXXX",
+    "XXXX..XXXX..XXXX..XXXX..XXXX",
+    "..XXXX..XXXXXXXXXXXX..XXXX..",
+    "....XXXXXXXX....XXXXXXXX....",
+    "......XX..XX..XX..XX........",
+};
+static const char *boss6B_rows[] = {
+    "....XX....XXXXXX....XX......",
+    "..XXXX..XXXXXXXXXX..XXXX....",
+    ".XXXX..XXXX.XX.XXXX..XXXX...",
+    "XXXX..XXXX......XXXX..XXXX..",
+    "XXXXXX..XXXXXXXXXXXX..XXXXXX",
+    "XXXXXXXX..XXXXXXXX..XXXXXXXX",
+    "XXXX..XXXX..XXXX..XXXX..XXXX",
+    "..XXXX..XXXXXXXXXXXX..XXXX..",
+    "....XXXXXXXX....XXXXXXXX....",
+    "........XX..XX..XX..XX......",
+};
 static const char *bunker_rows[] = {
     "....XXXXXXXXXXXX....",
     "...XXXXXXXXXXXXXX...",

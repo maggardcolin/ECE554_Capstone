@@ -10,6 +10,8 @@ static void try_spawn_bullet(game_t *g, bullet_t *shots, int x, int y, int pierc
             shots[i].alive = 1;
             shots[i].x = x;
             shots[i].y = y;
+            shots[i].dy = -4;
+            shots[i].reflected = 0;
             shots[i].last_hit_r = -1;
             shots[i].last_hit_c = -1;
             shots[i].pierce_active = pierce_active ? 1 : 0;
@@ -44,6 +46,12 @@ void clear_player_shots(game_t *g) {
         g->pshot[i].pierce_active = 0;
         g->pshot_left[i].pierce_active = 0;
         g->pshot_right[i].pierce_active = 0;
+        g->pshot[i].reflected = 0;
+        g->pshot_left[i].reflected = 0;
+        g->pshot_right[i].reflected = 0;
+        g->pshot[i].dy = 0;
+        g->pshot_left[i].dy = 0;
+        g->pshot_right[i].dy = 0;
         g->pshot[i].damage_remaining = 0;
         g->pshot_left[i].damage_remaining = 0;
         g->pshot_right[i].damage_remaining = 0;
@@ -53,18 +61,23 @@ void clear_player_shots(game_t *g) {
 void update_player_shots(game_t *g) {
     for (int i = 0; i < MAX_PSHOTS; i++) {
         if (g->pshot[i].alive) {
-            g->pshot[i].y -= 4;
-            if (g->pshot[i].y < 0) g->pshot[i].alive = 0;
+            int dy = (g->pshot[i].dy != 0) ? g->pshot[i].dy : -4;
+            g->pshot[i].y += dy;
+            if (g->pshot[i].y < 0 || g->pshot[i].y >= LH) g->pshot[i].alive = 0;
         }
         if (g->pshot_left[i].alive) {
-            g->pshot_left[i].x -= 1;
-            g->pshot_left[i].y -= 4;
-            if (g->pshot_left[i].y < 0 || g->pshot_left[i].x < 0) g->pshot_left[i].alive = 0;
+            int dx = g->pshot_left[i].reflected ? 0 : -1;
+            int dy = (g->pshot_left[i].dy != 0) ? g->pshot_left[i].dy : -4;
+            g->pshot_left[i].x += dx;
+            g->pshot_left[i].y += dy;
+            if (g->pshot_left[i].y < 0 || g->pshot_left[i].y >= LH || g->pshot_left[i].x < 0 || g->pshot_left[i].x >= LW) g->pshot_left[i].alive = 0;
         }
         if (g->pshot_right[i].alive) {
-            g->pshot_right[i].x += 1;
-            g->pshot_right[i].y -= 4;
-            if (g->pshot_right[i].y < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
+            int dx = g->pshot_right[i].reflected ? 0 : 1;
+            int dy = (g->pshot_right[i].dy != 0) ? g->pshot_right[i].dy : -4;
+            g->pshot_right[i].x += dx;
+            g->pshot_right[i].y += dy;
+            if (g->pshot_right[i].y < 0 || g->pshot_right[i].y >= LH || g->pshot_right[i].x < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
         }
     }
 }
@@ -176,6 +189,10 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
 void render_player_shots(const game_t *g, lfb_t *lfb) {
     for (int s = 0; s < MAX_PSHOTS; s++) {
         if (g->pshot[s].alive) {
+            if (g->pshot[s].reflected) {
+                for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y + i, 0xFF00E5FF);
+                continue;
+            }
             uint32_t bullet_color = rapid_fire_active(g) ? 0xFFFFA500 : 0xFFFFFFFF;
             if (g->pshot[s].pierce_active) {
                 for (int i = 0; i < 5; i++) {
@@ -189,9 +206,17 @@ void render_player_shots(const game_t *g, lfb_t *lfb) {
             }
         }
         if (g->pshot_left[s].alive) {
+            if (g->pshot_left[s].reflected) {
+                for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x, g->pshot_left[s].y + i, 0xFF00E5FF);
+                continue;
+            }
             for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - i / 2, g->pshot_left[s].y - i, 0xFF0000FF);
         }
         if (g->pshot_right[s].alive) {
+            if (g->pshot_right[s].reflected) {
+                for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x, g->pshot_right[s].y + i, 0xFF00E5FF);
+                continue;
+            }
             for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + i / 2, g->pshot_right[s].y - i, 0xFF0000FF);
         }
     }

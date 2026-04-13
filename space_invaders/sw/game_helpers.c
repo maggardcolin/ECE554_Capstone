@@ -201,6 +201,9 @@ const sprite1r_t *boss_sprite_for_frame(const game_t *g, int frame) {
     if (g->boss_type == BOSS_TYPE_CHARIOT) {
         return frame ? &g->BOSS5_B : &g->BOSS5_A;
     }
+    if (g->boss_type == BOSS_TYPE_MAGICIAN) {
+        return frame ? &g->BOSS6_B : &g->BOSS6_A;
+    }
     return frame ? &g->BOSS_B : &g->BOSS_A;
 }
 

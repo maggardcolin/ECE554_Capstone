@@ -57,6 +57,7 @@ int sw_sim_main(void) {
                 else if (game.boss_type == BOSS_TYPE_TOWER) mode = MUSIC_MODE_BOSS_TOWER;
                 else if (game.boss_type == BOSS_TYPE_HERMIT) mode = MUSIC_MODE_BOSS_HERMIT;
                 else if (game.boss_type == BOSS_TYPE_CHARIOT) mode = MUSIC_MODE_BOSS_CHARIOT;
+                else if (game.boss_type == BOSS_TYPE_MAGICIAN) mode = MUSIC_MODE_BOSS_MAGICIAN;
                 else mode = MUSIC_MODE_BOSS;
             }
             music_set_mode(mode);

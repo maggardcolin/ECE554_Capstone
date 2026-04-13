@@ -382,6 +382,51 @@ static const pattern_t PATTERN_BOSS_CHARIOT = {
     .gain = 0.22f,
 };
 
+static const pattern_t PATTERN_BOSS_MAGICIAN = {
+    .melody = {
+        369.99f, R, R, R, R, R, 415.30f, R,
+        R, R, 369.99f, R, R, R, R, R,
+
+        311.13f, R, R, R, R, R, 369.99f, R,
+        R, R, 415.30f, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R
+    },
+    .bass = {
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R,
+
+        87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,
+        77.78f, 77.78f, R, 77.78f, 87.31f, 87.31f, 92.50f, R
+    },
+    .harm = {
+        184.99f, R, R, R, 233.08f, R, R, R,
+        207.65f, R, R, R, 184.99f, R, R, R,
+
+        155.56f, R, R, R, 184.99f, R, R, R,
+        207.65f, R, R, R, 184.99f, R, R, R,
+
+        174.61f, R, R, R, 233.08f, R, R, R,
+        261.63f, R, R, R, 233.08f, R, R, R,
+
+        155.56f, R, R, R, 207.65f, R, R, R,
+        184.99f, R, R, R, 155.56f, R, R, R
+    },
+    .len = 64,
+    .bpm = 128,
+    .gain = 0.22f,
+};
+
 static const pattern_t PATTERN_SHOP = {
     .melody = {},
     .bass = {164.81f, R, 196.00f, R, 220.00f, R, 196.00f, R,
@@ -456,6 +501,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_BOSS_HERMIT;
     case MUSIC_MODE_BOSS_CHARIOT:
         return &PATTERN_BOSS_CHARIOT;
+    case MUSIC_MODE_BOSS_MAGICIAN:
+        return &PATTERN_BOSS_MAGICIAN;
     case MUSIC_MODE_SHOP:
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:
@@ -569,7 +616,8 @@ static void *audio_thread(void *arg) {
             float s1 = square(&phase1, f1, DUTY_MELODY);
             float s2 = square(&phase2, f2, DUTY_BASS);
             float s3 = square(&phase3, f3, DUTY_HARM);
-            float music_mix = (0.10f * s1) + (0.20f * s2) + (0.10f * s3);
+            float bass_mix_scale = (sequencer_mode == MUSIC_MODE_BOSS_MAGICIAN) ? 0.55f : 1.0f;
+            float music_mix = (0.10f * s1) + (0.20f * bass_mix_scale * s2) + (0.10f * s3);
             float ding_mix = 0.0f;
             float boom_mix = 0.0f;
             float boom_long_mix = 0.0f;

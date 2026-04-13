@@ -34,6 +34,10 @@ void boss_trigger_death(game_t *g, int points_awarded) {
     g->tower_wall_timer = 0;
     g->tower_wall_left = 0;
     g->tower_wall_right = 0;
+    g->magician_mirror.active = 0;
+    g->magician_mirror.timer = 0;
+    g->magician_mirror_alt.active = 0;
+    g->magician_mirror_alt.timer = 0;
     g->boss_shield_active = 0;
     g->ashot.alive = 0;
     music_play_boom_long();

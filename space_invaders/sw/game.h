@@ -31,12 +31,15 @@ typedef enum {
     BOSS_TYPE_TOWER = 3,
     BOSS_TYPE_HERMIT = 4,
     BOSS_TYPE_CHARIOT = 5,
-    BOSS_TYPE_COUNT = 6
+    BOSS_TYPE_MAGICIAN = 6,
+    BOSS_TYPE_COUNT = 7
 } boss_type_t;
 
 typedef struct {
     int x, y;
+    int dy;
     int alive;
+    int reflected;
     int damage_remaining;
     int pierce_active;
     int last_hit_r;
@@ -68,6 +71,26 @@ typedef struct {
     float vy;
 } hermit_lightning_t;
 
+typedef struct {
+    int active;
+    int follow_boss;
+    int alien_r;
+    int alien_c;
+    int x;
+    int y;
+    int width;
+    int timer;
+} magician_mirror_t;
+
+typedef struct {
+    int active;
+    int x;
+    int y;
+    int vx;
+    int vy;
+    int dir;
+} magician_wave_t;
+
 #define MAX_PSHOTS 8
 #define MAX_TOWER_ASTEROIDS 24
 #define PLAYER_LIVES 5
@@ -97,7 +120,7 @@ typedef struct {
     int credits_screen_active;
     int credits_scroll_y;
     int practice_menu_active;
-    int practice_menu_selection; // 0..3 boss entries, 4 exit
+    int practice_menu_selection; // 0..BOSS_TYPE_COUNT-1 boss entries, BOSS_TYPE_COUNT exit
     int practice_level_selection;
     int practice_preview_timer;
     int practice_run_active;
@@ -127,7 +150,7 @@ typedef struct {
     int powerup_slot_timer[5];       // Duration of each powerup slot (600 ticks = 10 seconds)
     int powerup_type_slot[5];        // Type of powerup in each slot
 
-    sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B, BOSS2_A, BOSS2_B, BOSS3_A, BOSS3_B, BOSS4_A, BOSS4_B, BOSS5_A, BOSS5_B;
+    sprite1r_t PLAYER, ALIEN_A, ALIEN_B, BOSS_A, BOSS_B, BOSS2_A, BOSS2_B, BOSS3_A, BOSS3_B, BOSS4_A, BOSS4_B, BOSS5_A, BOSS5_B, BOSS6_A, BOSS6_B;
     sprite1r_t BOSS_SHIELD;
     sprite1r_t SHOP_LIFE, SHOP_FIRE, SHOP_MOVE, SHOP_DMG, SHOP_PIERCE;
     sprite1r_t BUNKER0, BUNKER1, BUNKER2, BUNKER3;
@@ -152,7 +175,7 @@ typedef struct {
 
     // Boss alien state
     int boss_alive;
-    int boss_type; // 0 = classic, 1 = blue, 2 = yellow swarm, 3 = tower, 4 = hermit
+    int boss_type; // 0 = classic, 1 = blue, 2 = yellow swarm, 3 = tower, 4 = hermit, 5 = chariot, 6 = magician
     int boss_health; // 0-20 HP
     int boss_max_health; // Max HP for current level
     int boss_x, boss_y;
@@ -170,7 +193,7 @@ typedef struct {
     int boss_power_active;     // 1 when special attack is happening
     int boss_power_cooldown;   // Duration of purple/frozen state (30 ticks = 0.5 seconds)
     int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
-    int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle, 4 = tower walls, 5 = hermit dodge, 6 = chariot charge
+    int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle, 4 = tower walls, 5 = hermit dodge, 6 = chariot charge, 7 = magician mirrors
     int next_boss_attack_type; // The attack type that will be used for the next charge
     int boss_green_laser_last_hit_y; // Last y position where green laser hit aliens
     int boss_special_x;
@@ -188,6 +211,9 @@ typedef struct {
     int tower_wall_left;
     int tower_wall_right;
     hermit_lightning_t hermit_lightning[HERMIT_MAX_LIGHTNINGS];
+    magician_mirror_t magician_mirror;
+    magician_mirror_t magician_mirror_alt;
+    magician_wave_t magician_wave;
 
     uint8_t yellow_boss_marked[AROWS][ACOLS]; // 1 for aliens that belong to the yellow boss swarm
     bullet_t yellow_beam_shot[5];             // Yellow boss synchronized beam shots
