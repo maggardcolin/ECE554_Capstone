@@ -229,6 +229,7 @@ typedef struct {
     int shop_next_level;       // Level to start after exiting shop
     int shop_anim_timer;
     int shopkeeper_frame;
+    int player_exit_fly_active;
     int exit_available;        // 1 when boss is killed and exit is open
     int exit_was_available;
     int exit_blink_timer;

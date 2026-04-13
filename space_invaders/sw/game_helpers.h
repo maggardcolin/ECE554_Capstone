@@ -9,8 +9,6 @@ void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_
 int text_width_5x5(const char *text, int scale);
 uint32_t color_with_intensity(uint32_t color, int intensity_pct);
 void render_fps_counter(lfb_t *lfb);
-
-int exit_sign_visible(const game_t *g);
 void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type);
 void draw_points_upgrade_icon(lfb_t *lfb, int x0, int y0);
 int is_powerup_active(const game_t *g, powerup_type_t type);

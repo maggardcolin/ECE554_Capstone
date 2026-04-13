@@ -11,6 +11,7 @@
 
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
+#define PLAYER_EXIT_ASCEND_SPEED 2
 #define PLAYER_DEATH_DELAY_FRAMES 60
 #define PLAYER_IFRAMES 60
 #define PLAYER_SHIELD_RADIUS 8
@@ -1325,7 +1326,7 @@ static void reset_win_state(game_t *g) {
 
 static int player_invulnerable(const game_t *g) {
     if (g->player_dying) return 0;
-    return (g->player_iframe_timer > 0) || shield_power_active(g);
+    return g->player_exit_fly_active || (g->player_iframe_timer > 0) || shield_power_active(g);
 }
 
 static int player_visible_with_iframes(const game_t *g) {
@@ -1933,8 +1934,9 @@ static void enter_shop(game_t *g) {
     clear_boss_projectiles(g);
     g->fire_cooldown = 0;
 
-    // Position player on left side, keep y position constant
+    // Position player on left side at the normal gameplay baseline.
     g->player_x = 10;
+    g->player_y = LH - 30;
 
     g->shop_anim_timer = 0;
     g->shopkeeper_frame = 0;
@@ -2057,7 +2059,7 @@ static void shop_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, g->shop_items[i].x - price_w / 2, y0 + item_h + 2, price_text, 1, 0xFFFFFFFF);
     }
 
-    // Exit sign
+    // Exit sign in shop.
     int exit_y = g->player_y - 10;
     render_exit_indicator(lfb, exit_y);
 
@@ -2175,6 +2177,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
 
     g->player_x = 5;  // Spawn on left side
     g->player_y = LH - 30;
+    g->player_exit_fly_active = 0;
     g->exit_available = 0;
     g->exit_was_available = 0;
     g->exit_blink_timer = 0;
@@ -2382,6 +2385,7 @@ void game_reset(game_t *g) {
     g->player_dying = 0;
     g->player_death_timer = 0;
     g->player_iframe_timer = 0;
+    g->player_exit_fly_active = 0;
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
     g->main_menu_selection = 0;
@@ -2622,7 +2626,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         return;
     }
 
-    if (!g->player_dying && !g->game_over && tower_walls_closed(g)) {
+    if (!g->player_dying && !g->player_exit_fly_active && !g->game_over && tower_walls_closed(g)) {
         g->lives = 0;
         trigger_player_death(g);
         return;
@@ -2698,7 +2702,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
             if (g->alien_cleanup_timer <= 0) {
                 trigger_random_alien_cleanup_explosion(g);
-                g->alien_cleanup_timer = 4 + (rand() % 7);
+                g->alien_cleanup_timer = 2 + (rand() % 4);
             }
         }
     }
@@ -2711,11 +2715,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    // Decrement score every 0.33 seconds (20 ticks at 60 FPS)
+    // Decrement score every 0.33 seconds (20 ticks at 60 FPS) while aliens remain.
     static int score_decrement_timer = 0;
     score_decrement_timer++;
     if (score_decrement_timer >= 20) {
-        if (g->score > 0) g->score--;
+        if (g->score > 0 && aliens_remaining(g)) g->score--;
         score_decrement_timer = 0;
     }
 
@@ -2790,6 +2794,26 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
+    if (g->exit_available && !g->player_exit_fly_active) {
+        g->player_exit_fly_active = 1;
+        clear_player_shots(g);
+        clear_boss_projectiles(g);
+        g->ashot.alive = 0;
+    }
+
+    if (g->player_exit_fly_active) {
+        g->player_y -= PLAYER_EXIT_ASCEND_SPEED;
+        if (g->player_y <= TOP_HUD_SEPARATOR_Y + 1) {
+            g->player_y = TOP_HUD_SEPARATOR_Y + 1;
+            g->player_exit_fly_active = 0;
+            g->level_complete = 1;
+            g->level_complete_timer = 1;
+            g->level_just_completed = g->level;
+            g->exit_available = 0;
+        }
+        return;
+    }
+
     update_player_movement(g, buttons);
     update_player_firing(g, buttons);
 
@@ -2848,9 +2872,16 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
             }
         }
+    } else if (g->level == 0 && !g->boss_dying) {
+        // Tutorial alien animates in place but never moves.
+        g->alien_timer++;
+        if (g->alien_timer >= g->alien_period) {
+            g->alien_timer = 0;
+            g->alien_frame ^= 1;
+        }
     }
 
-    // No alien shooting on level 0 (tutorial) or after the boss has been defeated.
+    // No alien shooting on tutorial level; regular levels shoot only while boss is alive.
     if (g->level != 0 && g->boss_alive && !g->boss_dying) {
         static int col_cursor = 0;
         col_cursor = (col_cursor + 1) % ACOLS;
@@ -3083,7 +3114,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
 
         // Game over if boss reaches player's y position
-        if (g->boss_y + boss_h >= g->player_y) {
+        if (!g->player_exit_fly_active && g->boss_y + boss_h >= g->player_y) {
             g->game_over = 1;
             g->game_over_score = g->score;
             g->game_over_delay_timer = 90;
@@ -3631,13 +3662,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         return;
     }
 
-    // Check if player reached right side to exit level (when exit is available)
-    if (g->exit_available && g->player_x >= LW - g->PLAYER.w) {
-        g->level_complete = 1;
-        g->level_complete_timer = 0;
-        g->level_just_completed = g->level;
-        g->exit_available = 0;
-    }
     if (!g->game_over) {
         const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
         int spacing_x = 6, spacing_y = 5;
@@ -3645,7 +3669,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             for (int c = 0; c < ACOLS && !g->game_over; c++) {
                 if (!g->alien_alive[r][c]) continue;
                 int ay = g->alien_origin_y + r * (AS->h + spacing_y);
-                if (ay >= g->player_y) {
+                if (!g->player_exit_fly_active && ay >= g->player_y) {
                     g->game_over = 1;
                     g->game_over_score = g->score;
                     g->game_over_delay_timer = 90;
@@ -4018,31 +4042,6 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
     }
     
-    // Level 0 tutorial text
-    if (g->level == 0) {
-        const char *tutorial1 = "USE A/D OR LEFT/RIGHT TO MOVE";
-        const char *tutorial2 = "AND PRESS SPACE TO SHOOT";
-        const char *tutorial3 = "DESTROY THE BOSS ON EACH LEVEL TO EXIT";
-        const char *tutorial4 = "THEN PROCEED TO THE EXIT ON THE RIGHT";
-        int scale = 1;
-        int w1 = text_width_5x5(tutorial1, scale);
-        int w2 = text_width_5x5(tutorial2, scale);
-        int w3 = text_width_5x5(tutorial3, scale);
-        int w4 = text_width_5x5(tutorial4, scale);
-        int x1 = (LW - w1) / 2;
-        int x2 = (LW - w2) / 2;
-        int x3 = (LW - w3) / 2;
-        int x4 = (LW - w4) / 2;
-        int y1 = 20;
-        int y2 = y1 + 10;
-        int y3 = y2 + 10;
-        int y4 = y3 + 10;
-        l_draw_text(lfb, x1, y1, tutorial1, scale, 0xFFFFFFFF);
-        l_draw_text(lfb, x2, y2, tutorial2, scale, 0xFFFFFFFF);
-        l_draw_text(lfb, x3, y3, tutorial3, scale, 0xFFFFFFFF);
-        l_draw_text(lfb, x4, y4, tutorial4, scale, 0xFFFFFFFF);
-    }
-    
     render_score_display(g, lfb);
 
     // Boss health bar on the left side of screen
@@ -4377,12 +4376,6 @@ void game_render(game_t *g, lfb_t *lfb) {
         if (!l->active) continue;
         uint32_t bolt_color = (l->flash_timer > 0) ? 0xFFFFFF00 : 0xFF8000FF;
         draw_zigzag_segment(lfb, (int)l->start_x, (int)l->start_y, (int)l->tip_x, (int)l->tip_y, 3, 7, bolt_color);
-    }
-
-    // Exit sign when boss is killed
-    if (exit_sign_visible(g)) {
-        int exit_y = g->player_y - 10;
-        render_exit_indicator(lfb, exit_y);
     }
 
     render_tower_walls(lfb, g);

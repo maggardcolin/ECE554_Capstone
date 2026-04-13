@@ -96,12 +96,6 @@ void render_fps_counter(lfb_t *lfb) {
     l_draw_text(lfb, x, y, fps_text, 1, 0xFFFFFFFF);
 }
 
-int exit_sign_visible(const game_t *g) {
-    if (!g->exit_available) return 0;
-    if (g->exit_blink_toggles_remaining <= 0) return 1;
-    return (g->exit_blink_toggles_remaining % 2) == 0;
-}
-
 void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
     if (type == POWERUP_DOUBLE_SHOT) {
         int r = 6;
