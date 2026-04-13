@@ -3293,6 +3293,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (g->boss_dying) {
         clear_boss_projectiles(g);
+        boss_apply_explosion_to_aliens(g);
         if (g->boss_death_timer > 0) {
             g->boss_death_timer--;
         }

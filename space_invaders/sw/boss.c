@@ -4,6 +4,7 @@
 #include "music_alsa.h"
 
 #define BOSS_DEATH_DELAY_FRAMES 60
+#define ALIEN_EXPLOSION_FRAMES 18
 
 void boss_trigger_death(game_t *g, int points_awarded) {
     if (g->boss_dying || !g->boss_alive) return;
@@ -60,6 +61,11 @@ void boss_apply_explosion_to_aliens(game_t *g) {
             int ay = g->alien_origin_y + r * (AS->h + spacing_y);
             if (circle_intersects_rect(cx, cy, radius, ax, ay, AS->w, AS->h)) {
                 g->alien_alive[r][c] = 0;
+                if (g->alien_explode_timer[r][c] <= 0) {
+                    g->alien_explode_timer[r][c] = ALIEN_EXPLOSION_FRAMES;
+                    g->alien_explode_points[r][c] = 0;
+                    g->alien_explode_hit_boss[r][c] = 0;
+                }
             }
         }
     }
