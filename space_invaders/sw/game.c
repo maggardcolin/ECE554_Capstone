@@ -1844,7 +1844,8 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
                 } else if (chariot_descending) {
                     g->chariot_charge_damage += 1;
-                    if (g->chariot_charge_damage >= 3) {
+                    int required_hits = explosive_shot_active(g) ? 1 : 3;
+                    if (g->chariot_charge_damage >= required_hits) {
                         // Interrupt charge: explode where hit, then reset to top.
                         g->boss_special_x = g->boss_x;
                         g->boss_special_y = g->boss_y;
@@ -1856,6 +1857,14 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                             g->boss_y + BS->h / 2,
                             CHARIOT_CHARGE_EXPLOSION_RADIUS
                         );
+
+                        int self_damage = g->boss_max_health / 10;
+                        if (self_damage < 1) self_damage = 1;
+                        g->boss_health -= self_damage;
+                        if (g->boss_health <= 0) {
+                            g->boss_health = 0;
+                            boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
+                        }
                     }
                 }
                 shots[si].alive = 0;
