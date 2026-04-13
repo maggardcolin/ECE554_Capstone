@@ -381,7 +381,7 @@ static void hermit_move_point_toward(float *x, float *y, float tx, float ty, flo
     *y += dy * s;
 }
 
-static void hermit_spawn_lightning(game_t *g) {
+static void spawn_hermit_lightning_from(game_t *g, float start_x, float start_y) {
     int slot = -1;
     for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
         if (!g->hermit_lightning[i].active) {
@@ -392,14 +392,13 @@ static void hermit_spawn_lightning(game_t *g) {
     if (slot < 0) return;
 
     hermit_lightning_t *l = &g->hermit_lightning[slot];
-    const sprite1r_t *BS = active_boss_sprite(g);
     l->active = 1;
     l->flash_timer = 0;
     l->yellow_hit_applied = 0;
-    l->start_x = (float)(g->boss_x + BS->w / 2);
-    l->start_y = (float)(g->boss_y + BS->h + 1);
-    l->tip_x = l->start_x;
-    l->tip_y = l->start_y;
+    l->start_x = start_x;
+    l->start_y = start_y;
+    l->tip_x = start_x;
+    l->tip_y = start_y;
 
     float tx = (float)(g->player_x + g->PLAYER.w / 2);
     float ty = (float)LH;
@@ -412,7 +411,13 @@ static void hermit_spawn_lightning(game_t *g) {
     float scale = HERMIT_LIGHTNING_SPEED / denom;
     l->vx = dx * scale;
     l->vy = dy * scale;
+}
 
+static void hermit_spawn_lightning(game_t *g) {
+    const sprite1r_t *BS = active_boss_sprite(g);
+    spawn_hermit_lightning_from(g,
+                                (float)(g->boss_x + BS->w / 2),
+                                (float)(g->boss_y + BS->h + 1));
 }
 
 static void start_tower_asteroid_explosion(game_t *g, int ai) {
@@ -1378,6 +1383,33 @@ static int count_aliens_remaining(const game_t *g) {
     return remaining;
 }
 
+static void hermit_regenerate_aliens(game_t *g) {
+    int total_aliens = AROWS * ACOLS;
+    int alive = count_aliens_remaining(g);
+    int missing = total_aliens - alive;
+    if (missing <= 0) return;
+
+    int regen_count = 1;
+    if (g->level >= 3) regen_count = 2;
+    if (regen_count > missing) regen_count = missing;
+    if (regen_count <= 0) return;
+
+    int spawned = 0;
+    for (int r = 0; r < AROWS && spawned < regen_count; r++) {
+        for (int c = 0; c < ACOLS && spawned < regen_count; c++) {
+            if (g->alien_alive[r][c]) continue;
+            g->alien_alive[r][c] = 1;
+            g->alien_hermit_regen[r][c] = 1;
+            g->alien_health[r][c] = 1;
+            g->yellow_boss_marked[r][c] = 0;
+            g->alien_explode_timer[r][c] = 0;
+            g->alien_explode_points[r][c] = 0;
+            g->alien_explode_hit_boss[r][c] = 0;
+            spawned++;
+        }
+    }
+}
+
 static int award_alien_kill_points(game_t *g, int killed_yellow_boss_alien) {
     int remaining = count_aliens_remaining(g);
     int base_points;
@@ -1397,6 +1429,7 @@ static void kill_alien_with_explosion(game_t *g, int r, int c) {
     if (!g->alien_alive[r][c]) return;
     int killed_yellow_boss_alien = g->yellow_boss_marked[r][c];
     g->alien_alive[r][c] = 0;
+    g->alien_hermit_regen[r][c] = 0;
     g->yellow_boss_marked[r][c] = 0;
     g->alien_health[r][c] = 0;
     g->alien_explode_timer[r][c] = ALIEN_EXPLOSION_FRAMES;
@@ -1407,6 +1440,7 @@ static void kill_alien_with_explosion(game_t *g, int r, int c) {
 static void kill_alien_cleanup_with_explosion(game_t *g, int r, int c) {
     if (!g->alien_alive[r][c]) return;
     g->alien_alive[r][c] = 0;
+    g->alien_hermit_regen[r][c] = 0;
     g->yellow_boss_marked[r][c] = 0;
     g->alien_health[r][c] = 0;
     g->alien_explode_timer[r][c] = ALIEN_EXPLOSION_FRAMES;
@@ -2047,6 +2081,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
         g->ashot.alive = 0;
         clear_player_shots(g);
         memset(g->alien_alive, 0, sizeof(g->alien_alive));
+        memset(g->alien_hermit_regen, 0, sizeof(g->alien_hermit_regen));
         memset(g->alien_health, 0, sizeof(g->alien_health));
         memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
         memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
@@ -2061,6 +2096,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     // Level 0: tutorial level - only one alien in center
     if (level == 0) {
         memset(g->alien_alive, 0, sizeof(g->alien_alive));
+        memset(g->alien_hermit_regen, 0, sizeof(g->alien_hermit_regen));
         memset(g->alien_health, 0, sizeof(g->alien_health));
         memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
         memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
@@ -2070,6 +2106,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
         g->alien_health[4][5] = 1;
     } else {
         memset(g->alien_alive, 1, sizeof(g->alien_alive));
+        memset(g->alien_hermit_regen, 0, sizeof(g->alien_hermit_regen));
         memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
         memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
         memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
@@ -2673,23 +2710,28 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     // No alien shooting on level 0 (tutorial) or after the boss has been defeated.
     if (g->level != 0 && g->boss_alive && !g->boss_dying) {
-        if (!g->ashot.alive) {
-            static int col_cursor = 0;
-            col_cursor = (col_cursor + 1) % ACOLS;
-            int c = col_cursor;
-            int r_fire = -1;
-            for (int r = AROWS - 1; r >= 0; r--) if (g->alien_alive[r][c]) { r_fire = r; break; }
+        static int col_cursor = 0;
+        col_cursor = (col_cursor + 1) % ACOLS;
+        int c = col_cursor;
+        int r_fire = -1;
+        for (int r = AROWS - 1; r >= 0; r--) if (g->alien_alive[r][c]) { r_fire = r; break; }
 
-            if (r_fire >= 0 && (vsync_counter % 30u) == 0u) {
-                const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
-                int spacing_x = 6, spacing_y = 5;
-                int ax = g->alien_origin_x + c * (AS->w + spacing_x);
-                int ay = g->alien_origin_y + r_fire * (AS->h + spacing_y);
+        if (r_fire >= 0 && (vsync_counter % 30u) == 0u) {
+            const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+            int spacing_x = 6, spacing_y = 5;
+            int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+            int ay = g->alien_origin_y + r_fire * (AS->h + spacing_y);
+
+            if (g->boss_type == BOSS_TYPE_HERMIT && g->alien_hermit_regen[r_fire][c]) {
+                spawn_hermit_lightning_from(g, (float)(ax + AS->w / 2), (float)(ay + AS->h + 1));
+            } else if (!g->ashot.alive) {
                 g->ashot.alive = 1;
                 g->ashot.x = ax + AS->w / 2;
                 g->ashot.y = ay + AS->h + 1;
             }
-        } else {
+        }
+
+        if (g->ashot.alive) {
             g->ashot.y += 3;
             if (g->ashot.y > LH) g->ashot.alive = 0;
         }
@@ -2824,6 +2866,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_bomb.exploding = 0;
                 g->boss_bomb.explode_timer = 0;
                 g->boss_bomb.hit_player = 0;
+                hermit_regenerate_aliens(g);
                 int left_bound = movement_left_bound(g);
                 int right_bound = movement_right_bound(g);
                 int reflected_x = right_bound - boss_w - (g->boss_x - left_bound);
@@ -4036,6 +4079,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             uint32_t alien_color;
             if (g->yellow_boss_marked[r][c]) {
                 alien_color = 0xFFFFFF00;
+            } else if (g->alien_hermit_regen[r][c]) {
+                alien_color = 0xFFB266FF;
             } else {
                 alien_color = (g->alien_health[r][c] >= 3) ? 0xFFFF0000 : (g->alien_health[r][c] == 2) ? 0xFF00FF00 : 0xFFFFFFFF;
             }

@@ -253,13 +253,13 @@ static const pattern_t PATTERN_BOSS_TOWER = {
         349.23f, R, R, R, R, R, R, R,
 
         349.23f, R, R, R, R, R, R, R,
+        369.99f, R, R, R, R, R, R, R,
+
+        349.23f, R, R, R, R, R, R, R,
         349.23f, R, R, R, R, R, R, R,
 
-        R, R, R, R, R, R, R, R,
-        R, R, R, R, R, R, R, R,
-
-        R, R, R, R, R, R, R, R,
-        R, R, R, R, R, R, R, R
+        349.23f, R, R, R, R, R, R, R,
+        369.99f, R, R, R, R, R, R, R,
     },
     .bass = {
         87.31f, 87.31f, R, 87.31f, 92.50f, 92.50f, R, 92.50f,

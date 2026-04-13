@@ -133,6 +133,7 @@ typedef struct {
     int player_x, player_y;
 
     uint8_t alien_alive[AROWS][ACOLS];
+    uint8_t alien_hermit_regen[AROWS][ACOLS];
     int alien_health[AROWS][ACOLS];  // Hit points per alien (1 = one hit, 2 = two hits, etc.)
     int alien_explode_timer[AROWS][ACOLS];
     int alien_explode_points[AROWS][ACOLS];

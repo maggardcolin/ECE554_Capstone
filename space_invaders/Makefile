@@ -21,7 +21,12 @@ GCCFLAGS := -O3 $(AUDIODEFS) $(SDLFLAGS) $(RTLIBRARY) $(AUDIOLIBS)
 all: run
 
 run: hardware software
-	./hw_sim & sleep 0.5 && ./sw_game
+	-pkill -9 hw_sim
+	-pkill -9 sw_game
+	./hw_sim & HW_PID=$$!; \
+	trap 'kill -9 $$HW_PID 2>/dev/null || true' EXIT INT TERM; \
+	sleep 0.5; \
+	./sw_game
 
 hardware:
 	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
