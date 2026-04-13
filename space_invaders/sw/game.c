@@ -2516,7 +2516,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
                 if (right_pressed) {
                     g->practice_level_selection++;
-                    if (g->practice_level_selection > PRACTICE_LEVEL_MAX) g->practice_level_selection = PRACTICE_LEVEL_MAX;
+                    if (g->practice_level_selection > PRACTICE_LEVEL_MAX) g->practice_level_selection = PRACTICE_LEVEL_MIN;
                 }
                 if (up_pressed) {
                     g->practice_menu_selection--;
