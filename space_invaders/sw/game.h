@@ -208,6 +208,8 @@ typedef struct {
     int chariot_arc_delay;
     int chariot_charge_damage;
     int chariot_charge_target_x;
+    int chariot_charge_start_x;
+    int chariot_charge_start_y;
     int tower_wall_active;
     int tower_wall_timer;
     int tower_wall_left;

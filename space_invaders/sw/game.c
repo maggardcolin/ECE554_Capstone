@@ -3681,6 +3681,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_bomb.explode_timer = 0;
                 g->boss_bomb.hit_player = 0;
                 g->chariot_arc_active = 0;
+                g->chariot_charge_start_x = g->boss_x;
+                g->chariot_charge_start_y = g->boss_y;
                 g->boss_special_x = g->boss_x;
                 g->boss_special_y = g->boss_y;
                 g->boss_special_timer = 0;
@@ -3735,6 +3737,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         int freeze_boss = 0;
         if (g->boss_power_cooldown > 0) {
             freeze_boss = (g->boss_type != BOSS_TYPE_TOWER);
+            if (g->boss_type == BOSS_TYPE_MAGICIAN && g->boss_attack_type == MAGICIAN_MIRROR_ATTACK) {
+                freeze_boss = 0;
+            }
             g->boss_power_cooldown--;
         }
 
@@ -3802,9 +3807,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
                     g->boss_special_timer--;
                     if (g->boss_special_timer <= 0) {
-                        g->boss_special_y = g->boss_start_y;
-                        g->boss_y = g->boss_start_y;
-                        g->boss_x = g->boss_special_x;
+                        g->boss_special_x = g->chariot_charge_start_x;
+                        g->boss_special_y = g->chariot_charge_start_y;
+                        g->boss_x = g->chariot_charge_start_x;
+                        g->boss_y = g->chariot_charge_start_y;
                         if (g->boss_x < left_bound) g->boss_x = left_bound;
                         if (g->boss_x > right_bound - boss_w) g->boss_x = right_bound - boss_w;
                         g->boss_power_active = 0;
