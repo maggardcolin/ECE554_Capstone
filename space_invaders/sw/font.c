@@ -173,3 +173,29 @@ void l_draw_text(lfb_t *lfb, int x, int y, const char *text, int scale, uint32_t
         x += (w + spacing) * scale;
     }
 }
+
+void l_draw_text_clipped_y(lfb_t *lfb, int x, int y, const char *text, int scale, uint32_t c, int y_min, int y_max) {
+    if (scale < 1) scale = 1;
+    const int w = 5;
+    const int h = 5;
+    const int spacing = 1;
+    for (const char *p = text; *p; p++) {
+        const uint8_t *rows = glyph5_find(*p);
+        for (int gy = 0; gy < h; gy++) {
+            for (int gx = 0; gx < w; gx++) {
+                if (rows[gy] & (1u << (w - 1 - gx))) {
+                    int px = x + gx * scale;
+                    int py = y + gy * scale;
+                    for (int sy = 0; sy < scale; sy++) {
+                        int yy = py + sy;
+                        if (yy < y_min || yy > y_max) continue;
+                        for (int sx = 0; sx < scale; sx++) {
+                            l_putpix(lfb, px + sx, yy, c);
+                        }
+                    }
+                }
+            }
+        }
+        x += (w + spacing) * scale;
+    }
+}

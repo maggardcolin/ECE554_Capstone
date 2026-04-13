@@ -97,28 +97,32 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
     int base_r = 6 + frame * 3;
 
     if (g->boss_type == BOSS_TYPE_BLUE) {
-        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF0B3A8F);
-        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF1E6AD6);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 4, 0xFF0B3A8F, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 1, 0xFF1E6AD6, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         if ((age & 1) == 0) {
-            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFF66CCFF);
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFF66CCFF,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         }
     } else if (g->boss_type == BOSS_TYPE_HERMIT) {
-        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF5A1E9A);
-        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF8A39D6);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 4, 0xFF5A1E9A, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 1, 0xFF8A39D6, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         if ((age & 1) == 0) {
-            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFD9B3FF);
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFD9B3FF,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         }
     } else if (g->boss_type == BOSS_TYPE_TOWER) {
-        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFF4A2E12);
-        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFF8B5A2B);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 4, 0xFF4A2E12, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 1, 0xFF8B5A2B, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         if ((age & 1) == 0) {
-            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFC08A4B);
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFC08A4B,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         }
     } else {
-        draw_filled_circle(lfb, cx, cy, base_r + 4, 0xFFFF4500);
-        draw_filled_circle(lfb, cx, cy, base_r + 1, 0xFFFF8C00);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 4, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 1, 0xFFFF8C00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         if ((age & 1) == 0) {
-            draw_filled_circle(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00);
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 3) ? (base_r - 3) : 1, 0xFFFFFF00,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         }
     }
 
@@ -136,7 +140,7 @@ void boss_render_explosion(const game_t *g, lfb_t *lfb) {
         } else {
             c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
         }
-        l_putpix(lfb, cx + dx, cy + dy, c);
+        putpix_clipped_y(lfb, cx + dx, cy + dy, c, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     }
 
     if (g->boss_death_timer > 0) {

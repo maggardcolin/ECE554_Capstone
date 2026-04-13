@@ -22,6 +22,21 @@ void draw_filled_circle(lfb_t *lfb, int x0, int y0, int r, uint32_t color) {
     }
 }
 
+void draw_filled_circle_clipped_y(lfb_t *lfb, int x0, int y0, int r, uint32_t color, int y_min, int y_max) {
+    for (int y = -r; y <= r; y++) {
+        int yy = y0 + y;
+        if (yy < y_min || yy > y_max) continue;
+        for (int x = -r; x <= r; x++) {
+            if (x * x + y * y <= r * r) l_putpix(lfb, x0 + x, yy, color);
+        }
+    }
+}
+
+void putpix_clipped_y(lfb_t *lfb, int x, int y, uint32_t color, int y_min, int y_max) {
+    if (y < y_min || y > y_max) return;
+    l_putpix(lfb, x, y, color);
+}
+
 void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_color) {
     if (fill_w < 0) fill_w = 0;
     if (fill_w > w) fill_w = w;
@@ -191,7 +206,8 @@ void render_explosion_points(lfb_t *lfb, int cx, int cy, int points) {
     char points_text[16];
     snprintf(points_text, sizeof(points_text), "%d", points);
     int text_w = text_width_5x5(points_text, 1);
-    l_draw_text(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF);
+    l_draw_text_clipped_y(lfb, cx - (text_w / 2), cy - 3, points_text, 1, 0xFFFFFFFF,
+                          GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
 }
 
 int circle_intersects_rect(int cx, int cy, int r, int rx, int ry, int rw, int rh) {

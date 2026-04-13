@@ -50,9 +50,6 @@
 #define CREDITS_SCROLL_SPEED 1
 #define CREDITS_LINE_SPACING 12
 #define CREDITS_ALIEN_GAP 24
-#define TOP_HUD_SEPARATOR_Y 15
-#define BOTTOM_HUD_SEPARATOR_Y (LH - 20)
-
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
 static const sprite1r_t *active_boss_sprite(const game_t *g) {
@@ -707,6 +704,24 @@ static void render_black_hole_explosion(lfb_t *lfb, int cx, int cy, int r) {
     }
 }
 
+static void render_black_hole_explosion_clipped(lfb_t *lfb, int cx, int cy, int r) {
+    draw_filled_circle_clipped_y(lfb, cx, cy, r, 0xFF1A1A28, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    draw_filled_circle_clipped_y(lfb, cx, cy, r - 3, 0xFF06070D, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+
+    int ring_r = r - 1;
+    if (ring_r <= 1) return;
+
+    static const int ring_dx[20] = {16, 15, 13, 10, 5, 0, -5, -10, -13, -15,
+                                    -16, -15, -13, -10, -5, 0, 5, 10, 13, 15};
+    static const int ring_dy[20] = {0, 5, 10, 13, 15, 16, 15, 13, 10, 5,
+                                    0, -5, -10, -13, -15, -16, -15, -13, -10, -5};
+    for (int i = 0; i < 20; i++) {
+        int px = cx + (ring_dx[i] * ring_r) / 16;
+        int py = cy + (ring_dy[i] * ring_r) / 16;
+        putpix_clipped_y(lfb, px, py, 0xFF66CCFF, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    }
+}
+
 static void render_tower_asteroid(lfb_t *lfb, int cx, int cy, int spin) {
     draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS, 0xFF8B5A2B);
     draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS - 2, 0xFF6A4421);
@@ -1249,10 +1264,11 @@ static void render_player_explosion_at(lfb_t *lfb, int cx, int cy, int age) {
     int frame = age / 12;
     int base_r = 3 + frame * 2;
 
-    draw_filled_circle(lfb, cx, cy, base_r + 2, 0xFFFF4500);
-    draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
+    draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 2, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    draw_filled_circle_clipped_y(lfb, cx, cy, base_r, 0xFFFF8C00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     if ((age & 1) == 0) {
-        draw_filled_circle(lfb, cx, cy, (base_r > 2) ? (base_r - 2) : 1, 0xFFFFFF00);
+        draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 2) ? (base_r - 2) : 1, 0xFFFFFF00,
+                                     GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     }
 
     int spark_r = base_r + 3;
@@ -1260,7 +1276,7 @@ static void render_player_explosion_at(lfb_t *lfb, int cx, int cy, int age) {
         int dx = ((i * 7 + age * 3) % (spark_r * 2 + 1)) - spark_r;
         int dy = ((i * 11 + age * 5) % (spark_r * 2 + 1)) - spark_r;
         uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
-        l_putpix(lfb, cx + dx, cy + dy, c);
+        putpix_clipped_y(lfb, cx + dx, cy + dy, c, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     }
 }
 
@@ -1299,14 +1315,24 @@ static void render_exit_indicator(lfb_t *lfb, int exit_y) {
     }
 }
 
-static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int points) {
+static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int points, int clip_to_gameplay) {
     int age = ALIEN_EXPLOSION_FRAMES - timer;
     int base_r = 2 + (age / 3);
 
-    draw_filled_circle(lfb, cx, cy, base_r + 2, 0xFFFF4500);
-    draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
+    if (clip_to_gameplay) {
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 2, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r, 0xFFFF8C00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    } else {
+        draw_filled_circle(lfb, cx, cy, base_r + 2, 0xFFFF4500);
+        draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
+    }
     if ((age & 1) == 0) {
-        draw_filled_circle(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00);
+        if (clip_to_gameplay) {
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        } else {
+            draw_filled_circle(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00);
+        }
     }
 
     if (timer > 0) {
@@ -3849,7 +3875,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int hy[WIN_RING_ALIENS] = { cy - r, cy - r/2, cy + r/2, cy + r, cy + r/2, cy - r/2 };
         for (int i = 0; i < WIN_RING_ALIENS; i++) {
             if (g->win_alien_explode_timer[i] > 0) {
-                render_alien_explosion(lfb, hx[i], hy[i], g->win_alien_explode_timer[i], 0);
+                render_alien_explosion(lfb, hx[i], hy[i], g->win_alien_explode_timer[i], 0, 0);
             } else if (i >= g->win_explosion_index) {
                 draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
             }
@@ -4276,7 +4302,7 @@ void game_render(game_t *g, lfb_t *lfb) {
             if (g->alien_explode_timer[r][c] <= 0) continue;
             int ax = g->alien_origin_x + c * (AS->w + spacing_x) + AS->w / 2;
             int ay = g->alien_origin_y + r * (AS->h + spacing_y) + AS->h / 2;
-            render_alien_explosion(lfb, ax, ay, g->alien_explode_timer[r][c], g->alien_explode_points[r][c]);
+            render_alien_explosion(lfb, ax, ay, g->alien_explode_timer[r][c], g->alien_explode_points[r][c], 1);
         }
     }
 
@@ -4318,12 +4344,15 @@ void game_render(game_t *g, lfb_t *lfb) {
             render_tower_asteroid(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, g->tower_asteroid_spin[ai]);
         } else if (g->tower_asteroid_exploding[ai]) {
             int r = tower_asteroid_explosion_radius(g, ai);
-            draw_filled_circle(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r, 0xFFFF4500);
-            draw_filled_circle(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r - 2, 0xFFFF8C00);
+            draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r, 0xFFFF4500,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+            draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r - 2, 0xFFFF8C00,
+                                         GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             if ((g->tower_asteroid_explode_timer[ai] & 1) == 0) {
                 int core_r = r - 4;
                 if (core_r < 1) core_r = 1;
-                draw_filled_circle(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, core_r, 0xFFFFFF00);
+                draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, core_r, 0xFFFFFF00,
+                                             GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             }
         }
     }
@@ -4358,14 +4387,17 @@ void game_render(game_t *g, lfb_t *lfb) {
         } else {
             int r = boss_bomb_explosion_radius(g);
             if (blue_black_hole_enabled(g)) {
-                render_black_hole_explosion(lfb, g->boss_bomb.x, g->boss_bomb.y, r);
+                render_black_hole_explosion_clipped(lfb, g->boss_bomb.x, g->boss_bomb.y, r);
             } else {
-                draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, r, 0xFF0B3A8F);
-                draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, r - 3, 0xFF1E6AD6);
+                draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, r, 0xFF0B3A8F,
+                                             GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+                draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, r - 3, 0xFF1E6AD6,
+                                             GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
                 if ((g->boss_bomb.explode_timer & 1) == 0) {
                     int core_r = r - 7;
                     if (core_r < 1) core_r = 1;
-                    draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, core_r, 0xFF66CCFF);
+                    draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, core_r, 0xFF66CCFF,
+                                                 GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
                 }
             }
         }
