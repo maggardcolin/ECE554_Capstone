@@ -1583,6 +1583,14 @@ static void apply_player_damage(game_t *g, int damage) {
     }
 }
 
+static void apply_chariot_explosion_player_damage(game_t *g) {
+    int lives_before = g->lives;
+    apply_player_damage(g, 1);
+    if (g->lives < lives_before && g->lives <= 0) {
+        music_play_boom();
+    }
+}
+
 static void trigger_player_death(game_t *g) {
     if (g->player_dying || g->game_over) return;
     g->player_dying = 1;
@@ -1894,6 +1902,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                         g->boss_special_x = g->boss_x;
                         g->boss_special_y = g->boss_y;
                         g->boss_special_timer = CHARIOT_CHARGE_EXPLOSION_FRAMES;
+                        music_play_boom_long();
                         g->boss_special_hit_applied = 1;
                         apply_chariot_charge_explosion_to_aliens(
                             g,
@@ -3397,6 +3406,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->boss_special_y = BOTTOM_HUD_SEPARATOR_Y - 1 - boss_h;
                         g->boss_y = g->boss_special_y;
                         g->boss_special_timer = CHARIOT_CHARGE_EXPLOSION_FRAMES;
+                        music_play_boom_long();
                         apply_chariot_charge_explosion_to_aliens(
                             g,
                             g->boss_x + boss_w / 2,
@@ -3412,7 +3422,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                             int dx = pcx - ecx;
                             int dy = pcy - ecy;
                             if ((dx * dx + dy * dy) <= (CHARIOT_CHARGE_EXPLOSION_RADIUS * CHARIOT_CHARGE_EXPLOSION_RADIUS)) {
-                                apply_player_damage(g, 1);
+                                apply_chariot_explosion_player_damage(g);
                             }
                             g->boss_special_hit_applied = 1;
                         }
@@ -3423,7 +3433,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     if (radius > CHARIOT_CHARGE_EXPLOSION_RADIUS) radius = CHARIOT_CHARGE_EXPLOSION_RADIUS;
                     if (circle_intersects_rect(g->boss_x + boss_w / 2, g->boss_y + boss_h / 2, radius,
                                                g->player_x, g->player_y, g->PLAYER.w, g->PLAYER.h)) {
-                        apply_player_damage(g, 1);
+                        apply_chariot_explosion_player_damage(g);
                     }
 
                     g->boss_special_timer--;
@@ -3511,6 +3521,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->boss_bomb.exploding = 1;
                         g->boss_bomb.explode_timer = BOSS_BOMB_EXPLOSION_FRAMES;
                         g->boss_bomb.dy = 0;
+                        music_play_boom_long();
                     }
                 } else {
                     if (g->boss_bomb.explode_timer > 0) {
