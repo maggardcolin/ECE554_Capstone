@@ -1608,6 +1608,16 @@ static int count_aliens_remaining(const game_t *g) {
     return remaining;
 }
 
+static void hermit_spawn_regen_alien(game_t *g, int r, int c) {
+    g->alien_alive[r][c] = 1;
+    g->alien_hermit_regen[r][c] = 1;
+    g->alien_health[r][c] = 1;
+    g->yellow_boss_marked[r][c] = 0;
+    g->alien_explode_timer[r][c] = 0;
+    g->alien_explode_points[r][c] = 0;
+    g->alien_explode_hit_boss[r][c] = 0;
+}
+
 static void hermit_regenerate_aliens(game_t *g) {
     int total_aliens = AROWS * ACOLS;
     int alive = count_aliens_remaining(g);
@@ -1620,16 +1630,54 @@ static void hermit_regenerate_aliens(game_t *g) {
     if (regen_count <= 0) return;
 
     int spawned = 0;
-    for (int r = 0; r < AROWS && spawned < regen_count; r++) {
-        for (int c = 0; c < ACOLS && spawned < regen_count; c++) {
-            if (g->alien_alive[r][c]) continue;
-            g->alien_alive[r][c] = 1;
-            g->alien_hermit_regen[r][c] = 1;
-            g->alien_health[r][c] = 1;
-            g->yellow_boss_marked[r][c] = 0;
-            g->alien_explode_timer[r][c] = 0;
-            g->alien_explode_points[r][c] = 0;
-            g->alien_explode_hit_boss[r][c] = 0;
+    while (spawned < regen_count) {
+        int target_row = -1;
+        for (int r = 0; r < AROWS; r++) {
+            for (int c = 0; c < ACOLS; c++) {
+                if (!g->alien_alive[r][c]) {
+                    target_row = r;
+                    break;
+                }
+            }
+            if (target_row >= 0) break;
+        }
+        if (target_row < 0) break;
+
+        int cols[ACOLS];
+        int col_count = 0;
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[target_row][c]) {
+                cols[col_count++] = c;
+            }
+        }
+        if (col_count <= 0) break;
+
+        for (int i = col_count - 1; i > 0; i--) {
+            int j = rand() % (i + 1);
+            int tmp = cols[i];
+            cols[i] = cols[j];
+            cols[j] = tmp;
+        }
+
+        int first_col = cols[0];
+        hermit_spawn_regen_alien(g, target_row, first_col);
+        spawned++;
+        if (spawned >= regen_count) break;
+
+        int second_idx = -1;
+        for (int i = 1; i < col_count; i++) {
+            int c = cols[i];
+            if (c < first_col - 1 || c > first_col + 1) {
+                second_idx = i;
+                break;
+            }
+        }
+        if (second_idx < 0 && col_count > 1) {
+            second_idx = 1;
+        }
+
+        if (second_idx >= 0) {
+            hermit_spawn_regen_alien(g, target_row, cols[second_idx]);
             spawned++;
         }
     }
