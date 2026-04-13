@@ -30,6 +30,11 @@
 #define BOOM_LONG_DURATION_SAMPLES (AUDIO_RATE * 2 / 3)
 #define BOOM_LONG_GAIN 0.28f
 
+#define TOWER_ASTEROID_BOOM_FREQ_START 240.0f
+#define TOWER_ASTEROID_BOOM_FREQ_END 95.0f
+#define TOWER_ASTEROID_BOOM_DURATION_SAMPLES (AUDIO_RATE * 3 / 10)
+#define TOWER_ASTEROID_BOOM_GAIN 0.20f
+
 #define LASER_FREQ_START 320.0f
 #define LASER_FREQ_END 780.0f
 #define LASER_DURATION_SAMPLES (AUDIO_RATE / 5)
@@ -60,6 +65,7 @@ typedef struct {
     int ding_pending;
     int boom_pending;
     int boom_long_pending;
+    int tower_asteroid_boom_pending;
     int laser_pending;
     int powerup_pending;
 } music_ctx_t;
@@ -544,6 +550,8 @@ static void *audio_thread(void *arg) {
     float boom_phase = 0.0f;
     int boom_long_samples_left = 0;
     float boom_long_phase = 0.0f;
+    int tower_asteroid_boom_samples_left = 0;
+    float tower_asteroid_boom_phase = 0.0f;
     int laser_samples_left = 0;
     float laser_phase = 0.0f;
     int powerup_samples_left = 0;
@@ -568,6 +576,11 @@ static void *audio_thread(void *arg) {
             boom_long_phase = 0.0f;
             g_music.boom_long_pending = 0;
             boom_samples_left = 0;
+        }
+        if (g_music.tower_asteroid_boom_pending) {
+            tower_asteroid_boom_samples_left = TOWER_ASTEROID_BOOM_DURATION_SAMPLES;
+            tower_asteroid_boom_phase = 0.0f;
+            g_music.tower_asteroid_boom_pending = 0;
         }
         if (g_music.laser_pending) {
             laser_samples_left = LASER_DURATION_SAMPLES;
@@ -621,6 +634,7 @@ static void *audio_thread(void *arg) {
             float ding_mix = 0.0f;
             float boom_mix = 0.0f;
             float boom_long_mix = 0.0f;
+            float tower_asteroid_boom_mix = 0.0f;
             float laser_mix = 0.0f;
             float powerup_mix = 0.0f;
 
@@ -647,6 +661,14 @@ static void *audio_thread(void *arg) {
                 boom_long_samples_left--;
             }
 
+            if (tower_asteroid_boom_samples_left > 0) {
+                float env = (float)tower_asteroid_boom_samples_left / (float)TOWER_ASTEROID_BOOM_DURATION_SAMPLES;
+                float freq = TOWER_ASTEROID_BOOM_FREQ_END + (TOWER_ASTEROID_BOOM_FREQ_START - TOWER_ASTEROID_BOOM_FREQ_END) * env;
+                float pulse = square(&tower_asteroid_boom_phase, freq, 0.28f);
+                tower_asteroid_boom_mix = pulse * TOWER_ASTEROID_BOOM_GAIN * env;
+                tower_asteroid_boom_samples_left--;
+            }
+
             if (laser_samples_left > 0) {
                 float progress = 1.0f - ((float)laser_samples_left / (float)LASER_DURATION_SAMPLES);
                 float freq = LASER_FREQ_START + (LASER_FREQ_END - LASER_FREQ_START) * progress;
@@ -665,7 +687,7 @@ static void *audio_thread(void *arg) {
                 powerup_samples_left--;
             }
 
-            float mixed = ((music_paused ? 0.0f : (music_mix * pat->gain)) + ding_mix + boom_mix + boom_long_mix + laser_mix + powerup_mix);
+            float mixed = ((music_paused ? 0.0f : (music_mix * pat->gain)) + ding_mix + boom_mix + boom_long_mix + tower_asteroid_boom_mix + laser_mix + powerup_mix);
             int sample = (int)(mixed * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
@@ -780,6 +802,14 @@ void music_play_boom_long(void) {
     pthread_mutex_unlock(&g_music.lock);
 }
 
+void music_play_tower_asteroid_boom(void) {
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running) {
+        g_music.tower_asteroid_boom_pending = 1;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
 void music_play_laser(void) {
     pthread_mutex_lock(&g_music.lock);
     if (g_music.running) {
@@ -829,6 +859,9 @@ void music_play_boom(void) {
 }
 
 void music_play_boom_long(void) {
+}
+
+void music_play_tower_asteroid_boom(void) {
 }
 
 void music_play_laser(void) {

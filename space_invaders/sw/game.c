@@ -537,7 +537,7 @@ static void start_tower_asteroid_explosion(game_t *g, int ai) {
     g->tower_asteroid_exploding[ai] = 1;
     g->tower_asteroid_explode_timer[ai] = TOWER_ASTEROID_EXPLOSION_FRAMES;
     g->tower_asteroid_boss_damage_applied[ai] = 0;
-    music_play_boom();
+    music_play_tower_asteroid_boom();
 }
 
 static int boss_bomb_explosion_radius(const game_t *g) {
@@ -3720,7 +3720,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 g->boss_laser_last_hit_y = -1000;  // Reset hit tracking
                 g->boss_green_laser_last_hit_y = -1000;  // Reset green laser tracking
                 g->boss_power_timer = 0;  // Reset for next charge
-                music_play_laser();
+                if (g->boss_type == BOSS_TYPE_CLASSIC &&
+                    (g->boss_attack_type == 0 || g->boss_attack_type == 1)) {
+                    music_play_tower_asteroid_boom();
+                } else {
+                    music_play_laser();
+                }
             }
             
             // Boss recovers 10% health if using green laser
