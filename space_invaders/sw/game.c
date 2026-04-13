@@ -3016,6 +3016,19 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     update_player_shots(g);
 
+    // Keep player projectiles out of the top HUD strip.
+    for (int i = 0; i < MAX_PSHOTS; i++) {
+        if (g->pshot[i].alive && g->pshot[i].y <= TOP_HUD_SEPARATOR_Y) {
+            g->pshot[i].alive = 0;
+        }
+        if (g->pshot_left[i].alive && g->pshot_left[i].y <= TOP_HUD_SEPARATOR_Y) {
+            g->pshot_left[i].alive = 0;
+        }
+        if (g->pshot_right[i].alive && g->pshot_right[i].y <= TOP_HUD_SEPARATOR_Y) {
+            g->pshot_right[i].alive = 0;
+        }
+    }
+
     // Boss shooting logic (rate depends on health)
     if (g->boss_alive && !g->boss_dying) {
         if (g->boss_type == BOSS_TYPE_YELLOW) {
