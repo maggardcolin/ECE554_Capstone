@@ -5257,23 +5257,52 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
     }
 
-    // Boss laser beam and trailing after-image copies.
-    // Only the leading beam is used for collision in update logic.
+    // Emperor plasma beam: stacked rectangular slices with fading intensity,
+    // plus a tapered trailing tail at the back end.
     if (g->boss_laser.alive) {
         const sprite1r_t *BS = active_boss_sprite(g);
-        int laser_w = BS->w;  // Width matches boss width
-        int laser_left = g->boss_laser.x - laser_w / 2;
-        uint32_t laser_color = (g->boss_attack_type == 1) ? 0xFF00FF00 : 0xFF8000FF;  // Green or purple
-        const int trail_offsets[] = {0, 5, 10, 20};
-        const int trail_intensity[] = {100, 65, 40, 22};
+        int laser_w = BS->w;
+        int laser_center_x = g->boss_laser.x;
+        uint32_t laser_color = (g->boss_attack_type == 1) ? 0xFF00FF00 : 0xFF8000FF;
 
-        for (int t = 0; t < 4; t++) {
-            int trail_y = g->boss_laser.y - trail_offsets[t];
-            if (trail_y < 0 || trail_y >= LH) continue;
-            uint32_t trail_color = color_with_intensity(laser_color, trail_intensity[t]);
-            for (int px = laser_left; px < laser_left + laser_w; px++) {
-                if (px >= 0 && px < LW) {
-                    l_putpix(lfb, px, trail_y, trail_color);
+        const int seg_count = 5;
+        const int seg_offset_y[5] = {0, 3, 7, 12, 18};
+        const int seg_height[5] = {3, 3, 3, 3, 2};
+        const int seg_shrink[5] = {0, 0, 1, 2, 3};
+        const int seg_intensity[5] = {100, 80, 62, 44, 28};
+
+        for (int s = 0; s < seg_count; s++) {
+            int seg_w = laser_w - (seg_shrink[s] * 2);
+            if (seg_w < 1) continue;
+            int seg_left = laser_center_x - seg_w / 2;
+            int seg_top = g->boss_laser.y - seg_offset_y[s];
+            uint32_t seg_color = color_with_intensity(laser_color, seg_intensity[s]);
+
+            for (int py = 0; py < seg_height[s]; py++) {
+                int y = seg_top + py;
+                if (y < GAMEPLAY_CLIP_Y_MIN || y > GAMEPLAY_CLIP_Y_MAX) continue;
+                for (int px = 0; px < seg_w; px++) {
+                    int x = seg_left + px;
+                    if (x >= 0 && x < LW) {
+                        l_putpix(lfb, x, y, seg_color);
+                    }
+                }
+            }
+        }
+
+        // Draw a tapered tail behind the faded rectangles.
+        int tail_start_y = g->boss_laser.y - 22;
+        for (int i = 0; i < 8; i++) {
+            int y = tail_start_y - i;
+            if (y < GAMEPLAY_CLIP_Y_MIN || y > GAMEPLAY_CLIP_Y_MAX) continue;
+            int half_w = 3 - (i / 2);
+            if (half_w < 0) half_w = 0;
+            int intensity = 22 - (i * 2);
+            if (intensity < 6) intensity = 6;
+            uint32_t tail_color = color_with_intensity(laser_color, intensity);
+            for (int x = laser_center_x - half_w; x <= laser_center_x + half_w; x++) {
+                if (x >= 0 && x < LW) {
+                    l_putpix(lfb, x, y, tail_color);
                 }
             }
         }
