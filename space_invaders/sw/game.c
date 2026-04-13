@@ -485,6 +485,7 @@ static void start_tower_asteroid_explosion(game_t *g, int ai) {
     g->tower_asteroid_exploding[ai] = 1;
     g->tower_asteroid_explode_timer[ai] = TOWER_ASTEROID_EXPLOSION_FRAMES;
     g->tower_asteroid_boss_damage_applied[ai] = 0;
+    music_play_boom();
 }
 
 static int boss_bomb_explosion_radius(const game_t *g) {
