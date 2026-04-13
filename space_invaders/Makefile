@@ -20,6 +20,9 @@ GCCFLAGS := -O3 $(AUDIODEFS) $(SDLFLAGS) $(RTLIBRARY) $(AUDIOLIBS)
 
 all: run
 
+run: hardware software
+	./hw_sim & sleep 0.5 && ./sw_game
+
 hardware:
 	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
 

@@ -2465,6 +2465,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     if (g->overworld_cutscene_active) {
+        int skip_pressed = (buttons & BTN_FIRE) && !(old_buttons & BTN_FIRE);
+        int pixelate_start_timer = OVERWORLD_TOTAL_FRAMES - (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES);
+        if (skip_pressed && g->overworld_cutscene_timer > pixelate_start_timer) {
+            g->overworld_cutscene_timer = pixelate_start_timer;
+        }
         if (g->overworld_cutscene_timer > 0) {
             g->overworld_cutscene_timer--;
         }
@@ -2484,6 +2489,10 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     if (g->boss_intro_active) {
+        int skip_pressed = (buttons & BTN_FIRE) && !(old_buttons & BTN_FIRE);
+        if (skip_pressed) {
+            g->boss_intro_timer = 0;
+        }
         if (g->boss_intro_timer > 0) {
             g->boss_intro_timer--;
         }
