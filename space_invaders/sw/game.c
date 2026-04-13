@@ -2051,23 +2051,21 @@ static int pick_random_boss_type(game_t *g) {
     int pool[BOSS_TYPE_COUNT];
     int pool_count = 0;
 
-    // First pass: types still under the cap and not matching the previous pick.
+    // First pass: choose among unseen bosses.
     for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
-        if (g->boss_pick_count[i] >= 2) continue;
-        if (i == g->last_random_boss_type) continue;
+        if (g->boss_pick_count[i] != 0) continue;
         pool[pool_count++] = i;
     }
 
-    // Fallback: if needed, allow repeating the last type but still enforce max-two cap.
+    // Fallback: all bosses seen, so pick any except the most recent one.
     if (pool_count == 0) {
         for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
-            if (g->boss_pick_count[i] < 2) {
-                pool[pool_count++] = i;
-            }
+            if (i == g->last_random_boss_type) continue;
+            pool[pool_count++] = i;
         }
     }
 
-    // Final fallback (should be rare): if every type hit cap, pick any type.
+    // Final fallback for safety (e.g., single-type edge case).
     if (pool_count == 0) {
         for (int i = 0; i < BOSS_TYPE_COUNT; i++) {
             pool[pool_count++] = i;
@@ -2076,9 +2074,7 @@ static int pick_random_boss_type(game_t *g) {
 
     int picked = pool[rand() % pool_count];
     if (picked >= 0 && picked < BOSS_TYPE_COUNT) {
-        if (g->boss_pick_count[picked] < 2) {
-            g->boss_pick_count[picked]++;
-        }
+        g->boss_pick_count[picked]++;
         g->last_random_boss_type = picked;
     }
     return picked;
