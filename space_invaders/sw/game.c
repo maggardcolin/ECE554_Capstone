@@ -2232,6 +2232,10 @@ void game_init(game_t *g) {
 void game_reset(game_t *g) {
     g->game_over = 0;
     g->game_over_score = 0;
+    g->game_over_delay_timer = 0;
+    g->player_dying = 0;
+    g->player_death_timer = 0;
+    g->player_iframe_timer = 0;
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
     g->main_menu_selection = 0;
@@ -2255,15 +2259,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     static uint32_t prev_buttons = 0;
     uint32_t old_buttons = prev_buttons;
     if ((buttons & BTN_RESET) && !(old_buttons & BTN_RESET)) {
+        game_reset(g);
         g->start_screen = 1;
-        g->practice_menu_active = 0;
-        g->practice_run_active = 0;
-        g->practice_return_delay_timer = 0;
-        g->forced_boss_type = -1;
-        g->main_menu_selection = 0;
-        g->practice_menu_selection = 0;
-        g->practice_level_selection = PRACTICE_LEVEL_MIN;
-        g->practice_preview_timer = BOSS_INTRO_FRAMES;
         g->start_screen_delay_timer = 30;
     }
     
