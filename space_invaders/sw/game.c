@@ -1840,27 +1840,54 @@ static void enter_shop(game_t *g) {
     int spacing = 60;
     int start_x = LW / 2 - spacing;
     int y = LH / 2;
-    int pierce_added = 0;
-    int points_added = 0;
-    for (int i = 0; i < MAX_SHOP_ITEMS; i++) {
-        shop_item_type_t picked = shop_pool[rand() % shop_pool_count];
-        if ((!g->pierce_unlocked && picked == SHOP_ITEM_PIERCE && pierce_added) ||
-            (!g->points_unlocked && picked == SHOP_ITEM_POINTS && points_added)) {
-            static const shop_item_type_t fallback_pool[] = {
-                SHOP_ITEM_FIRE_SPEED,
-                SHOP_ITEM_LIFE,
-                SHOP_ITEM_DAMAGE
-            };
-            picked = fallback_pool[rand() % 3];
+
+    int used_type[SHOP_ITEM_COUNT] = {0};
+    int chosen_type[MAX_SHOP_ITEMS];
+    int chosen_count = 0;
+
+    // Guarantee at least one good item when at least one is still available.
+    int good_candidates[2];
+    int good_count = 0;
+    if (!g->pierce_unlocked) good_candidates[good_count++] = SHOP_ITEM_PIERCE;
+    if (!g->points_unlocked) good_candidates[good_count++] = SHOP_ITEM_POINTS;
+    if (good_count > 0) {
+        int good_pick = good_candidates[rand() % good_count];
+        chosen_type[chosen_count++] = good_pick;
+        used_type[good_pick] = 1;
+    }
+
+    // Fill remaining slots with unique picks from the pool.
+    while (chosen_count < MAX_SHOP_ITEMS) {
+        shop_item_type_t candidates[5];
+        int candidate_count = 0;
+        for (int p = 0; p < shop_pool_count; p++) {
+            shop_item_type_t t = shop_pool[p];
+            if (used_type[t]) continue;
+            candidates[candidate_count++] = t;
         }
+
+        if (candidate_count == 0) {
+            break;
+        }
+
+        shop_item_type_t picked = candidates[rand() % candidate_count];
+        chosen_type[chosen_count++] = picked;
+        used_type[picked] = 1;
+    }
+
+    // Randomize display order while preserving uniqueness/guarantees.
+    for (int i = chosen_count - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int tmp = chosen_type[i];
+        chosen_type[i] = chosen_type[j];
+        chosen_type[j] = tmp;
+    }
+
+    for (int i = 0; i < MAX_SHOP_ITEMS; i++) {
+        shop_item_type_t picked = (i < chosen_count) ? (shop_item_type_t)chosen_type[i] : SHOP_ITEM_FIRE_SPEED;
 
         g->shop_items[i].active = 1;
         g->shop_items[i].type = picked;
-        if (picked == SHOP_ITEM_PIERCE) {
-            pierce_added = 1;
-        } else if (picked == SHOP_ITEM_POINTS) {
-            points_added = 1;
-        }
         g->shop_items[i].price = 500 * price_multiplier;
         g->shop_items[i].x = start_x + i * spacing;
         g->shop_items[i].y = y;
