@@ -92,7 +92,9 @@ typedef struct {
     int level;
     int start_screen;
     int start_screen_delay_timer;
-    int main_menu_selection;   // 0 = start game, 1 = practice mode
+    int main_menu_selection;   // 0 = start game, 1 = practice mode, 2 = credits
+    int credits_screen_active;
+    int credits_scroll_y;
     int practice_menu_active;
     int practice_menu_selection; // 0..3 boss entries, 4 exit
     int practice_level_selection;

@@ -45,6 +45,10 @@
 #define PRACTICE_LEVEL_MAX (WIN_LEVEL - 1)
 #define PRACTICE_EXIT_INDEX BOSS_TYPE_COUNT
 #define PRACTICE_MENU_COUNT (BOSS_TYPE_COUNT + 1)
+#define MAIN_MENU_COUNT 3
+#define CREDITS_SCROLL_SPEED 1
+#define CREDITS_LINE_SPACING 12
+#define CREDITS_ALIEN_GAP 24
 #define TOP_HUD_SEPARATOR_Y 15
 #define BOTTOM_HUD_SEPARATOR_Y (LH - 20)
 
@@ -2086,6 +2090,51 @@ static int aliens_remaining(const game_t *g) {
     return 0;
 }
 
+static const char *credits_lines[] = {
+    "LEAD DEVELOPER: COLIN",
+    "PLAYTESTERS: COLIN, JOSH 2, MICHAEL",
+    "HARDWARE SUPPORT: MICHAEL",
+    "LINUX SUPPORT: JOSH 2",
+    "COMPATABILITY: JOSH 2",
+    "",
+    "SPECIAL THANKS:",
+    "ECE 554",
+    "GEORGE",
+    "THE BINDING OF ISAAC: REBIRTH",
+    "NOITA",
+    "SPELUNKY HD",
+    "TERRARIA",
+    "HOLLOW KNIGHT",
+    "",
+    "DEDICATED TO MJ"
+};
+
+static int credits_text_height(void) {
+    return (int)(sizeof(credits_lines) / sizeof(credits_lines[0])) * CREDITS_LINE_SPACING;
+}
+
+static int credits_total_height(const game_t *g) {
+    const sprite1r_t *SK = &g->ALIEN_A;
+    int alien_h = SK->h * 6;
+    return credits_text_height() + CREDITS_ALIEN_GAP + alien_h;
+}
+
+static void render_credits_screen(const game_t *g, lfb_t *lfb) {
+    int y = g->credits_scroll_y;
+    for (int i = 0; i < (int)(sizeof(credits_lines) / sizeof(credits_lines[0])); i++) {
+        int line_w = text_width_5x5(credits_lines[i], 1);
+        l_draw_text(lfb, (LW - line_w) / 2, y + i * CREDITS_LINE_SPACING, credits_lines[i], 1, 0xFFBFBFBF);
+    }
+
+    const sprite1r_t *SK = ((g->credits_scroll_y / 8) & 1) ? &g->ALIEN_B : &g->ALIEN_A;
+    int scale = 6;
+    int sw = SK->w * scale;
+    int sh = SK->h * scale;
+    int alien_x = (LW - sw) / 2;
+    int alien_y = y + credits_text_height() + CREDITS_ALIEN_GAP;
+    draw_sprite1r_scaled(lfb, SK, alien_x, alien_y, 0xFF8000FF, scale);
+}
+
 static void bunkers_rebuild(game_t *g);
 
 static void setup_practice_run(game_t *g, int boss_type) {
@@ -2311,6 +2360,8 @@ void game_init(game_t *g) {
     g->start_screen = 1;
     g->start_screen_delay_timer = 0;
     g->main_menu_selection = 0;
+    g->credits_screen_active = 0;
+    g->credits_scroll_y = LH;
     g->practice_menu_active = 0;
     g->practice_menu_selection = 0;
     g->practice_level_selection = PRACTICE_LEVEL_MIN;
@@ -2334,6 +2385,8 @@ void game_reset(game_t *g) {
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
     g->main_menu_selection = 0;
+    g->credits_screen_active = 0;
+    g->credits_scroll_y = LH;
     g->practice_menu_active = 0;
     g->practice_menu_selection = 0;
     g->practice_level_selection = PRACTICE_LEVEL_MIN;
@@ -2385,18 +2438,45 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             int right_pressed = (buttons & BTN_RIGHT) && !(old_buttons & BTN_RIGHT);
             int select_pressed = (buttons & BTN_FIRE) && !(old_buttons & BTN_FIRE);
 
-            if (!g->practice_menu_active) {
+            if (g->credits_screen_active) {
+                if (select_pressed) {
+                    g->credits_screen_active = 0;
+                    g->main_menu_selection = 0;
+                } else {
+                    if ((vsync_counter & 1u) == 0u) {
+                        g->credits_scroll_y -= CREDITS_SCROLL_SPEED;
+                    }
+                    if (g->credits_scroll_y + credits_total_height(g) < 0) {
+                        g->credits_screen_active = 0;
+                        g->main_menu_selection = 0;
+                    }
+                }
+            } else if (!g->practice_menu_active) {
                 if (up_pressed || down_pressed) {
-                    g->main_menu_selection = 1 - g->main_menu_selection;
+                    if (up_pressed) {
+                        g->main_menu_selection--;
+                    }
+                    if (down_pressed) {
+                        g->main_menu_selection++;
+                    }
+                    if (g->main_menu_selection < 0) {
+                        g->main_menu_selection = MAIN_MENU_COUNT - 1;
+                    }
+                    if (g->main_menu_selection >= MAIN_MENU_COUNT) {
+                        g->main_menu_selection = 0;
+                    }
                 }
                 if (select_pressed) {
                     if (g->main_menu_selection == 0) {
                         game_reset(g);
-                    } else {
+                    } else if (g->main_menu_selection == 1) {
                         g->practice_menu_active = 1;
                         g->practice_menu_selection = 0;
                         g->practice_level_selection = PRACTICE_LEVEL_MIN;
                         g->practice_preview_timer = BOSS_INTRO_FRAMES;
+                    } else {
+                        g->credits_screen_active = 1;
+                        g->credits_scroll_y = LH;
                     }
                 }
             } else {
@@ -2518,7 +2598,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
         }
 
-        if (g->win_prompt_ready && (buttons & BTN_FIRE)) {
+        if (g->win_prompt_ready) {
             if (g->practice_run_active) {
                 g->start_screen = 1;
                 g->start_screen_delay_timer = 30;
@@ -2530,7 +2610,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 setup_level(g, 0, 1);
             } else {
                 g->start_screen = 1;
-                g->start_screen_delay_timer = 30;
+                g->start_screen_delay_timer = 0;
+                g->main_menu_selection = 0;
+                g->practice_menu_active = 0;
+                g->credits_screen_active = 1;
+                g->credits_scroll_y = LH;
                 reset_player_progression(g);
                 setup_level(g, 0, 1);
             }
@@ -3598,9 +3682,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
         l_clear(lfb, 0xFF000000);
-        if (!g->practice_menu_active) {
+        if (g->credits_screen_active) {
+            render_credits_screen(g, lfb);
+        } else if (!g->practice_menu_active) {
             const char *title = "ALIENS";
-            const char *options[2] = {"START GAME", "PRACTICE MODE"};
+            const char *options[MAIN_MENU_COUNT] = {"START GAME", "PRACTICE MODE", "CREDITS"};
 
             int title_scale = 3;
             int title_w = text_width_5x5(title, title_scale);
@@ -3609,8 +3695,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
 
             int option_scale = 2;
-            int option_base_y = title_y + 56;
-            for (int i = 0; i < 2; i++) {
+            int option_base_y = title_y + 42;
+            for (int i = 0; i < MAIN_MENU_COUNT; i++) {
                 int is_selected = (i == g->main_menu_selection);
                 int opt_w = text_width_5x5(options[i], option_scale);
                 int opt_x = (LW - opt_w) / 2;
@@ -3753,14 +3839,6 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, label_x + label_w + 6, label_y, g->score, 0xFFFFFFFF);
 
-        if (g->win_prompt_ready) {
-            const char *prompt = "PRESS SPACE TO CONTINUE";
-            int prompt_scale = 2;
-            int prompt_w = text_width_5x5(prompt, prompt_scale);
-            int prompt_x = (LW - prompt_w) / 2;
-            int prompt_y = label_y + 25;
-            l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
-        }
         return;
     }
 
