@@ -4080,16 +4080,6 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     l_clear(lfb, 0xFF000000);
 
-    // Draw "PAUSED" text if game is paused
-    if (g->paused) {
-        const char *paused_text = "PAUSED";
-        int scale = 2;
-        int text_w = text_width_5x5(paused_text, scale);
-        int text_x = (LW - text_w) / 2;
-        int text_y = (LH - scale * 5) / 2;
-        l_draw_text(lfb, text_x, text_y, paused_text, scale, 0xFFFFFFFF);
-    }
-    
     // Starfield background (static tiling pattern)
     {
         int star_spacing = 20;
@@ -4462,4 +4452,33 @@ void game_render(game_t *g, lfb_t *lfb) {
     render_tower_walls(lfb, g);
 
     render_fps_counter(lfb);
+
+    if (g->paused) {
+        const char *paused_text = "PAUSED";
+        int panel_w = (LW * 3) / 4;
+        int panel_h = LH / 3;
+        int panel_x = (LW - panel_w) / 2;
+        int panel_y = (LH - panel_h) / 2;
+
+        for (int y = panel_y; y < panel_y + panel_h; y++) {
+            for (int x = panel_x; x < panel_x + panel_w; x++) {
+                l_putpix(lfb, x, y, 0xFF000000);
+            }
+        }
+
+        for (int x = panel_x; x < panel_x + panel_w; x++) {
+            l_putpix(lfb, x, panel_y, 0xFFFFFFFF);
+            l_putpix(lfb, x, panel_y + panel_h - 1, 0xFFFFFFFF);
+        }
+        for (int y = panel_y; y < panel_y + panel_h; y++) {
+            l_putpix(lfb, panel_x, y, 0xFFFFFFFF);
+            l_putpix(lfb, panel_x + panel_w - 1, y, 0xFFFFFFFF);
+        }
+
+        int scale = 3;
+        int text_w = text_width_5x5(paused_text, scale);
+        int text_x = panel_x + (panel_w - text_w) / 2;
+        int text_y = panel_y + (panel_h - (scale * 5)) / 2;
+        l_draw_text(lfb, text_x, text_y, paused_text, scale, 0xFFFFFFFF);
+    }
 }
