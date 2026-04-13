@@ -193,6 +193,8 @@ typedef struct {
     int boss_power_active;     // 1 when special attack is happening
     int boss_power_cooldown;   // Duration of purple/frozen state (30 ticks = 0.5 seconds)
     int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
+    int boss_no_hit_taken;     // 1 if player has not been hit during the current boss fight
+    int perfect_text_timer;    // Frames remaining to show PERFECT bonus text
     int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle, 4 = tower walls, 5 = hermit dodge, 6 = chariot charge, 7 = magician mirrors
     int next_boss_attack_type; // The attack type that will be used for the next charge
     int boss_green_laser_last_hit_y; // Last y position where green laser hit aliens

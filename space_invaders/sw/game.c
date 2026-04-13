@@ -1883,6 +1883,10 @@ static void apply_player_damage(game_t *g, int damage) {
     if (damage <= 0) return;
     if (player_invulnerable(g)) return;
 
+    if (g->boss_alive && !g->boss_dying) {
+        g->boss_no_hit_taken = 0;
+    }
+
     g->lives -= damage;
     if (g->lives < 0) g->lives = 0;
     if (g->lives > 0) {
@@ -2867,6 +2871,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->boss_dying = 0;
     g->boss_death_timer = 0;
     g->boss_explode_points = 0;
+    g->boss_no_hit_taken = (level > 0) ? 1 : 0;
+    g->perfect_text_timer = 0;
     g->boss_shield_active = (g->boss_type == BOSS_TYPE_HERMIT && level >= 3) ? 1 : 0;
     g->boss_frame = 0;
     g->boss_timer = 0;
@@ -3040,6 +3046,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (g->player_iframe_timer > 0) {
         g->player_iframe_timer--;
+    }
+    if (g->perfect_text_timer > 0) {
+        g->perfect_text_timer--;
     }
 
     if (g->start_screen) {
@@ -5315,6 +5324,15 @@ void game_render(game_t *g, lfb_t *lfb) {
     render_tower_walls(lfb, g);
 
     render_fps_counter(lfb);
+
+    if (g->perfect_text_timer > 0) {
+        const char *perfect_text = "PERFECT";
+        int perfect_scale = 4;
+        int perfect_w = text_width_5x5(perfect_text, perfect_scale);
+        int perfect_x = (LW - perfect_w) / 2;
+        int perfect_y = (LH - (perfect_scale * 5)) / 2;
+        l_draw_text(lfb, perfect_x, perfect_y, perfect_text, perfect_scale, 0xFF00FF00);
+    }
 
     if (g->paused) {
         const char *paused_text = "PAUSED";

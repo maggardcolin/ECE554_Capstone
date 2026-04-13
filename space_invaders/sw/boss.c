@@ -5,6 +5,8 @@
 
 #define BOSS_DEATH_DELAY_FRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
+#define PERFECT_BOSS_KILL_BONUS 500
+#define PERFECT_TEXT_FRAMES 90
 
 static int no_regular_aliens_killed(const game_t *g) {
     for (int r = 0; r < AROWS; r++) {
@@ -20,6 +22,10 @@ void boss_trigger_death(game_t *g, int points_awarded) {
     if (g->boss_dying || !g->boss_alive) return;
     if (no_regular_aliens_killed(g)) {
         points_awarded = 2000;
+    }
+    if (g->boss_no_hit_taken) {
+        points_awarded += PERFECT_BOSS_KILL_BONUS;
+        g->perfect_text_timer = PERFECT_TEXT_FRAMES;
     }
     g->boss_dying = 1;
     g->boss_death_timer = BOSS_DEATH_DELAY_FRAMES;
