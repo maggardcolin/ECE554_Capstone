@@ -491,9 +491,11 @@ static void *audio_thread(void *arg) {
             break;
         }
 
-        const pattern_t *pat = pattern_for_mode(mode);
-        if (mode != active_mode) {
-            active_mode = mode;
+        int music_paused = (mode == MUSIC_MODE_PAUSED);
+        music_mode_t sequencer_mode = music_paused ? active_mode : mode;
+        const pattern_t *pat = pattern_for_mode(sequencer_mode);
+        if (!music_paused && sequencer_mode != active_mode) {
+            active_mode = sequencer_mode;
             step = 0;
             sample_in_step = 0;
             game_over_finished = 0;
@@ -511,7 +513,7 @@ static void *audio_thread(void *arg) {
             float f1 = 0.0f;
             float f2 = 0.0f;
             float f3 = 0.0f;
-            if (!((mode == MUSIC_MODE_GAME_OVER || mode == MUSIC_MODE_WIN) && game_over_finished)) {
+            if (!music_paused && !((sequencer_mode == MUSIC_MODE_GAME_OVER || sequencer_mode == MUSIC_MODE_WIN) && game_over_finished)) {
                 f1 = pat->melody[step];
                 f2 = pat->bass[step];
                 f3 = pat->harm[step];
@@ -568,22 +570,25 @@ static void *audio_thread(void *arg) {
                 powerup_samples_left--;
             }
 
-            int sample = (int)(((music_mix * pat->gain) + ding_mix + boom_mix + boom_long_mix + laser_mix + powerup_mix) * 32767.0f);
+            float mixed = ((music_paused ? 0.0f : (music_mix * pat->gain)) + ding_mix + boom_mix + boom_long_mix + laser_mix + powerup_mix);
+            int sample = (int)(mixed * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
             buffer[i] = (int16_t)sample;
 
-            sample_in_step++;
-            if (sample_in_step >= samples_per_step) {
-                sample_in_step = 0;
-                if (!((mode == MUSIC_MODE_GAME_OVER || mode == MUSIC_MODE_WIN) && game_over_finished)) {
-                    step++;
-                    if (step >= pat->len) {
-                        if (mode == MUSIC_MODE_GAME_OVER || mode == MUSIC_MODE_WIN) {
-                            step = pat->len - 1;
-                            game_over_finished = 1;
-                        } else {
-                            step = 0;
+            if (!music_paused) {
+                sample_in_step++;
+                if (sample_in_step >= samples_per_step) {
+                    sample_in_step = 0;
+                    if (!((sequencer_mode == MUSIC_MODE_GAME_OVER || sequencer_mode == MUSIC_MODE_WIN) && game_over_finished)) {
+                        step++;
+                        if (step >= pat->len) {
+                            if (sequencer_mode == MUSIC_MODE_GAME_OVER || sequencer_mode == MUSIC_MODE_WIN) {
+                                step = pat->len - 1;
+                                game_over_finished = 1;
+                            } else {
+                                step = 0;
+                            }
                         }
                     }
                 }
