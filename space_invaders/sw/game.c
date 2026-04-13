@@ -3239,6 +3239,37 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         clear_boss_projectiles(g);
     }
 
+    // Keep gameplay projectiles out of the bottom HUD strip.
+    // Only active projectiles are culled here; explosion effects are left intact.
+    if (g->ashot.alive && g->ashot.y >= BOTTOM_HUD_SEPARATOR_Y) {
+        g->ashot.alive = 0;
+    }
+    if (g->boss_shot.alive && g->boss_shot.y >= BOTTOM_HUD_SEPARATOR_Y) {
+        g->boss_shot.alive = 0;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (g->boss_triple_shot[i].alive && g->boss_triple_shot[i].y >= BOTTOM_HUD_SEPARATOR_Y) {
+            g->boss_triple_shot[i].alive = 0;
+        }
+    }
+    for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
+        if (g->yellow_beam_shot[i].alive && g->yellow_beam_shot[i].y >= BOTTOM_HUD_SEPARATOR_Y) {
+            g->yellow_beam_shot[i].alive = 0;
+        }
+    }
+    if (g->boss_laser.alive && g->boss_laser.y >= BOTTOM_HUD_SEPARATOR_Y) {
+        g->boss_laser.alive = 0;
+        g->boss_power_active = 0;
+    }
+    for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
+        if (g->tower_asteroid[ai].alive &&
+            (g->tower_asteroid[ai].y + TOWER_ASTEROID_RADIUS) >= BOTTOM_HUD_SEPARATOR_Y) {
+            g->tower_asteroid[ai].alive = 0;
+            g->tower_asteroid_hp[ai] = 0;
+            g->tower_asteroid_dx[ai] = 0;
+        }
+    }
+
     // collisions: player shots
     handle_player_shot_collisions(g, g->pshot, 0, 1);
     handle_player_shot_collisions(g, g->pshot_left, -1, 0);
