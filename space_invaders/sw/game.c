@@ -4831,27 +4831,30 @@ void game_render(game_t *g, lfb_t *lfb) {
         const sprite1r_t *BS = active_boss_sprite(g);
         int boss_x = (LW - BS->w) / 2;
         int boss_y = 68;
+        uint32_t intro_boss_color = 0xFF00FF00;
         if (g->boss_type != BOSS_TYPE_YELLOW) {
-            uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                                  (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                                  (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
-                                  (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                                  (g->boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(magician_intro_special_anim_active(g)) : 0xFF00FF00;
+            intro_boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
+                               (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
+                               (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
+                               (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
+                               (g->boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(magician_intro_special_anim_active(g)) : 0xFF00FF00;
             if (g->boss_type == BOSS_TYPE_CLASSIC) {
-                boss_color = type_color;
+                intro_boss_color = type_color;
             }
             if (!chariot_intro_charge_anim_active(g)) {
-                draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
+                draw_sprite1r(lfb, BS, boss_x, boss_y, intro_boss_color);
             }
+        } else {
+            intro_boss_color = 0xFFFFFF00;
         }
         render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS, 1);
 
-        uint32_t desc_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
-                              (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF99 :
-                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFFC08A4B :
-                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFD9B3FF :
-                              (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFFC080 :
-                              (g->boss_type == BOSS_TYPE_MAGICIAN) ? 0xFFA8F8FF : 0xFF99FF99;
+        uint32_t desc_color = intro_boss_color;
+        if (g->boss_type == BOSS_TYPE_CLASSIC) {
+            desc_color = 0xFF00FF00;
+        } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
+            desc_color = 0xFF00E5FF;
+        }
         int desc1_w = text_width_5x5(desc_line1, 1);
         int desc2_w = text_width_5x5(desc_line2, 1);
         int desc1_x = (LW - desc1_w) / 2;
