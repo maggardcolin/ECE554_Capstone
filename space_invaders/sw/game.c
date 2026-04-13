@@ -2369,11 +2369,6 @@ static const char *credits_lines[] = {
     "SPECIAL THANKS:",
     "ECE 554",
     "GEORGE",
-    "THE BINDING OF ISAAC: REBIRTH",
-    "NOITA",
-    "SPELUNKY HD",
-    "TERRARIA",
-    "HOLLOW KNIGHT",
     "",
     "DEDICATED TO MJ"
 };
