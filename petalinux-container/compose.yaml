@@ -29,5 +29,6 @@ services:
     volumes:
       - ./petalinux-build:/petalinux-build:Z,U
       - ./petalinux:/petalinux:Z,U
+      - ../space_invaders:/petalinux-build/projbuild/projbuild/project-spec/meta-user/recipes-apps/space-invaders/files:Z,U
 
 

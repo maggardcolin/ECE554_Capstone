@@ -1,9 +1,10 @@
-.PHONY: run hwardware software clean
+ifeq ($(FB),)
 
 OS := $(shell uname -s)
 
-SDLFLAGS := $(shell sdl2-config --cflags --libs)
 RTLIBRARY := $(if $(filter $(OS),Linux),-lrt,)
+SDLFLAGS := $(shell sdl2-config --cflags --libs)
+
 ALSAFLAGS := $(shell pkg-config --cflags --libs alsa 2>/dev/null)
 
 ifeq ($(strip $(ALSAFLAGS)),)
@@ -14,14 +15,10 @@ AUDIODEFS :=
 AUDIOLIBS := $(ALSAFLAGS) -lpthread
 endif
 
+
 GCCFLAGS := -O3 $(AUDIODEFS) $(SDLFLAGS) $(RTLIBRARY) $(AUDIOLIBS)
 
 all: run
-
-ifeq ($(FB),)
-
-run: hardware software
-	./hw_sim & sleep 0.5 && ./sw_game
 
 hardware:
 	gcc hw_sim.c -o hw_sim $(GCCFLAGS)
@@ -29,20 +26,39 @@ hardware:
 software:
 	gcc -D__HW_SIM__ sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/boss.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
 
+.PHONY: clean
+clean:
+	-rm -f hw_sim sw_game
+
 else
 
-run: hardware software
-	./fb_sim & sleep 0.5
-	./sw_game
-	pkill -9 -f fb_sim
+APP = space-invaders
 
-hardware:
-	gcc fb_sim.c -o fb_sim $(GCCFLAGS) -levdev
+CFLAGS += $(shell pkg-config --cflags libevdev)
+LDFLAGS += $(shell pkg-config --libs libevdev)
 
-software:
-	gcc sw/main.c sw/shm_map.c sw/gfx.c sw/sprite.c sw/font.c sw/game.c sw/boss.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c -o sw_game $(GCCFLAGS)
+CFLAGS += $(shell pkg-config --cflags alsa)
+LDFLAGS += $(shell pkg-config --libs alsa)
+
+CFLAGS += -O3 -lrt -lpthread
+
+SW_SRC := sw/font.c sw/gfx.c sw/shm_map.c sw/sprite.c sw/boss.c sw/game.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c sw/main.c 
+HW_SRC := fb_sim.c
+SRC := $(HW_SRC) $(SW_SRC) $(APP).c
+APP_OBJS = $(SRC:.c=.o)
+
+all: build
+
+build: $(APP)
+
+$(APP): $(APP_OBJS)
+	$(CC) $^ -o $@ $(CFLAGS) $(LDFLAGS) $(LDLIBS) -lpthread
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	-rm -f $(APP) $(APP_OBJS)
 
 endif
 
-clean:
-	rm -f hw_sim sw_game

@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
@@ -19,7 +20,6 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <time.h>
-#include <SDL/SDL.h>
 
 #define SHM_NAME "/pynq_fbmmio"
 
@@ -76,7 +76,7 @@ int find_keyboard_event(char *out_path, size_t out_size) {
 	while ((ent = readdir(dir)) != NULL) {
 		if (strncmp(ent->d_name, "event", 5) != 0) continue;
 
-		char path[256];
+		char path[300];
 		snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
 
 		int fd = open(path, O_RDONLY | O_NONBLOCK);
@@ -289,7 +289,7 @@ int fb_sim_main(void) {
 		uint8_t *src = front + y * W * 4;
 		
 		for (int i = 0; i < 3; i++) {
-			uint16_t *dst = fbp + (3*y+i) * finfo.line_length;
+			uint16_t *dst = (uint16_t *)(fbp + (3*y+i) * finfo.line_length);
 			for (int x = 0; x < cw; x++) {
 				for (int j = 0; j < 3; j++) {
   					uint16_t b = src[4*x + 0];
@@ -317,7 +317,6 @@ int fb_sim_main(void) {
     // SDL_DestroyTexture(tex);
     // SDL_DestroyRenderer(ren);
     // SDL_DestroyWindow(win);
-    SDL_Quit();
 
     munmap(base, total); munmap(fbp, screensize);
     close(fd); close(fb);
