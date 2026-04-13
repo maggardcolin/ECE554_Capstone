@@ -2230,7 +2230,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             if (boss_hit) {
                 int dmg = player_shot_damage_for_hit(g, &shots[si]);
                 if (g->boss_type == BOSS_TYPE_MAGICIAN && magician_mirror_attack_active(g)) {
-                    dmg *= 2;
+                    dmg += 1;
                 }
                 g->boss_health -= dmg;
                 if (g->boss_health <= 0) {
