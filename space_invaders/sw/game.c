@@ -1114,10 +1114,6 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     snprintf(level_text, sizeof(level_text), "LEVEL: %d", preview.level);
     l_draw_text(lfb, right_x, 52, level_text, 1, 0xFFFFFFFF);
 
-    char hp_text[20];
-    snprintf(hp_text, sizeof(hp_text), "BOSS HP: %d", BOSS_MAX_HEALTH(preview.level));
-    l_draw_text(lfb, right_x + 80, 52, hp_text, 1, 0xFFBFBFBF);
-
     const sprite1r_t *BS = boss_sprite_for_frame(&preview, preview.boss_frame);
     int pane_center_x = LW * 3 / 4;
     int boss_x = pane_center_x - BS->w / 2;
