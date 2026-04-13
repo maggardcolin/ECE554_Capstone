@@ -6,8 +6,21 @@
 #define BOSS_DEATH_DELAY_FRAMES 60
 #define ALIEN_EXPLOSION_FRAMES 18
 
+static int no_regular_aliens_killed(const game_t *g) {
+    for (int r = 0; r < AROWS; r++) {
+        for (int c = 0; c < ACOLS; c++) {
+            if (g->yellow_boss_marked[r][c]) continue;
+            if (!g->alien_alive[r][c]) return 0;
+        }
+    }
+    return 1;
+}
+
 void boss_trigger_death(game_t *g, int points_awarded) {
     if (g->boss_dying || !g->boss_alive) return;
+    if (no_regular_aliens_killed(g)) {
+        points_awarded = 2000;
+    }
     g->boss_dying = 1;
     g->boss_death_timer = BOSS_DEATH_DELAY_FRAMES;
     g->boss_explode_points = points_awarded;
