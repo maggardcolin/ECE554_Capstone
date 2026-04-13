@@ -115,7 +115,7 @@ static const char *boss_intro_desc_line2(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID EXPLOSIONS HURT IT.";
     if (g->boss_type == BOSS_TYPE_HERMIT) {
         return (g->level >= 3) ? "TRY TO BREAK ITS SHIELD." :
-                                 "DODGES OCCASIONALLY.";
+                                 "JUMPS AROUND A BIT.";
     }
     return (g->level >= 3) ? "GREEN PLASMA NOW HEALS DURING THE FIGHT." :
                              "DESCENDS ONCE HALF THE ALIENS ARE GONE.";
@@ -1288,7 +1288,8 @@ static void reset_win_state(game_t *g) {
 }
 
 static int player_invulnerable(const game_t *g) {
-    return (g->player_iframe_timer > 0) && !g->player_dying;
+    if (g->player_dying) return 0;
+    return (g->player_iframe_timer > 0) || shield_power_active(g);
 }
 
 static int player_visible_with_iframes(const game_t *g) {
