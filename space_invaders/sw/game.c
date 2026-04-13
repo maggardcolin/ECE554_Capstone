@@ -82,6 +82,15 @@ static const char *boss_menu_label(int boss_type) {
     return "EMPEROR";
 }
 
+static uint32_t practice_menu_boss_color(int boss_type) {
+    if (boss_type == BOSS_TYPE_BLUE) return 0xFF3399FF;
+    if (boss_type == BOSS_TYPE_YELLOW) return 0xFFFFFF00;
+    if (boss_type == BOSS_TYPE_TOWER) return 0xFF8B5A2B;
+    if (boss_type == BOSS_TYPE_HERMIT) return 0xFFB266FF;
+    if (boss_type == BOSS_TYPE_CHARIOT) return 0xFFFF8C00;
+    return 0xFF00FF00;
+}
+
 static const char *boss_intro_main_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_BLUE) return "TRIPLE SHOT";
     if (g->boss_type == BOSS_TYPE_YELLOW) return "STANDARD LASER";
@@ -4198,12 +4207,21 @@ void game_render(game_t *g, lfb_t *lfb) {
             int row_h = 13;
             for (int i = 0; i < PRACTICE_MENU_COUNT; i++) {
                 int is_selected = (i == g->practice_menu_selection);
-                uint32_t color = is_selected ? 0xFF00FF00 : 0xFFAAAAAA;
-                if (i == PRACTICE_EXIT_INDEX && !is_selected) color = 0xFFFF7A7A;
+                uint32_t color = 0xFFAAAAAA;
+                uint32_t cursor_color = 0xFF00FF00;
+
+                if (i < BOSS_TYPE_COUNT) {
+                    if (is_selected) {
+                        color = practice_menu_boss_color(i);
+                        cursor_color = color;
+                    }
+                } else {
+                    color = is_selected ? 0xFF00FF00 : 0xFFFFFFFF;
+                }
 
                 int entry_y = base_y + i * row_h;
                 if (is_selected) {
-                    l_draw_text(lfb, 16, entry_y, ">", 1, 0xFF00FF00);
+                    l_draw_text(lfb, 16, entry_y, ">", 1, cursor_color);
                 }
                 l_draw_text(lfb, 26, entry_y, entries[i], 1, color);
             }
