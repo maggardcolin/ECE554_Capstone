@@ -4,6 +4,22 @@
 #include "font.h"
 #include "game_helpers.h"
 
+#define MAGICIAN_SIDE_WALL_THICKNESS 2
+#define MAGICIAN_SIDE_DEFLECT_DY -2
+#define MAGICIAN_SIDE_DEFLECT_DX 3
+
+static int magician_side_wall_active(const game_t *g) {
+    return g->boss_alive && !g->boss_dying && (g->boss_type == BOSS_TYPE_MAGICIAN);
+}
+
+static int magician_side_wall_left_bound(void) {
+    return MAGICIAN_SIDE_WALL_THICKNESS;
+}
+
+static int magician_side_wall_right_bound(void) {
+    return LW - MAGICIAN_SIDE_WALL_THICKNESS - 1;
+}
+
 static void try_spawn_bullet(game_t *g, bullet_t *shots, int x, int y, int pierce_active) {
     for (int i = 0; i < MAX_PSHOTS; i++) {
         if (!shots[i].alive) {
@@ -66,17 +82,45 @@ void update_player_shots(game_t *g) {
             if (g->pshot[i].y < 0 || g->pshot[i].y >= LH) g->pshot[i].alive = 0;
         }
         if (g->pshot_left[i].alive) {
-            int dx = g->pshot_left[i].reflected ? 0 : -1;
+            int dx = -1;
+            if (g->pshot_left[i].reflected == 1) dx = 0;
+            else if (g->pshot_left[i].reflected == 2) dx = MAGICIAN_SIDE_DEFLECT_DX;
             int dy = (g->pshot_left[i].dy != 0) ? g->pshot_left[i].dy : -4;
             g->pshot_left[i].x += dx;
             g->pshot_left[i].y += dy;
+
+            if (magician_side_wall_active(g) && g->pshot_left[i].reflected == 0) {
+                int left_bound = magician_side_wall_left_bound();
+                if (g->pshot_left[i].x < left_bound) {
+                    int overshoot = left_bound - g->pshot_left[i].x;
+                    g->pshot_left[i].x = left_bound + overshoot;
+                    g->pshot_left[i].reflected = 2;
+                    g->pshot_left[i].dy = MAGICIAN_SIDE_DEFLECT_DY;
+                    continue;
+                }
+            }
+
             if (g->pshot_left[i].y < 0 || g->pshot_left[i].y >= LH || g->pshot_left[i].x < 0 || g->pshot_left[i].x >= LW) g->pshot_left[i].alive = 0;
         }
         if (g->pshot_right[i].alive) {
-            int dx = g->pshot_right[i].reflected ? 0 : 1;
+            int dx = 1;
+            if (g->pshot_right[i].reflected == 1) dx = 0;
+            else if (g->pshot_right[i].reflected == 3) dx = -MAGICIAN_SIDE_DEFLECT_DX;
             int dy = (g->pshot_right[i].dy != 0) ? g->pshot_right[i].dy : -4;
             g->pshot_right[i].x += dx;
             g->pshot_right[i].y += dy;
+
+            if (magician_side_wall_active(g) && g->pshot_right[i].reflected == 0) {
+                int right_bound = magician_side_wall_right_bound();
+                if (g->pshot_right[i].x > right_bound) {
+                    int overshoot = g->pshot_right[i].x - right_bound;
+                    g->pshot_right[i].x = right_bound - overshoot;
+                    g->pshot_right[i].reflected = 3;
+                    g->pshot_right[i].dy = MAGICIAN_SIDE_DEFLECT_DY;
+                    continue;
+                }
+            }
+
             if (g->pshot_right[i].y < 0 || g->pshot_right[i].y >= LH || g->pshot_right[i].x < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
         }
     }
@@ -88,6 +132,12 @@ void update_player_movement(game_t *g, uint32_t buttons) {
 
     int left_limit = g->tower_wall_active ? g->tower_wall_left : 0;
     int right_limit = g->tower_wall_active ? (g->tower_wall_right - g->PLAYER.w) : (LW - g->PLAYER.w);
+    if (magician_side_wall_active(g)) {
+        int magician_left = magician_side_wall_left_bound();
+        int magician_right = magician_side_wall_right_bound() - g->PLAYER.w + 1;
+        if (magician_left > left_limit) left_limit = magician_left;
+        if (magician_right < right_limit) right_limit = magician_right;
+    }
     if (right_limit < left_limit) right_limit = left_limit;
 
     if (g->player_x < left_limit) g->player_x = left_limit;
@@ -116,20 +166,64 @@ void render_player(const game_t *g, lfb_t *lfb) {
 }
 
 void render_score_display(const game_t *g, lfb_t *lfb) {
-    const char *label = "SCORE:";
+    const char *score_label = "SCORE:";
+    const char *power_label = "POWER:";
     int label_scale = 1;
-    int label_w = text_width_5x5(label, label_scale);
     int digit_w = 4;
-    int digits = digit_count(g->score);
-    int score_w = digits * digit_w;
+    int y = LH - 12;
+
+    int score_label_w = text_width_5x5(score_label, label_scale);
+    int score_digits = digit_count(g->score);
+    int score_w = score_digits * digit_w;
     int right_edge = LW - 5;
     int score_x = right_edge - score_w;
-    int label_x = right_edge - label_w - 30;
+    int score_label_x = right_edge - score_label_w - 30;
 
-    int y = LH - 12;
     uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
-    l_draw_text(lfb, label_x, y, label, label_scale, score_color);
+    l_draw_text(lfb, score_label_x, y, score_label, label_scale, score_color);
     l_draw_score(lfb, score_x, y, g->score, score_color);
+
+    int best_timer = 0;
+    for (int i = 0; i < 5; i++) {
+        if (g->powerup_slot_timer[i] > best_timer) {
+            best_timer = g->powerup_slot_timer[i];
+        }
+    }
+    int power_gap = 4;
+
+    int power_label_w = text_width_5x5(power_label, label_scale);
+    int none_w = text_width_5x5("NONE", label_scale);
+    int power_value_w = none_w;
+    int power_total_w = power_label_w + power_gap + power_value_w;
+    int power_x = score_label_x - 6 - power_total_w;
+
+    l_draw_text(lfb, power_x, y, power_label, label_scale, 0xFFFFFFFF);
+    int value_x = power_x + power_label_w + power_gap;
+
+    if (best_timer <= 0) {
+        l_draw_text(lfb, value_x, y, "NONE", label_scale, 0xFFFFFFFF);
+        return;
+    }
+
+    int seconds_w = 2 * digit_w;
+
+    int tenths_total = (best_timer * 10 + 30) / 60;
+    if (tenths_total < 0) tenths_total = 0;
+    if (tenths_total > 999) tenths_total = 999;
+    int seconds = tenths_total / 10;
+    int tenths = tenths_total % 10;
+    int tens = seconds / 10;
+    int ones = seconds % 10;
+
+    if (tens > 0) {
+        l_draw_digit(lfb, value_x, y, tens, 0xFFFFFFFF);
+    }
+    int ones_x = value_x + digit_w;
+    int dot_x = ones_x + digit_w - 1;
+    int tenths_x = dot_x + 5;
+    l_draw_digit(lfb, ones_x, y, ones, 0xFFFFFFFF);
+    l_draw_text(lfb, dot_x, y, ".", label_scale, 0xFFFFFFFF);
+    l_draw_score(lfb, tenths_x, y, tenths, 0xFFFFFFFF);
 }
 
 void render_player_health_bar(const game_t *g, lfb_t *lfb) {
@@ -189,7 +283,7 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
 void render_player_shots(const game_t *g, lfb_t *lfb) {
     for (int s = 0; s < MAX_PSHOTS; s++) {
         if (g->pshot[s].alive) {
-            if (g->pshot[s].reflected) {
+            if (g->pshot[s].reflected == 1) {
                 for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y + i, 0xFF00E5FF);
                 continue;
             }
@@ -206,18 +300,34 @@ void render_player_shots(const game_t *g, lfb_t *lfb) {
             }
         }
         if (g->pshot_left[s].alive) {
-            if (g->pshot_left[s].reflected) {
+            if (g->pshot_left[s].reflected == 1) {
                 for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x, g->pshot_left[s].y + i, 0xFF00E5FF);
                 continue;
             }
-            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - i / 2, g->pshot_left[s].y - i, 0xFF0000FF);
+            if (g->pshot_left[s].reflected == 2) {
+                for (int i = 0; i < 5; i++) {
+                    int x = g->pshot_left[s].x + ((3 * i) / 2);
+                    int y = g->pshot_left[s].y - i;
+                    l_putpix(lfb, x, y, 0xFF0000FF);
+                }
+                continue;
+            }
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - (i / 4), g->pshot_left[s].y - i, 0xFF0000FF);
         }
         if (g->pshot_right[s].alive) {
-            if (g->pshot_right[s].reflected) {
+            if (g->pshot_right[s].reflected == 1) {
                 for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x, g->pshot_right[s].y + i, 0xFF00E5FF);
                 continue;
             }
-            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + i / 2, g->pshot_right[s].y - i, 0xFF0000FF);
+            if (g->pshot_right[s].reflected == 3) {
+                for (int i = 0; i < 5; i++) {
+                    int x = g->pshot_right[s].x - ((3 * i) / 2);
+                    int y = g->pshot_right[s].y - i;
+                    l_putpix(lfb, x, y, 0xFF0000FF);
+                }
+                continue;
+            }
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + (i / 4), g->pshot_right[s].y - i, 0xFF0000FF);
         }
     }
 }

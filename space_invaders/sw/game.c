@@ -34,6 +34,9 @@
 #define MAGICIAN_ORB_RADIUS 11
 #define MAGICIAN_MIRROR_WIDTH_BOSS 56
 #define MAGICIAN_MIRROR_WIDTH_ALIEN 30
+#define MAGICIAN_SIDE_WALL_THICKNESS 2
+#define MAGICIAN_REFLECT_TAN30_NUM 577
+#define MAGICIAN_REFLECT_TAN30_DEN 1000
 #define MAGICIAN_MIRROR_NOTCH_HALF_BOSS 9
 #define MAGICIAN_MIRROR_ALIEN_OFFSET 3
 #define MAGICIAN_MIRROR_BOSS_OFFSET 8
@@ -167,12 +170,63 @@ static const char *boss_intro_desc_line2(const game_t *g) {
                              "DESCENDS ONCE HALF THE ALIENS ARE GONE.";
 }
 
+static int magician_side_wall_active(const game_t *g) {
+    return g->boss_alive && !g->boss_dying && (g->boss_type == BOSS_TYPE_MAGICIAN);
+}
+
+static int magician_side_wall_thickness(const game_t *g) {
+    if (!magician_side_wall_active(g)) return 0;
+    int thickness = MAGICIAN_SIDE_WALL_THICKNESS;
+    int max_thickness = (LW / 2) - 1;
+    if (max_thickness < 1) max_thickness = 1;
+    if (thickness > max_thickness) thickness = max_thickness;
+    return thickness;
+}
+
+static int magician_inward_dx_from_vertical_step(int vertical_step) {
+    if (vertical_step < 0) vertical_step = -vertical_step;
+    int dx = (vertical_step * MAGICIAN_REFLECT_TAN30_NUM + (MAGICIAN_REFLECT_TAN30_DEN / 2)) /
+             MAGICIAN_REFLECT_TAN30_DEN;
+    if (dx < 1) dx = 1;
+    return dx;
+}
+
+static void reflect_x_from_magician_side_walls(const game_t *g, int *x, int *dx, int vertical_step) {
+    int wall = magician_side_wall_thickness(g);
+    if (wall <= 0) return;
+
+    int left_bound = wall;
+    int right_bound = LW - wall - 1;
+    if (right_bound < left_bound) right_bound = left_bound;
+    int inward_dx = magician_inward_dx_from_vertical_step(vertical_step);
+
+    if (*x < left_bound) {
+        int overshoot = left_bound - *x;
+        *x = left_bound + overshoot;
+        *dx = inward_dx;
+    } else if (*x > right_bound) {
+        int overshoot = *x - right_bound;
+        *x = right_bound - overshoot;
+        *dx = -inward_dx;
+    }
+
+    if (*x < left_bound) *x = left_bound;
+    if (*x > right_bound) *x = right_bound;
+}
+
 static int movement_left_bound(const game_t *g) {
-    return g->tower_wall_active ? g->tower_wall_left : 0;
+    int left = g->tower_wall_active ? g->tower_wall_left : 0;
+    int mirror_wall = magician_side_wall_thickness(g);
+    if (mirror_wall > left) left = mirror_wall;
+    return left;
 }
 
 static int movement_right_bound(const game_t *g) {
-    return g->tower_wall_active ? g->tower_wall_right : LW;
+    int right = g->tower_wall_active ? g->tower_wall_right : LW;
+    int mirror_wall = magician_side_wall_thickness(g);
+    int mirror_right = LW - mirror_wall;
+    if (mirror_wall > 0 && mirror_right < right) right = mirror_right;
+    return right;
 }
 
 static int tower_walls_closed(const game_t *g) {
@@ -1074,6 +1128,28 @@ static void render_tower_walls(lfb_t *lfb, const game_t *g) {
         }
         for (int x = g->tower_wall_right; x < LW; x++) {
             l_putpix(lfb, x, y, 0xFF4A2E12);
+        }
+    }
+}
+
+static void render_magician_side_walls(lfb_t *lfb, const game_t *g) {
+    int wall = magician_side_wall_thickness(g);
+    if (wall <= 0) return;
+
+    int top = TOP_HUD_SEPARATOR_Y + 1;
+    int bottom = BOTTOM_HUD_SEPARATOR_Y - 1;
+    if (bottom < top) return;
+
+    for (int y = top; y <= bottom; y++) {
+        for (int x = 0; x < wall; x++) {
+            uint32_t c = 0xFFB0B0B0;
+            if (x == wall - 1 && ((y & 3) == 0)) c = 0xFFE0E0E0;
+            l_putpix(lfb, x, y, c);
+        }
+        for (int x = LW - wall; x < LW; x++) {
+            uint32_t c = 0xFFB0B0B0;
+            if (x == LW - wall && ((y & 3) == 0)) c = 0xFFE0E0E0;
+            l_putpix(lfb, x, y, c);
         }
     }
 }
@@ -2097,7 +2173,11 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
     for (int si = 0; si < MAX_PSHOTS; si++) {
         if (!shots[si].alive) continue;
 
-        if (shots[si].reflected) {
+        int shot_spread_dir = spread_dir;
+        if (shots[si].reflected == 2) shot_spread_dir = 1;
+        else if (shots[si].reflected == 3) shot_spread_dir = -1;
+
+        if (shots[si].reflected == 1) {
             handle_enemy_shot_collisions(g, &shots[si], 0, 1);
             continue;
         }
@@ -2123,7 +2203,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
         if (g->boss_alive && !g->boss_dying && g->boss_type == BOSS_TYPE_MAGICIAN) {
             int reflected = 0;
             for (int bi = 0; bi < 5 && !reflected; bi++) {
-                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int bx = bullet_x_with_spread(&shots[si], bi, shot_spread_dir);
                 int by = shots[si].y - bi;
                 if (magician_mirror_hits_point(&g->magician_mirror, bx, by) ||
                     magician_mirror_hits_point(&g->magician_mirror_alt, bx, by) ||
@@ -2141,7 +2221,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
         if (g->boss_attack_type == 2 && g->boss_bomb.alive && !g->boss_bomb.exploding) {
             int bomb_hit = 0;
             for (int bi = 0; bi < 5 && !bomb_hit; bi++) {
-                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int bx = bullet_x_with_spread(&shots[si], bi, shot_spread_dir);
                 int by = shots[si].y - bi;
                 int dx = bx - g->boss_bomb.x;
                 int dy = by - g->boss_bomb.y;
@@ -2164,7 +2244,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             if (!g->tower_asteroid[ai].alive) continue;
             int asteroid_hit = 0;
             for (int bi = 0; bi < 5 && !asteroid_hit; bi++) {
-                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int bx = bullet_x_with_spread(&shots[si], bi, shot_spread_dir);
                 int by = shots[si].y - bi;
                 int dx = bx - g->tower_asteroid[ai].x;
                 int dy = by - g->tower_asteroid[ai].y;
@@ -2196,7 +2276,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             int sx = boss_shield_x(g);
             int sy = boss_shield_y(g);
             for (int bi = 0; bi < 5 && !shield_hit; bi++) {
-                int bx = bullet_x_with_spread(&shots[si], bi, spread_dir);
+                int bx = bullet_x_with_spread(&shots[si], bi, shot_spread_dir);
                 int by = shots[si].y - bi;
                 if (bullet_hits_sprite(&g->BOSS_SHIELD, sx, sy, bx, by)) {
                     bunker_damage(&g->BOSS_SHIELD, bx - sx, by - sy, 3);
@@ -2220,7 +2300,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             for (int bi = 0; bi < 5 && !boss_hit; bi++) {
                 if (bullet_hits_sprite(BS,
                                        g->boss_x, g->boss_y,
-                                       bullet_x_with_spread(&shots[si], bi, spread_dir), shots[si].y - bi)) {
+                                       bullet_x_with_spread(&shots[si], bi, shot_spread_dir), shots[si].y - bi)) {
                     boss_hit = 1;
                 }
             }
@@ -2275,7 +2355,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 int bullet_hit = 0;
                 for (int bi = 0; bi < 5 && !bullet_hit; bi++) {
                     if (bullet_hits_sprite(AS, ax, ay,
-                                           bullet_x_with_spread(&shots[si], bi, spread_dir), shots[si].y - bi)) {
+                                           bullet_x_with_spread(&shots[si], bi, shot_spread_dir), shots[si].y - bi)) {
                         bullet_hit = 1;
                     }
                 }
@@ -2313,7 +2393,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             }
         }
         if (!hit && shots[si].alive) {
-            handle_bunker_bullet_collisions(g, &shots[si], spread_dir, -1, 3);
+            handle_bunker_bullet_collisions(g, &shots[si], shot_spread_dir, -1, 3);
         }
     }
 }
@@ -4179,8 +4259,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
                 for (int i = 0; i < CHARIOT_ARC_SHOT_COUNT; i++) {
                     if (!g->boss_arc_shot[i].alive) continue;
-                    g->boss_arc_shot[i].x += g->boss_arc_shot_dx[i];
+                    int dx = g->boss_arc_shot_dx[i];
+                    g->boss_arc_shot[i].x += dx;
                     g->boss_arc_shot[i].y += 2;
+                    reflect_x_from_magician_side_walls(g, &g->boss_arc_shot[i].x, &dx, 2);
+                    g->boss_arc_shot_dx[i] = dx;
                     if (g->boss_arc_shot[i].y > LH || g->boss_arc_shot[i].x < 0 || g->boss_arc_shot[i].x >= LW) {
                         g->boss_arc_shot[i].alive = 0;
                     }
@@ -4231,8 +4314,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             } else {
                 for (int i = 0; i < 3; i++) {
                     if (!g->boss_triple_shot[i].alive) continue;
-                    g->boss_triple_shot[i].x += g->boss_triple_shot_dx[i];
+                    int dx = g->boss_triple_shot_dx[i];
+                    g->boss_triple_shot[i].x += dx;
                     g->boss_triple_shot[i].y += 2;
+                    reflect_x_from_magician_side_walls(g, &g->boss_triple_shot[i].x, &dx, 2);
+                    g->boss_triple_shot_dx[i] = dx;
                     if (g->boss_triple_shot[i].y > LH || g->boss_triple_shot[i].x < 0 || g->boss_triple_shot[i].x >= LW) {
                         g->boss_triple_shot[i].alive = 0;
                     }
@@ -5024,59 +5110,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     render_player_health_bar(g, lfb);
-        
-    // Powerup progress bars
-    {
-        const char *p1 = "PLAYER 1";
-        int scale = 1;
-        int x = 5;
-        int y = LH - 12;
-        int lx = x + text_width_5x5(p1, scale) + 6;
-        int bar_w = 40;
-        {
-            int px = lx + bar_w + 10;  // Start after health bar
-            int py = y;
-            int powerup_bar_h = 6;
-            int powerup_bar_w = 30;
-            int icon_size = 6;
-            int spacing = 45;  // Space between each powerup display
-            
-            for (int slot = 0; slot < 5; slot++) {
-                if (g->powerup_slot_timer[slot] > 0) {
-                    // Draw powerup icon
-                    uint32_t icon_color = 0xFFFFFFFF;
-                    if (g->powerup_type_slot[slot] == POWERUP_DOUBLE_SHOT) {
-                        icon_color = 0xFFFFFF00;  // Yellow
-                    } else if (g->powerup_type_slot[slot] == POWERUP_TRIPLE_SHOT) {
-                        icon_color = 0xFF0000FF;  // Blue
-                    } else if (g->powerup_type_slot[slot] == POWERUP_RAPID_FIRE) {
-                        icon_color = 0xFFFFA500;  // Orange
-                    } else if (g->powerup_type_slot[slot] == POWERUP_EXPLOSIVE) {
-                        icon_color = 0xFFFF0000;  // Red
-                    } else if (g->powerup_type_slot[slot] == POWERUP_SHIELD) {
-                        icon_color = 0xFF3399FF;  // Blue
-                    }
-                    
-                    // Draw "POWER:" label
-                    const char *power_label = "POWER:";
-                    l_draw_text(lfb, px, py, power_label, 1, 0xFFFFFFFF);
-                    int label_w = text_width_5x5(power_label, 1);
-                    
-                    // Draw progress bar to the right of label
-                    int bar_x = px + label_w + 3;
-                    int bar_y = py - 1;
-                    
-                    // Filled portion (proportional to remaining time)
-                    int max_timer = 600;  // 600 frames = 10 seconds at 60 FPS
-                    int fill_w = (g->powerup_slot_timer[slot] * powerup_bar_w) / max_timer;
-                    draw_bar(lfb, bar_x, bar_y, powerup_bar_w, powerup_bar_h, fill_w, icon_color);
-                    
-                    // Move to next slot position
-                    px += spacing;
-                }
-            }
-        }
-    }
+
     // bunkers (not on level 0)
     if (g->level != 0) {
         for (int i = 0; i < 4; i++) {
@@ -5357,6 +5391,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             }
         }
     }
+
+    render_magician_side_walls(lfb, g);
 
     render_tower_walls(lfb, g);
 
