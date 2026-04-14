@@ -46,6 +46,7 @@ int sw_sim_main(void) {
             if (game.start_screen) mode = MUSIC_MODE_MENU;
             else if (game.game_over) mode = MUSIC_MODE_GAME_OVER;
             else if (game.win_screen) mode = MUSIC_MODE_WIN;
+            else if (game.level_complete) mode = MUSIC_MODE_SILENT;
             else if (game.level == 0 && !game.level_complete) mode = MUSIC_MODE_SILENT;
             else if (game.overworld_cutscene_active) mode = MUSIC_MODE_SILENT;
             else if (game.paused) mode = MUSIC_MODE_PAUSED;
