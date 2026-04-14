@@ -842,32 +842,29 @@ static void spawn_magician_mirror(game_t *g) {
     m_alt->follow_boss = 0;
     m_alt->width = MAGICIAN_MIRROR_WIDTH_ALIEN;
 
-    int can_pick_alien = 0;
-    for (int r = 0; r < AROWS && !can_pick_alien; r++) {
+    int target_row = -1;
+    for (int r = AROWS - 1; r >= 0; r--) {
         for (int c = 0; c < ACOLS; c++) {
             if (g->alien_alive[r][c]) {
-                can_pick_alien = 1;
+                target_row = r;
                 break;
             }
         }
+        if (target_row >= 0) break;
     }
 
-    if (can_pick_alien) {
-        int rr[AROWS * ACOLS];
-        int cc[AROWS * ACOLS];
+    if (target_row >= 0) {
+        int cols[ACOLS];
         int n = 0;
-        for (int r = 0; r < AROWS; r++) {
-            for (int c = 0; c < ACOLS; c++) {
-                if (!g->alien_alive[r][c]) continue;
-                rr[n] = r;
-                cc[n] = c;
-                n++;
-            }
+        for (int c = 0; c < ACOLS; c++) {
+            if (!g->alien_alive[target_row][c]) continue;
+            cols[n++] = c;
         }
+
         if (n > 0) {
             int pick = rand() % n;
-            m_alt->alien_r = rr[pick];
-            m_alt->alien_c = cc[pick];
+            m_alt->alien_r = target_row;
+            m_alt->alien_c = cols[pick];
         } else {
             reset_magician_mirror_state(m_alt);
         }
