@@ -14,6 +14,7 @@
 #define PLAYER_EXIT_ASCEND_SPEED 2
 #define PLAYER_DEATH_DELAY_FRAMES 60
 #define PLAYER_IFRAMES 60
+#define CRITICAL_HIT_TEXT_FRAMES 120
 #define PLAYER_SHIELD_RADIUS 8
 #define ALIEN_EXPLOSION_FRAMES 18
 #define BOSS_BOMB_EXPLOSION_FRAMES 60
@@ -2203,12 +2204,22 @@ static int bullet_x_with_spread(const bullet_t *shot, int bi, int spread_dir) {
 }
 
 static int player_shot_damage_for_hit(game_t *g, bullet_t *shot) {
+    int dmg;
     if (shot->pierce_active) {
-        int dmg = shot->damage_remaining;
+        dmg = shot->damage_remaining;
         if (dmg < 0) dmg = 0;
-        return dmg;
+    } else {
+        dmg = g->player_damage;
+        if (shot->critical) {
+            dmg *= 2;
+        }
     }
-    return g->player_damage;
+    return dmg;
+}
+
+static void trigger_critical_hit_banner(game_t *g, const bullet_t *shot) {
+    (void)g;
+    (void)shot;
 }
 
 static void consume_player_shot_damage(bullet_t *shot, int consumed) {
@@ -2273,6 +2284,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     g->magician_wave.vy = -iabs_int(MAGICIAN_ORB_SPEED_Y);
                     g->magician_wave.hp = 0;
                 }
+                trigger_critical_hit_banner(g, &shots[si]);
                 shots[si].alive = 0;
             }
         }
@@ -2307,6 +2319,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
             }
             if (bomb_hit) {
+                trigger_critical_hit_banner(g, &shots[si]);
                 shots[si].alive = 0;
                 g->boss_bomb.hits_taken++;
                 if (!g->boss_bomb.reversed && g->boss_bomb.hits_taken >= BOSS_BOMB_HITS_TO_REVERSE) {
@@ -2330,6 +2343,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
             }
             if (asteroid_hit) {
+                trigger_critical_hit_banner(g, &shots[si]);
                 int dmg = player_shot_damage_for_hit(g, &shots[si]);
                 if (dmg <= 0) {
                     shots[si].alive = 0;
@@ -2364,6 +2378,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 if (!sprite_has_any_bits(&g->BOSS_SHIELD)) {
                     g->boss_shield_active = 0;
                 }
+                trigger_critical_hit_banner(g, &shots[si]);
                 shots[si].alive = 0;
             }
         }
@@ -2382,6 +2397,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 }
             }
             if (boss_hit) {
+                trigger_critical_hit_banner(g, &shots[si]);
                 int dmg = player_shot_damage_for_hit(g, &shots[si]);
                 if (g->boss_type == BOSS_TYPE_MAGICIAN && magician_mirror_attack_active(g)) {
                     dmg += 1;
@@ -2437,6 +2453,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                     }
                 }
                 if (bullet_hit) {
+                    trigger_critical_hit_banner(g, &shots[si]);
                     if (shots[si].pierce_active && shots[si].last_hit_r == r && shots[si].last_hit_c == c) {
                         continue;
                     }
@@ -2535,10 +2552,26 @@ static void reset_player_progression(game_t *g) {
     g->player_speed = PLAYER_BASE_SPEED;
     g->fire_speed_bonus = 0;
     g->player_damage = PLAYER_BASE_DAMAGE;
+    g->shots_fired_counter = 0;
     g->pierce_unlocked = 0;
     g->points_unlocked = 0;
+    g->crit_unlocked = 0;
+    g->unlock_order_count = 0;
+    for (int i = 0; i < 3; i++) g->unlock_order[i] = -1;
     reset_shop_state(g);
     reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
+}
+
+static int is_one_time_shop_item(shop_item_type_t type) {
+    return type == SHOP_ITEM_PIERCE || type == SHOP_ITEM_POINTS || type == SHOP_ITEM_CRIT;
+}
+
+static void add_unlock_in_order(game_t *g, shop_item_type_t type) {
+    for (int i = 0; i < g->unlock_order_count; i++) {
+        if (g->unlock_order[i] == (int)type) return;
+    }
+    if (g->unlock_order_count >= 3) return;
+    g->unlock_order[g->unlock_order_count++] = (int)type;
 }
 
 static void reset_boss_selection_history(game_t *g) {
@@ -2601,6 +2634,7 @@ static const char *shop_item_label(shop_item_type_t type) {
         case SHOP_ITEM_DAMAGE:     return "DMG";
         case SHOP_ITEM_PIERCE:     return "PIERCE";
         case SHOP_ITEM_POINTS:     return "POINTS";
+        case SHOP_ITEM_CRIT:       return "CRIT";
         default:                   return "ITEM";
     }
 }
@@ -2628,7 +2662,7 @@ static void enter_shop(game_t *g) {
         g->overworld_current_node = to_node;
     }
 
-    shop_item_type_t shop_pool[5];
+    shop_item_type_t shop_pool[6];
     int shop_pool_count = 0;
     shop_pool[shop_pool_count++] = SHOP_ITEM_FIRE_SPEED;
     shop_pool[shop_pool_count++] = SHOP_ITEM_LIFE;
@@ -2638,6 +2672,9 @@ static void enter_shop(game_t *g) {
     }
     if (!g->points_unlocked) {
         shop_pool[shop_pool_count++] = SHOP_ITEM_POINTS;
+    }
+    if (!g->crit_unlocked) {
+        shop_pool[shop_pool_count++] = SHOP_ITEM_CRIT;
     }
 
     int price_multiplier = g->shop_count; // Base * shops seen
@@ -2650,23 +2687,27 @@ static void enter_shop(game_t *g) {
     int chosen_count = 0;
 
     // Guarantee at least one good item when at least one is still available.
-    int good_candidates[2];
+    int good_candidates[3];
     int good_count = 0;
     if (!g->pierce_unlocked) good_candidates[good_count++] = SHOP_ITEM_PIERCE;
     if (!g->points_unlocked) good_candidates[good_count++] = SHOP_ITEM_POINTS;
+    if (!g->crit_unlocked) good_candidates[good_count++] = SHOP_ITEM_CRIT;
+    int one_time_picks = 0;
     if (good_count > 0) {
         int good_pick = good_candidates[rand() % good_count];
         chosen_type[chosen_count++] = good_pick;
         used_type[good_pick] = 1;
+        one_time_picks = 1;
     }
 
     // Fill remaining slots with unique picks from the pool.
     while (chosen_count < MAX_SHOP_ITEMS) {
-        shop_item_type_t candidates[5];
+        shop_item_type_t candidates[6];
         int candidate_count = 0;
         for (int p = 0; p < shop_pool_count; p++) {
             shop_item_type_t t = shop_pool[p];
             if (used_type[t]) continue;
+            if (is_one_time_shop_item(t) && one_time_picks >= 2) continue;
             candidates[candidate_count++] = t;
         }
 
@@ -2677,6 +2718,7 @@ static void enter_shop(game_t *g) {
         shop_item_type_t picked = candidates[rand() % candidate_count];
         chosen_type[chosen_count++] = picked;
         used_type[picked] = 1;
+        if (is_one_time_shop_item(picked)) one_time_picks++;
     }
 
     // Randomize display order while preserving uniqueness/guarantees.
@@ -2742,8 +2784,16 @@ static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         else if (g->shop_items[it].type == SHOP_ITEM_MOVE_SPEED) g->player_speed++;
                         else if (g->shop_items[it].type == SHOP_ITEM_LIFE) g->lives++;
                         else if (g->shop_items[it].type == SHOP_ITEM_DAMAGE) g->player_damage++;
-                        else if (g->shop_items[it].type == SHOP_ITEM_PIERCE) g->pierce_unlocked = 1;
-                        else if (g->shop_items[it].type == SHOP_ITEM_POINTS) g->points_unlocked = 1;
+                        else if (g->shop_items[it].type == SHOP_ITEM_PIERCE) {
+                            g->pierce_unlocked = 1;
+                            add_unlock_in_order(g, SHOP_ITEM_PIERCE);
+                        } else if (g->shop_items[it].type == SHOP_ITEM_POINTS) {
+                            g->points_unlocked = 1;
+                            add_unlock_in_order(g, SHOP_ITEM_POINTS);
+                        } else if (g->shop_items[it].type == SHOP_ITEM_CRIT) {
+                            g->crit_unlocked = 1;
+                            add_unlock_in_order(g, SHOP_ITEM_CRIT);
+                        }
                         g->shop_items[it].active = 0;
                     }
                     if (bi == 0) g->pshot[si].alive = 0;
@@ -2814,6 +2864,8 @@ static void shop_render(game_t *g, lfb_t *lfb) {
             draw_sprite1r(lfb, icon, icon_x, icon_y, icon_color);
         } else if (g->shop_items[i].type == SHOP_ITEM_POINTS) {
             draw_points_upgrade_icon(lfb, center_x, center_y);
+        } else if (g->shop_items[i].type == SHOP_ITEM_CRIT) {
+            draw_crit_upgrade_icon(lfb, center_x, center_y);
         }
 
         // Label and price

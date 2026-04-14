@@ -16,6 +16,7 @@ uint32_t color_with_intensity(uint32_t color, int intensity_pct);
 void render_fps_counter(lfb_t *lfb);
 void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type);
 void draw_points_upgrade_icon(lfb_t *lfb, int x0, int y0);
+void draw_crit_upgrade_icon(lfb_t *lfb, int x0, int y0);
 int is_powerup_active(const game_t *g, powerup_type_t type);
 int double_shot_active(const game_t *g);
 int triple_shot_active(const game_t *g);

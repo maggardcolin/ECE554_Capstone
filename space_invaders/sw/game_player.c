@@ -7,7 +7,6 @@
 #define MAGICIAN_SIDE_WALL_THICKNESS 4
 #define MAGICIAN_SIDE_DEFLECT_DY -2
 #define MAGICIAN_SIDE_DEFLECT_DX 3
-
 static int magician_side_wall_active(const game_t *g) {
     return g->boss_alive && !g->boss_dying && (g->boss_type == BOSS_TYPE_MAGICIAN);
 }
@@ -20,28 +19,42 @@ static int magician_side_wall_right_bound(void) {
     return LW - MAGICIAN_SIDE_WALL_THICKNESS - 1;
 }
 
-static void try_spawn_bullet(game_t *g, bullet_t *shots, int x, int y, int pierce_active) {
+static void try_spawn_bullet(game_t *g, bullet_t *shots, int x, int y, int pierce_active, int critical) {
     for (int i = 0; i < MAX_PSHOTS; i++) {
         if (!shots[i].alive) {
+            int base_damage = pierce_active ? (g->player_damage + 1) : g->player_damage;
             shots[i].alive = 1;
             shots[i].x = x;
             shots[i].y = y;
             shots[i].dy = -4;
             shots[i].reflected = 0;
+            shots[i].critical = critical ? 1 : 0;
             shots[i].last_hit_r = -1;
             shots[i].last_hit_c = -1;
             shots[i].pierce_active = pierce_active ? 1 : 0;
-            shots[i].damage_remaining = pierce_active ? (g->player_damage + 1) : g->player_damage;
+            // Critical piercing shots carry a doubled damage pool while still piercing.
+            shots[i].damage_remaining = (critical ? (base_damage * 2) : base_damage);
             break;
         }
     }
 }
 
 static void fire_player_shots(game_t *g, int center_x, int center_y) {
-    try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
-    if (triple_shot_active(g)) {
-        try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, 0);
-        try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, 0);
+    int triple_active = triple_shot_active(g);
+    int center_critical = 0;
+    if (g->crit_unlocked) {
+        g->shots_fired_counter++;
+        if (g->shots_fired_counter >= 10) {
+            center_critical = 1;
+            g->shots_fired_counter = 0;
+        }
+    } else {
+        g->shots_fired_counter = 0;
+    }
+    try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked, center_critical);
+    if (triple_active) {
+        try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, 0, 0);
+        try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, 0, 0);
     }
 }
 
@@ -71,15 +84,20 @@ void clear_player_shots(game_t *g) {
         g->pshot[i].damage_remaining = 0;
         g->pshot_left[i].damage_remaining = 0;
         g->pshot_right[i].damage_remaining = 0;
+        g->pshot[i].critical = 0;
+        g->pshot_left[i].critical = 0;
+        g->pshot_right[i].critical = 0;
     }
 }
 
 void update_player_shots(game_t *g) {
+    int top_limit = TOP_HUD_SEPARATOR_Y + 1;
+
     for (int i = 0; i < MAX_PSHOTS; i++) {
         if (g->pshot[i].alive) {
             int dy = (g->pshot[i].dy != 0) ? g->pshot[i].dy : -4;
             g->pshot[i].y += dy;
-            if (g->pshot[i].y < 0 || g->pshot[i].y >= LH) g->pshot[i].alive = 0;
+            if (g->pshot[i].y < top_limit || g->pshot[i].y >= LH) g->pshot[i].alive = 0;
         }
         if (g->pshot_left[i].alive) {
             int dx = -1;
@@ -100,7 +118,7 @@ void update_player_shots(game_t *g) {
                 }
             }
 
-            if (g->pshot_left[i].y < 0 || g->pshot_left[i].y >= LH || g->pshot_left[i].x < 0 || g->pshot_left[i].x >= LW) g->pshot_left[i].alive = 0;
+            if (g->pshot_left[i].y < top_limit || g->pshot_left[i].y >= LH || g->pshot_left[i].x < 0 || g->pshot_left[i].x >= LW) g->pshot_left[i].alive = 0;
         }
         if (g->pshot_right[i].alive) {
             int dx = 1;
@@ -121,7 +139,7 @@ void update_player_shots(game_t *g) {
                 }
             }
 
-            if (g->pshot_right[i].y < 0 || g->pshot_right[i].y >= LH || g->pshot_right[i].x < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
+            if (g->pshot_right[i].y < top_limit || g->pshot_right[i].y >= LH || g->pshot_right[i].x < 0 || g->pshot_right[i].x >= LW) g->pshot_right[i].alive = 0;
         }
     }
 }
@@ -255,10 +273,11 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
     l_draw_score(lfb, lives_x, text_y, lives, 0xFFFFFFFF);
 
     int status_x = lives_x + digit_count(lives) * 4 + 8;
-    int unlocked_icon_type[2];
+    int unlocked_icon_type[3];
     int unlocked_count = 0;
-    if (g->pierce_unlocked) unlocked_icon_type[unlocked_count++] = SHOP_ITEM_PIERCE;
-    if (g->points_unlocked) unlocked_icon_type[unlocked_count++] = SHOP_ITEM_POINTS;
+    for (int i = 0; i < g->unlock_order_count && i < 3; i++) {
+        unlocked_icon_type[unlocked_count++] = g->unlock_order[i];
+    }
 
     int box_x = status_x;
     int box_y = text_y - 5;
@@ -288,6 +307,10 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
                 int cx = x0 + box_w / 2;
                 int cy = box_y + box_h / 2;
                 draw_points_upgrade_icon(lfb, cx, cy);
+            } else if (unlocked_icon_type[i] == SHOP_ITEM_CRIT) {
+                int cx = x0 + box_w / 2;
+                int cy = box_y + box_h / 2;
+                draw_crit_upgrade_icon(lfb, cx, cy);
             }
         }
     }
@@ -340,16 +363,23 @@ void render_player_shots(const game_t *g, lfb_t *lfb) {
                 for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y + i, 0xFF00E5FF);
                 continue;
             }
-            uint32_t bullet_color = rapid_fire_active(g) ? 0xFFFFA500 : 0xFFFFFFFF;
+            uint32_t bullet_color = g->pshot[s].critical ? 0xFF00FF00 : (rapid_fire_active(g) ? 0xFFFFA500 : 0xFFFFFFFF);
             if (g->pshot[s].pierce_active) {
                 for (int i = 0; i < 5; i++) {
                     int py = g->pshot[s].y - i;
-                    l_putpix(lfb, g->pshot[s].x, py, 0xFF66CCFF);
-                    l_putpix(lfb, g->pshot[s].x - 1, py, 0xFF66CCFF);
-                    l_putpix(lfb, g->pshot[s].x + 1, py, 0xFF66CCFF);
+                    l_putpix(lfb, g->pshot[s].x, py, bullet_color);
+                    l_putpix(lfb, g->pshot[s].x - 1, py, bullet_color);
+                    l_putpix(lfb, g->pshot[s].x + 1, py, bullet_color);
                 }
             } else {
-                for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y - i, bullet_color);
+                for (int i = 0; i < 5; i++) {
+                    int py = g->pshot[s].y - i;
+                    l_putpix(lfb, g->pshot[s].x, py, bullet_color);
+                    if (g->pshot[s].critical) {
+                        l_putpix(lfb, g->pshot[s].x - 1, py, bullet_color);
+                        l_putpix(lfb, g->pshot[s].x + 1, py, bullet_color);
+                    }
+                }
             }
         }
         if (g->pshot_left[s].alive) {

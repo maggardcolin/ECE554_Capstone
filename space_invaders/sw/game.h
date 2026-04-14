@@ -21,7 +21,8 @@ typedef enum {
     SHOP_ITEM_DAMAGE = 3,
     SHOP_ITEM_PIERCE = 4,
     SHOP_ITEM_POINTS = 5,
-    SHOP_ITEM_COUNT = 6
+    SHOP_ITEM_CRIT = 6,
+    SHOP_ITEM_COUNT = 7
 } shop_item_type_t;
 
 typedef enum {
@@ -40,6 +41,7 @@ typedef struct {
     int dy;
     int alive;
     int reflected;
+    int critical;
     int damage_remaining;
     int pierce_active;
     int last_hit_r;
@@ -196,6 +198,7 @@ typedef struct {
     int boss_laser_last_hit_y; // Last y position where laser hit player (to prevent multiple hits)
     int boss_no_hit_taken;     // 1 if player has not been hit during the current boss fight
     int perfect_text_timer;    // Frames remaining to show PERFECT bonus text
+    int critical_hit_timer;    // Frames remaining to show CRITICAL HIT text in HUD
     int boss_attack_type;      // 0 = purple laser, 1 = green heal laser, 2 = blue bomb, 3 = yellow shuffle, 4 = tower walls, 5 = hermit dodge, 6 = chariot charge, 7 = magician mirrors
     int next_boss_attack_type; // The attack type that will be used for the next charge
     int boss_green_laser_last_hit_y; // Last y position where green laser hit aliens
@@ -269,8 +272,12 @@ typedef struct {
     int player_speed;          // Base 2, increased by shop item
     int fire_speed_bonus;      // Each point reduces cooldown
     int player_damage;         // Base 1, increased by shop item
+    int shots_fired_counter;   // Counts fired center shots; every 10th center shot is a critical
     int pierce_unlocked;       // Permanent shop upgrade
     int points_unlocked;       // Permanent 2x-points shop upgrade
+    int crit_unlocked;         // Permanent critical-hit shop upgrade
+    int unlock_order[3];       // Pickup order for one-time upgrades shown in HUD boxes
+    int unlock_order_count;
 
     // Shop state
     int in_shop;

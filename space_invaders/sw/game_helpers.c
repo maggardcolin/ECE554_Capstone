@@ -153,6 +153,15 @@ void draw_points_upgrade_icon(lfb_t *lfb, int x0, int y0) {
     l_draw_text(lfb, x0 - 1, y0 - 2, "2", 1, 0xFFFFFF00);
 }
 
+void draw_crit_upgrade_icon(lfb_t *lfb, int x0, int y0) {
+    // Match the critical center-shot bullet: 5px tall and 3px wide, solid green.
+    for (int i = -2; i <= 2; i++) {
+        l_putpix(lfb, x0 - 1, y0 + i, 0xFF00FF00);
+        l_putpix(lfb, x0, y0 + i, 0xFF00FF00);
+        l_putpix(lfb, x0 + 1, y0 + i, 0xFF00FF00);
+    }
+}
+
 int is_powerup_active(const game_t *g, powerup_type_t type) {
     for (int i = 0; i < 5; i++) {
         if (g->powerup_slot_timer[i] > 0 && g->powerup_type_slot[i] == type) return 1;
