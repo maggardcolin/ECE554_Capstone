@@ -101,6 +101,20 @@ static const char *boss_menu_label(int boss_type) {
     return "EMPEROR";
 }
 
+static int practice_menu_boss_type_for_index(int menu_index) {
+    static const int order[BOSS_TYPE_COUNT] = {
+        BOSS_TYPE_MAGICIAN, // I
+        BOSS_TYPE_CLASSIC,  // IV (Emperor)
+        BOSS_TYPE_CHARIOT,  // VII
+        BOSS_TYPE_HERMIT,   // IX
+        BOSS_TYPE_TOWER,    // XVI
+        BOSS_TYPE_YELLOW,   // XVII (Star)
+        BOSS_TYPE_BLUE      // XVIII (Moon)
+    };
+    if (menu_index < 0 || menu_index >= BOSS_TYPE_COUNT) return BOSS_TYPE_CLASSIC;
+    return order[menu_index];
+}
+
 static uint32_t practice_menu_boss_color(int boss_type) {
     if (boss_type == BOSS_TYPE_BLUE) return 0xFF3399FF;
     if (boss_type == BOSS_TYPE_YELLOW) return 0xFFFFFF00;
@@ -3304,7 +3318,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->practice_menu_active = 0;
                         g->main_menu_selection = 0;
                     } else {
-                        setup_practice_run(g, g->practice_menu_selection);
+                        int selected_boss_type = practice_menu_boss_type_for_index(g->practice_menu_selection);
+                        setup_practice_run(g, selected_boss_type);
                     }
                 }
             }
@@ -4775,13 +4790,13 @@ void game_render(game_t *g, lfb_t *lfb) {
             l_draw_text(lfb, (LW - hint_w) / 2, LH - 22, hint, 1, 0xFFBFBFBF);
         } else {
             const char *entries[PRACTICE_MENU_COUNT] = {
-                boss_menu_label(BOSS_TYPE_CLASSIC),
-                boss_menu_label(BOSS_TYPE_BLUE),
-                boss_menu_label(BOSS_TYPE_YELLOW),
-                boss_menu_label(BOSS_TYPE_TOWER),
-                boss_menu_label(BOSS_TYPE_HERMIT),
-                boss_menu_label(BOSS_TYPE_CHARIOT),
                 boss_menu_label(BOSS_TYPE_MAGICIAN),
+                boss_menu_label(BOSS_TYPE_CLASSIC),
+                boss_menu_label(BOSS_TYPE_CHARIOT),
+                boss_menu_label(BOSS_TYPE_HERMIT),
+                boss_menu_label(BOSS_TYPE_TOWER),
+                boss_menu_label(BOSS_TYPE_YELLOW),
+                boss_menu_label(BOSS_TYPE_BLUE),
                 "EXIT TO MAIN MENU"
             };
 
@@ -4794,7 +4809,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
                 if (i < BOSS_TYPE_COUNT) {
                     if (is_selected) {
-                        color = practice_menu_boss_color(i);
+                        int boss_type = practice_menu_boss_type_for_index(i);
+                        color = practice_menu_boss_color(boss_type);
                         cursor_color = color;
                     }
                 } else {
@@ -4809,7 +4825,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             }
 
             if (g->practice_menu_selection < BOSS_TYPE_COUNT) {
-                render_practice_boss_preview(g, lfb, g->practice_menu_selection);
+                int selected_boss_type = practice_menu_boss_type_for_index(g->practice_menu_selection);
+                render_practice_boss_preview(g, lfb, selected_boss_type);
             }
 
             const char *hint = "UP/DOWN BOSS  LEFT/RIGHT LEVEL  SPACE ENTER";
