@@ -200,3 +200,29 @@ void l_draw_text_clipped_y(lfb_t *lfb, int x, int y, const char *text, int scale
         x += (w + spacing) * scale;
     }
 }
+
+int l_text_width_compact(const char *text) {
+    int count = 0;
+    for (const char *p = text; *p; p++) count++;
+    if (count == 0) return 0;
+    return count * 4 - 1;
+}
+
+void l_draw_text_compact(lfb_t *lfb, int x, int y, const char *text, uint32_t c) {
+    const int gx_idx[3] = {0, 2, 4};
+    const int gy_idx[3] = {0, 2, 4};
+
+    for (const char *p = text; *p; p++) {
+        const uint8_t *rows = glyph5_find(*p);
+        for (int gy = 0; gy < 3; gy++) {
+            int src_y = gy_idx[gy];
+            for (int gx = 0; gx < 3; gx++) {
+                int src_x = gx_idx[gx];
+                if (rows[src_y] & (1u << (4 - src_x))) {
+                    l_putpix(lfb, x + gx, y + gy, c);
+                }
+            }
+        }
+        x += 4;
+    }
+}

@@ -89,6 +89,7 @@ typedef struct {
     int vx;
     int vy;
     int dir;
+    int hp;
 } magician_wave_t;
 
 #define MAX_PSHOTS 8

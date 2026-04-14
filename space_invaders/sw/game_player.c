@@ -37,37 +37,11 @@ static void try_spawn_bullet(game_t *g, bullet_t *shots, int x, int y, int pierc
     }
 }
 
-static int magician_dual_shot_active(const game_t *g) {
-    return g->boss_alive && !g->boss_dying &&
-           (g->boss_type == BOSS_TYPE_MAGICIAN) &&
-           (g->level >= 3) &&
-           (g->magician_curse_timer > 0);
-}
-
 static void fire_player_shots(game_t *g, int center_x, int center_y) {
-    if (magician_dual_shot_active(g)) {
-        int side_pierce = g->pierce_unlocked ? 1 : 0;
-        if (triple_shot_active(g)) {
-            // Keep triple-shot behavior unchanged.
-            try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, side_pierce);
-            try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, side_pierce);
-        } else if (g->magician_shot_alternate_side == 0) {
-            try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, side_pierce);
-            g->magician_shot_alternate_side = 1;
-        } else {
-            try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, side_pierce);
-            g->magician_shot_alternate_side = 0;
-        }
-
-        if (triple_shot_active(g)) {
-            try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
-        }
-    } else {
-        try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
-        if (triple_shot_active(g)) {
-            try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, 0);
-            try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, 0);
-        }
+    try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
+    if (triple_shot_active(g)) {
+        try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, 0);
+        try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, 0);
     }
 }
 
@@ -181,9 +155,19 @@ void update_player_firing(game_t *g, uint32_t buttons) {
 }
 
 static uint32_t get_player_color(const game_t *g) {
+    if (explosive_shot_active(g)) return 0xFFFF0000;
     if (rapid_fire_active(g)) return 0xFFFFA500;
     if (triple_shot_active(g)) return 0xFF0000FF;
     return 0xFF00FF00;
+}
+
+static uint32_t powerup_type_color(powerup_type_t type) {
+    if (type == POWERUP_DOUBLE_SHOT) return 0xFFFFFF00;
+    if (type == POWERUP_TRIPLE_SHOT) return 0xFF0000FF;
+    if (type == POWERUP_RAPID_FIRE) return 0xFFFFA500;
+    if (type == POWERUP_EXPLOSIVE) return 0xFFFF0000;
+    if (type == POWERUP_SHIELD) return 0xFF66CCFF;
+    return 0xFFFFFFFF;
 }
 
 void render_player(const game_t *g, lfb_t *lfb) {
@@ -210,11 +194,14 @@ void render_score_display(const game_t *g, lfb_t *lfb) {
     l_draw_score(lfb, score_x, y, g->score, score_color);
 
     int best_timer = 0;
+    powerup_type_t best_type = POWERUP_DOUBLE_SHOT;
     for (int i = 0; i < 5; i++) {
         if (g->powerup_slot_timer[i] > best_timer) {
             best_timer = g->powerup_slot_timer[i];
+            best_type = (powerup_type_t)g->powerup_type_slot[i];
         }
     }
+    uint32_t power_countdown_color = (best_timer > 0) ? powerup_type_color(best_type) : 0xFFFFFFFF;
     int power_gap = 4;
 
     int power_label_w = text_width_5x5(power_label, label_scale);
@@ -247,9 +234,9 @@ void render_score_display(const game_t *g, lfb_t *lfb) {
     int ones_x = value_x + digit_w;
     int dot_x = ones_x + digit_w - 1;
     int tenths_x = dot_x + 5;
-    l_draw_digit(lfb, ones_x, y, ones, 0xFFFFFFFF);
-    l_draw_text(lfb, dot_x, y, ".", label_scale, 0xFFFFFFFF);
-    l_draw_score(lfb, tenths_x, y, tenths, 0xFFFFFFFF);
+    l_draw_digit(lfb, ones_x, y, ones, power_countdown_color);
+    l_draw_text(lfb, dot_x, y, ".", label_scale, power_countdown_color);
+    l_draw_score(lfb, tenths_x, y, tenths, power_countdown_color);
 }
 
 void render_player_health_bar(const game_t *g, lfb_t *lfb) {
@@ -306,13 +293,8 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
     }
 
     {
-        const char *curse_text = "CURSE APPLIED.";
         int score_label_w = text_width_5x5("SCORE:", 1);
-        int score_digits = digit_count(g->score);
-        int score_w = score_digits * 4;
-        int right_edge = LW - 5;
-        int score_x = right_edge - score_w;
-        int score_label_x = right_edge - score_label_w - 30;
+        int score_label_x = (LW - 5) - score_label_w - 30;
 
         int power_label_w = text_width_5x5("POWER:", 1);
         int none_w = text_width_5x5("NONE", 1);
@@ -339,15 +321,9 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
                 l_putpix(lfb, banner_x, yy, 0xFFFFFFFF);
                 l_putpix(lfb, banner_x + banner_w - 1, yy, 0xFFFFFFFF);
             }
-
-            int text_w = text_width_5x5(curse_text, 1);
-            int text_x = banner_x + (banner_w - text_w) / 2;
-            if (text_x < banner_x + 1) text_x = banner_x + 1;
-            if (g->level >= 3 && g->magician_curse_announce_timer > 0) {
-                l_draw_text(lfb, text_x, text_y, curse_text, 1, 0xFF00E5FF);
-            }
         }
     }
+
 }
 
 void render_player_shots(const game_t *g, lfb_t *lfb) {

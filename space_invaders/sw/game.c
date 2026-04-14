@@ -29,8 +29,11 @@
 #define CHARIOT_ARC_SHOT_COUNT 9
 #define CHARIOT_ARC_MIDDLE_SHOT_COUNT 5
 #define CHARIOT_ARC_SHOT_DELAY 8
-#define MAGICIAN_ORB_SPEED_X 0
-#define MAGICIAN_ORB_SPEED_Y 2
+#define MAGICIAN_ORB_SPEED_X 2
+#define MAGICIAN_ORB_SPEED_Y 1
+#define MAGICIAN_ORB_HIT_COUNT 3
+#define MAGICIAN_ORB_FIRE_PERIOD_MULT 2
+#define MAGICIAN_ORB_MOVE_FRAME_DIV 1
 #define MAGICIAN_ORB_RADIUS 11
 #define MAGICIAN_MIRROR_WIDTH_BOSS 56
 #define MAGICIAN_MIRROR_WIDTH_ALIEN 30
@@ -118,12 +121,19 @@ static const char *boss_intro_main_attack_text(const game_t *g) {
     if (g->boss_type == BOSS_TYPE_TOWER) return "ASTEROID";
     if (g->boss_type == BOSS_TYPE_HERMIT) return "LIGHTNING";
     if (g->boss_type == BOSS_TYPE_CHARIOT) return "ARC";
-    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "MIRROR ORB";
+    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "ORB";
     return "STANDARD LASER";
 }
 
 static int blue_black_hole_enabled(const game_t *g) {
     return (g->boss_type == BOSS_TYPE_BLUE) && (g->level >= 3);
+}
+
+static int any_powerup_active(const game_t *g) {
+    for (int i = 0; i < 5; i++) {
+        if (g->powerup_slot_timer[i] > 0) return 1;
+    }
+    return 0;
 }
 
 static const char *boss_intro_special_attack_text(const game_t *g) {
@@ -149,7 +159,7 @@ static const char *boss_intro_desc_line1(const game_t *g) {
                                  "HOMING LIGHTNING ATTACKS.";
     }
     if (g->boss_type == BOSS_TYPE_CHARIOT) return "SHOOTS IN AN ARC.";
-    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "FIRES A LARGE MIRROR ORB STRAIGHT DOWN.";
+    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "FIRES BOUNCING ORBS AT ANGLES. HIT THEM.";
     return (g->level >= 3) ? "EMPEROR ENTERS PHASE TWO PLASMA PATTERNS." :
                              "FIGHTS WITH HEAVY PLASMA FIRE.";
 }
@@ -166,7 +176,7 @@ static const char *boss_intro_desc_line2(const game_t *g) {
                                  "JUMPS AROUND A BIT. SUMMONS ALIENS.";
     }
     if (g->boss_type == BOSS_TYPE_CHARIOT) return "RUSHES TOWARDS THE PLAYER.";
-    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "ORB AND MIRROR WALL REFLECT SHOTS.";
+    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "MIRROR WALLS REFLECT SHOTS.";
     return (g->level >= 3) ? "GREEN PLASMA NOW HEALS DURING THE FIGHT." :
                              "DESCENDS ONCE HALF THE ALIENS ARE GONE.";
 }
@@ -462,6 +472,7 @@ static void clear_boss_projectiles(game_t *g) {
     g->magician_wave.vx = 0;
     g->magician_wave.vy = 0;
     g->magician_wave.dir = 1;
+    g->magician_wave.hp = 0;
     for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
         g->hermit_lightning[i].active = 0;
         g->hermit_lightning[i].flash_timer = 0;
@@ -844,28 +855,56 @@ static void spawn_magician_wave(game_t *g) {
     const sprite1r_t *BS = active_boss_sprite(g);
     magician_wave_t *w = &g->magician_wave;
     int boss_cx = g->boss_x + BS->w / 2;
-    int player_cx = g->player_x + g->PLAYER.w / 2;
     w->active = 1;
     w->x = boss_cx;
     w->y = g->boss_y + BS->h + 6;
-    w->dir = (player_cx >= boss_cx) ? 1 : -1;
-    w->vx = w->dir * MAGICIAN_ORB_SPEED_X;
+    // Randomly fire either rightward-down or leftward-down at a shallow angle.
+    int go_right = rand() & 1;
+    w->vx = go_right ? MAGICIAN_ORB_SPEED_X : -MAGICIAN_ORB_SPEED_X;
+    w->dir = go_right ? 1 : -1;
     w->vy = MAGICIAN_ORB_SPEED_Y;
+    w->hp = MAGICIAN_ORB_HIT_COUNT;
 }
 
-static void update_magician_wave(game_t *g) {
+static void update_magician_wave(game_t *g, uint32_t vsync_counter) {
     magician_wave_t *w = &g->magician_wave;
     if (!w->active) return;
+    if ((vsync_counter % (uint32_t)MAGICIAN_ORB_MOVE_FRAME_DIV) != 0u) return;
     w->x += w->vx;
     w->y += w->vy;
+
+    if (w->x - MAGICIAN_ORB_RADIUS <= 0) {
+        w->x = MAGICIAN_ORB_RADIUS;
+        if (w->vx < 0) w->vx = -w->vx;
+        w->dir = 1;
+    } else if (w->x + MAGICIAN_ORB_RADIUS >= LW - 1) {
+        w->x = LW - 1 - MAGICIAN_ORB_RADIUS;
+        if (w->vx > 0) w->vx = -w->vx;
+        w->dir = -1;
+    }
+
+    if (w->vy < 0 && g->boss_alive && !g->boss_dying && g->boss_type == BOSS_TYPE_MAGICIAN) {
+        const sprite1r_t *BS = active_boss_sprite(g);
+        if (circle_intersects_rect(w->x, w->y, MAGICIAN_ORB_RADIUS,
+                                   g->boss_x, g->boss_y, BS->w, BS->h)) {
+            int orb_damage = g->boss_max_health / 10;
+            if (orb_damage < 1) orb_damage = 1;
+            g->boss_health -= orb_damage;
+            if (g->boss_health <= 0) {
+                g->boss_health = 0;
+                boss_trigger_death(g, double_shot_active(g) ? 1000 : 500);
+            }
+            w->active = 0;
+            return;
+        }
+    }
 
     if (circle_intersects_rect(w->x, w->y, MAGICIAN_ORB_RADIUS,
                                g->player_x, g->player_y, g->PLAYER.w, g->PLAYER.h)) {
         apply_player_damage(g, 1);
     }
 
-    if (w->y - MAGICIAN_ORB_RADIUS > LH || w->x < -MAGICIAN_ORB_RADIUS ||
-        w->x >= LW + MAGICIAN_ORB_RADIUS) {
+    if (w->y - MAGICIAN_ORB_RADIUS > LH || w->y + MAGICIAN_ORB_RADIUS < 0) {
         w->active = 0;
     }
 }
@@ -2195,7 +2234,31 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                         break;
                     }
                 }
+                // Picking up any powerup immediately suppresses the magician curse.
+                g->magician_curse_timer = 0;
+                g->magician_curse_announce_timer = 0;
                 g->powerup_active = 0;
+                shots[si].alive = 0;
+            }
+        }
+        if (!shots[si].alive) continue;
+
+        if (g->boss_alive && !g->boss_dying && g->boss_type == BOSS_TYPE_MAGICIAN && g->magician_wave.active) {
+            int orb_hit = 0;
+            for (int bi = 0; bi < 5 && !orb_hit; bi++) {
+                int bx = bullet_x_with_spread(&shots[si], bi, shot_spread_dir);
+                int by = shots[si].y - bi;
+                if (magician_wave_hits_point(g, bx, by)) {
+                    orb_hit = 1;
+                }
+            }
+            if (orb_hit) {
+                g->magician_wave.hp--;
+                if (explosive_shot_active(g) || g->magician_wave.hp <= 0) {
+                    g->magician_wave.vx = 0;
+                    g->magician_wave.vy = -iabs_int(MAGICIAN_ORB_SPEED_Y);
+                    g->magician_wave.hp = 0;
+                }
                 shots[si].alive = 0;
             }
         }
@@ -2207,8 +2270,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 int bx = bullet_x_with_spread(&shots[si], bi, shot_spread_dir);
                 int by = shots[si].y - bi;
                 if (magician_mirror_hits_point(&g->magician_mirror, bx, by) ||
-                    magician_mirror_hits_point(&g->magician_mirror_alt, bx, by) ||
-                    magician_wave_hits_point(g, bx, by)) {
+                    magician_mirror_hits_point(&g->magician_mirror_alt, bx, by)) {
                     reflected = 1;
                 }
             }
@@ -3143,7 +3205,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         int magician_fight_active = !g->boss_intro_active &&
                                    g->boss_alive && !g->boss_dying &&
                                    g->boss_type == BOSS_TYPE_MAGICIAN;
-        if (magician_fight_active && g->level >= 3) {
+        int player_has_powerup = any_powerup_active(g);
+        if (magician_fight_active && g->level >= 3 && !player_has_powerup) {
             if (!g->magician_curse_announce_shown) {
                 g->magician_curse_announce_timer = MAGICIAN_CURSE_TEXT_DURATION_FRAMES;
                 g->magician_curse_announce_shown = 1;
@@ -4308,10 +4371,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     g->boss_triple_shot[i].alive = 0;
                 }
             } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
-                if (!any_magician_wave_alive(g) && (vsync_counter % (uint32_t)period) == 0u) {
+                int magician_period = period * MAGICIAN_ORB_FIRE_PERIOD_MULT;
+                if (magician_period < 1) magician_period = 1;
+                if (!any_magician_wave_alive(g) && (vsync_counter % (uint32_t)magician_period) == 0u) {
                     spawn_magician_wave(g);
                 }
-                update_magician_wave(g);
+                update_magician_wave(g, vsync_counter);
 
                 g->boss_shot.alive = 0;
                 g->boss_laser.alive = 0;
@@ -4756,7 +4821,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         const int game_over_ship_hold_frames = 30;
         int game_over_age = 90 - g->game_over_delay_timer;
         if (game_over_age < game_over_ship_hold_frames) {
-            uint32_t player_color = triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00;
+            uint32_t player_color = explosive_shot_active(g) ? 0xFFFF0000 :
+                                    (triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00);
             draw_sprite1r(lfb, &g->PLAYER, cx - g->PLAYER.w / 2, cy - g->PLAYER.h / 2, player_color);
         } else if (game_over_age < game_over_ship_hold_frames + PLAYER_DEATH_DELAY_FRAMES) {
             render_player_explosion_at(lfb, cx, cy, game_over_age - game_over_ship_hold_frames);
@@ -4807,7 +4873,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int p_w = g->PLAYER.w;
         int p_h = g->PLAYER.h;
 
-        uint32_t player_color = triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00;
+        uint32_t player_color = explosive_shot_active(g) ? 0xFFFF0000 :
+                    (triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00);
         draw_sprite1r(lfb, &g->PLAYER, cx - p_w / 2, cy - p_h / 2, player_color);
 
         int r = 22;
