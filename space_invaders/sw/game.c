@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
@@ -5365,26 +5366,39 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     {
+        static struct timespec fps_last_ts = {0, 0};
+        static int fps_frame_count = 0;
+        static int fps_value = 0;
+
+        struct timespec fps_now;
+        timespec_get(&fps_now, TIME_UTC);
+        fps_frame_count++;
+
+        if (fps_last_ts.tv_sec == 0 && fps_last_ts.tv_nsec == 0) {
+            fps_last_ts = fps_now;
+        }
+
+        double fps_elapsed = (double)(fps_now.tv_sec - fps_last_ts.tv_sec) +
+                             (double)(fps_now.tv_nsec - fps_last_ts.tv_nsec) / 1000000000.0;
+        if (fps_elapsed >= 1.0) {
+            fps_value = (int)(fps_frame_count / fps_elapsed);
+            fps_frame_count = 0;
+            fps_last_ts = fps_now;
+        }
+
         const char *label = "LEVEL:";
         int label_scale = 1;
         int label_w = text_width_5x5(label, label_scale);
         int x = LW - (label_w + 6 + 3) - 5;
+
+        char fps_text[16];
+        snprintf(fps_text, sizeof(fps_text), "FPS:%d", fps_value);
+        int fps_w = text_width_5x5(fps_text, 1);
+        int fps_x = x - fps_w - 8;
+        l_draw_text(lfb, fps_x, 5, fps_text, 1, 0xFFFFFFFF);
+
         l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
         l_draw_score(lfb, x + label_w + 6, 5, g->level, 0xFFFFFFFF);
-
-        const char *remaining_label = "REMAINING:";
-        int remaining_label_scale = 1;
-        int remaining_label_w = text_width_5x5(remaining_label, remaining_label_scale);
-        int remaining_x = x - remaining_label_w - 20;
-        int remaining_count = 0;
-        for (int r = 0; r < AROWS; r++) {
-            for (int c = 0; c < ACOLS; c++) {
-                if (g->alien_alive[r][c]) remaining_count++;
-            }
-        }
-        l_draw_text(lfb, remaining_x, 5, remaining_label, remaining_label_scale, 0xFFFFFFFF);
-        l_draw_score(lfb, remaining_x + remaining_label_w + 6, 5, remaining_count, 0xFFFFFFFF);
-
     }
 
     // Draw a separator line above the bottom HUD (player/powerup info) with a small gap.
