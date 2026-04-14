@@ -4636,23 +4636,41 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             }
             if (pull_step < 1) pull_step = 1;
 
-            int delta_x = g->boss_bomb.x - pcx;
-            if (delta_x > 0) {
-                int step = (delta_x < pull_step) ? delta_x : pull_step;
-                g->player_x += step;
-            } else if (delta_x < 0) {
-                int step = ((-delta_x) < pull_step) ? (-delta_x) : pull_step;
-                g->player_x -= step;
+            if (g->boss_bomb.reversed && g->boss_alive && !g->boss_dying) {
+                const sprite1r_t *BS = active_boss_sprite(g);
+                int bcx = g->boss_x + BS->w / 2;
+                int delta_x = g->boss_bomb.x - bcx;
+                if (delta_x > 0) {
+                    int step = (delta_x < pull_step) ? delta_x : pull_step;
+                    g->boss_x += step;
+                } else if (delta_x < 0) {
+                    int step = ((-delta_x) < pull_step) ? (-delta_x) : pull_step;
+                    g->boss_x -= step;
+                }
+
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                if (g->boss_x < left_bound) g->boss_x = left_bound;
+                if (g->boss_x > right_bound - BS->w) g->boss_x = right_bound - BS->w;
+            } else {
+                int delta_x = g->boss_bomb.x - pcx;
+                if (delta_x > 0) {
+                    int step = (delta_x < pull_step) ? delta_x : pull_step;
+                    g->player_x += step;
+                } else if (delta_x < 0) {
+                    int step = ((-delta_x) < pull_step) ? (-delta_x) : pull_step;
+                    g->player_x -= step;
+                }
+
+                int left_bound = movement_left_bound(g);
+                int right_bound = movement_right_bound(g);
+                if (g->player_x < left_bound) g->player_x = left_bound;
+                if (g->player_x > right_bound - g->PLAYER.w) g->player_x = right_bound - g->PLAYER.w;
+
+                // Recompute center after movement for hit test.
+                pcx = g->player_x + g->PLAYER.w / 2;
+                dx = pcx - g->boss_bomb.x;
             }
-
-            int left_bound = movement_left_bound(g);
-            int right_bound = movement_right_bound(g);
-            if (g->player_x < left_bound) g->player_x = left_bound;
-            if (g->player_x > right_bound - g->PLAYER.w) g->player_x = right_bound - g->PLAYER.w;
-
-            // Recompute center after movement for hit test.
-            pcx = g->player_x + g->PLAYER.w / 2;
-            dx = pcx - g->boss_bomb.x;
         }
 
         if (!g->boss_bomb.hit_player && (dx * dx + dy * dy) <= (radius * radius)) {
