@@ -5381,7 +5381,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         double fps_elapsed = (double)(fps_now.tv_sec - fps_last_ts.tv_sec) +
                              (double)(fps_now.tv_nsec - fps_last_ts.tv_nsec) / 1000000000.0;
         if (fps_elapsed >= 1.0) {
-            fps_value = (int)(fps_frame_count / fps_elapsed);
+            fps_value = (int)((fps_frame_count / fps_elapsed) + 0.5);
             fps_frame_count = 0;
             fps_last_ts = fps_now;
         }

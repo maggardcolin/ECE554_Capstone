@@ -99,7 +99,7 @@ void render_fps_counter(lfb_t *lfb) {
     double elapsed = (double)(now.tv_sec - last_ts.tv_sec) +
                      (double)(now.tv_nsec - last_ts.tv_nsec) / 1000000000.0;
     if (elapsed >= 1.0) {
-        fps = (int)(frame_count / elapsed);
+        fps = (int)((frame_count / elapsed) + 0.5);
         frame_count = 0;
         last_ts = now;
     }
