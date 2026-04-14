@@ -2609,6 +2609,10 @@ static void enter_shop(game_t *g) {
     g->in_shop = 1;
     g->shop_next_level = g->level + 1;
     g->shop_count++;
+    reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
+    g->powerup_active = 0;
+    g->powerup_timer = 0;
+    g->powerup_spawn_timer = 0;
     if (g->lives < PLAYER_LIVES) g->lives = PLAYER_LIVES;
 
     int to_node = overworld_shop_node_after_level(g->level);
@@ -2933,6 +2937,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->powerup_active = 0;
     g->powerup_timer = 0;
     g->powerup_spawn_timer = 0;
+    reset_powerup_slots(g, POWERUP_DOUBLE_SHOT);
     g->magician_curse_timer = 0;
     g->magician_curse_pending = 0;
     g->magician_shot_alternate_side = 0;
@@ -3545,9 +3550,13 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    // No powerups on level 0 (tutorial)
+    // No powerups on level 0 (tutorial). Also remove spawned powerups once the boss is dead.
     if (g->level != 0) {
-        if (!g->powerup_active) {
+        if (!g->boss_alive || g->boss_dying) {
+            g->powerup_active = 0;
+            g->powerup_timer = 0;
+            g->powerup_spawn_timer = 0;
+        } else if (!g->powerup_active) {
             g->powerup_spawn_timer++;
             if (g->powerup_spawn_timer >= 900) {
                 int tile = 8;
