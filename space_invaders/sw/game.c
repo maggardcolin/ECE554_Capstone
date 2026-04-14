@@ -2961,6 +2961,9 @@ static void setup_practice_run(game_t *g, int boss_type) {
     if (boss_type < 0 || boss_type >= BOSS_TYPE_COUNT) return;
     if (g->practice_level_selection < PRACTICE_LEVEL_MIN) g->practice_level_selection = PRACTICE_LEVEL_MIN;
     if (g->practice_level_selection > PRACTICE_LEVEL_MAX) g->practice_level_selection = PRACTICE_LEVEL_MAX;
+    g->hard_mode = 0;
+    g->tutorial_mode = 0;
+    g->lives = PLAYER_LIVES;
     g->start_screen = 0;
     g->practice_menu_active = 0;
     g->practice_run_active = 1;
@@ -3346,6 +3349,9 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->difficulty_menu_active = 1;
                         g->difficulty_menu_selection = g->hard_mode ? 2 : 1;
                     } else if (g->main_menu_selection == 1) {
+                        g->hard_mode = 0;
+                        g->tutorial_mode = 0;
+                        g->lives = PLAYER_LIVES;
                         g->practice_menu_active = 1;
                         g->practice_menu_selection = 0;
                         g->practice_level_selection = PRACTICE_LEVEL_MIN;
