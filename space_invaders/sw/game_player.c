@@ -4,7 +4,7 @@
 #include "font.h"
 #include "game_helpers.h"
 
-#define MAGICIAN_SIDE_WALL_THICKNESS 2
+#define MAGICIAN_SIDE_WALL_THICKNESS 4
 #define MAGICIAN_SIDE_DEFLECT_DY -2
 #define MAGICIAN_SIDE_DEFLECT_DX 3
 
