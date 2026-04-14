@@ -37,11 +37,37 @@ static void try_spawn_bullet(game_t *g, bullet_t *shots, int x, int y, int pierc
     }
 }
 
+static int magician_dual_shot_active(const game_t *g) {
+    return g->boss_alive && !g->boss_dying &&
+           (g->boss_type == BOSS_TYPE_MAGICIAN) &&
+           (g->level >= 3) &&
+           (g->magician_curse_timer > 0);
+}
+
 static void fire_player_shots(game_t *g, int center_x, int center_y) {
-    try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
-    if (triple_shot_active(g)) {
-        try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, 0);
-        try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, 0);
+    if (magician_dual_shot_active(g)) {
+        int side_pierce = g->pierce_unlocked ? 1 : 0;
+        if (triple_shot_active(g)) {
+            // Keep triple-shot behavior unchanged.
+            try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, side_pierce);
+            try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, side_pierce);
+        } else if (g->magician_shot_alternate_side == 0) {
+            try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, side_pierce);
+            g->magician_shot_alternate_side = 1;
+        } else {
+            try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, side_pierce);
+            g->magician_shot_alternate_side = 0;
+        }
+
+        if (triple_shot_active(g)) {
+            try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
+        }
+    } else {
+        try_spawn_bullet(g, g->pshot, center_x, center_y, g->pierce_unlocked);
+        if (triple_shot_active(g)) {
+            try_spawn_bullet(g, g->pshot_left, center_x - 2, center_y, 0);
+            try_spawn_bullet(g, g->pshot_right, center_x + 2, center_y, 0);
+        }
     }
 }
 
@@ -317,14 +343,21 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
             int text_w = text_width_5x5(curse_text, 1);
             int text_x = banner_x + (banner_w - text_w) / 2;
             if (text_x < banner_x + 1) text_x = banner_x + 1;
-            if (g->magician_curse_timer > 0) {
-                l_draw_text(lfb, text_x, text_y, curse_text, 1, 0xFFFFFFFF);
+            if (g->level >= 3 && g->magician_curse_announce_timer > 0) {
+                l_draw_text(lfb, text_x, text_y, curse_text, 1, 0xFF00E5FF);
             }
         }
     }
 }
 
 void render_player_shots(const game_t *g, lfb_t *lfb) {
+    uint32_t side_bullet_color = 0xFFFFFFFF;
+    if (rapid_fire_active(g)) {
+        side_bullet_color = 0xFFFFA500;
+    } else if (triple_shot_active(g)) {
+        side_bullet_color = 0xFF0000FF;
+    }
+
     for (int s = 0; s < MAX_PSHOTS; s++) {
         if (g->pshot[s].alive) {
             if (g->pshot[s].reflected == 1) {
@@ -348,30 +381,48 @@ void render_player_shots(const game_t *g, lfb_t *lfb) {
                 for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x, g->pshot_left[s].y + i, 0xFF00E5FF);
                 continue;
             }
+            if (g->pshot_left[s].pierce_active) {
+                for (int i = 0; i < 5; i++) {
+                    int py = g->pshot_left[s].y - i;
+                    l_putpix(lfb, g->pshot_left[s].x, py, 0xFF66CCFF);
+                    l_putpix(lfb, g->pshot_left[s].x - 1, py, 0xFF66CCFF);
+                    l_putpix(lfb, g->pshot_left[s].x + 1, py, 0xFF66CCFF);
+                }
+                continue;
+            }
             if (g->pshot_left[s].reflected == 2) {
                 for (int i = 0; i < 5; i++) {
                     int x = g->pshot_left[s].x + ((3 * i) / 2);
                     int y = g->pshot_left[s].y - i;
-                    l_putpix(lfb, x, y, 0xFF0000FF);
+                    l_putpix(lfb, x, y, side_bullet_color);
                 }
                 continue;
             }
-            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - (i / 4), g->pshot_left[s].y - i, 0xFF0000FF);
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - (i / 4), g->pshot_left[s].y - i, side_bullet_color);
         }
         if (g->pshot_right[s].alive) {
             if (g->pshot_right[s].reflected == 1) {
                 for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x, g->pshot_right[s].y + i, 0xFF00E5FF);
                 continue;
             }
+            if (g->pshot_right[s].pierce_active) {
+                for (int i = 0; i < 5; i++) {
+                    int py = g->pshot_right[s].y - i;
+                    l_putpix(lfb, g->pshot_right[s].x, py, 0xFF66CCFF);
+                    l_putpix(lfb, g->pshot_right[s].x - 1, py, 0xFF66CCFF);
+                    l_putpix(lfb, g->pshot_right[s].x + 1, py, 0xFF66CCFF);
+                }
+                continue;
+            }
             if (g->pshot_right[s].reflected == 3) {
                 for (int i = 0; i < 5; i++) {
                     int x = g->pshot_right[s].x - ((3 * i) / 2);
                     int y = g->pshot_right[s].y - i;
-                    l_putpix(lfb, x, y, 0xFF0000FF);
+                    l_putpix(lfb, x, y, side_bullet_color);
                 }
                 continue;
             }
-            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + (i / 4), g->pshot_right[s].y - i, 0xFF0000FF);
+            for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x + (i / 4), g->pshot_right[s].y - i, side_bullet_color);
         }
     }
 }

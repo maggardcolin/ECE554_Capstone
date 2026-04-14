@@ -220,6 +220,9 @@ typedef struct {
     magician_wave_t magician_wave;
     int magician_curse_timer;
     int magician_curse_pending;
+    int magician_shot_alternate_side;
+    int magician_curse_announce_timer;
+    int magician_curse_announce_shown;
 
     uint8_t yellow_boss_marked[AROWS][ACOLS]; // 1 for aliens that belong to the yellow boss swarm
     bullet_t yellow_beam_shot[5];             // Yellow boss synchronized beam shots

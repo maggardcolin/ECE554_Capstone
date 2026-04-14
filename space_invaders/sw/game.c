@@ -41,6 +41,7 @@
 #define MAGICIAN_MIRROR_ALIEN_OFFSET 3
 #define MAGICIAN_MIRROR_BOSS_OFFSET 8
 #define MAGICIAN_MIRROR_DURATION 180
+#define MAGICIAN_CURSE_TEXT_DURATION_FRAMES 300
 #define CHARIOT_CHARGE_SPEED_Y 4
 #define CHARIOT_CHARGE_SPEED_X 3
 #define CHARIOT_CHARGE_EXPLOSION_FRAMES 30
@@ -2858,6 +2859,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->powerup_spawn_timer = 0;
     g->magician_curse_timer = 0;
     g->magician_curse_pending = 0;
+    g->magician_shot_alternate_side = 0;
+    g->magician_curse_announce_timer = 0;
+    g->magician_curse_announce_shown = 0;
 
     g->player_x = 5;  // Spawn on left side
     g->player_y = LH - 30;
@@ -3132,13 +3136,29 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     if (g->perfect_text_timer > 0) {
         g->perfect_text_timer--;
     }
-    if (g->magician_curse_timer > 0) {
-        g->magician_curse_timer--;
+    if (g->magician_curse_announce_timer > 0) {
+        g->magician_curse_announce_timer--;
     }
-    if (g->magician_curse_pending && !g->boss_intro_active &&
-        g->boss_alive && !g->boss_dying && g->boss_type == BOSS_TYPE_MAGICIAN) {
-        g->magician_curse_timer = 120;
-        g->magician_curse_pending = 0;
+    {
+        int magician_fight_active = !g->boss_intro_active &&
+                                   g->boss_alive && !g->boss_dying &&
+                                   g->boss_type == BOSS_TYPE_MAGICIAN;
+        if (magician_fight_active && g->level >= 3) {
+            if (!g->magician_curse_announce_shown) {
+                g->magician_curse_announce_timer = MAGICIAN_CURSE_TEXT_DURATION_FRAMES;
+                g->magician_curse_announce_shown = 1;
+            }
+
+            // Curse is active only while the mirror special attack is active.
+            if (magician_mirror_attack_active(g)) {
+                g->magician_curse_timer = 1;
+            } else {
+                g->magician_curse_timer = 0;
+            }
+        } else {
+            g->magician_curse_timer = 0;
+            g->magician_curse_announce_timer = 0;
+        }
     }
 
     if (g->start_screen) {
@@ -4391,9 +4411,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
 
     // collisions: player shots
+    int magician_dual_player_shot_mode =
+        g->boss_alive && !g->boss_dying && (g->boss_type == BOSS_TYPE_MAGICIAN);
     handle_player_shot_collisions(g, g->pshot, 0, 1);
-    handle_player_shot_collisions(g, g->pshot_left, -1, 0);
-    handle_player_shot_collisions(g, g->pshot_right, 1, 0);
+    handle_player_shot_collisions(g, g->pshot_left, -1, magician_dual_player_shot_mode);
+    handle_player_shot_collisions(g, g->pshot_right, 1, magician_dual_player_shot_mode);
 
     if (g->boss_type != BOSS_TYPE_YELLOW) {
         boss_apply_alien_explosions_to_boss(g);
