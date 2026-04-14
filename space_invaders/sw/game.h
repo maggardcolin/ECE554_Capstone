@@ -218,6 +218,8 @@ typedef struct {
     magician_mirror_t magician_mirror;
     magician_mirror_t magician_mirror_alt;
     magician_wave_t magician_wave;
+    int magician_curse_timer;
+    int magician_curse_pending;
 
     uint8_t yellow_boss_marked[AROWS][ACOLS]; // 1 for aliens that belong to the yellow boss swarm
     bullet_t yellow_beam_shot[5];             // Yellow boss synchronized beam shots

@@ -278,6 +278,50 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
             }
         }
     }
+
+    {
+        const char *curse_text = "CURSE APPLIED.";
+        int score_label_w = text_width_5x5("SCORE:", 1);
+        int score_digits = digit_count(g->score);
+        int score_w = score_digits * 4;
+        int right_edge = LW - 5;
+        int score_x = right_edge - score_w;
+        int score_label_x = right_edge - score_label_w - 30;
+
+        int power_label_w = text_width_5x5("POWER:", 1);
+        int none_w = text_width_5x5("NONE", 1);
+        int power_total_w = power_label_w + 4 + none_w;
+        int power_x = score_label_x - 6 - power_total_w;
+
+        int item_boxes_right = box_x + (3 * box_w) + (2 * box_gap);
+        int banner_x = item_boxes_right + 4;
+        int banner_right = power_x - 4;
+        int banner_w = banner_right - banner_x;
+
+        if (banner_w > 4) {
+            for (int yy = box_y; yy < box_y + box_h; yy++) {
+                for (int xx = banner_x; xx < banner_x + banner_w; xx++) {
+                    l_putpix(lfb, xx, yy, 0xFF000000);
+                }
+            }
+
+            for (int xx = banner_x; xx < banner_x + banner_w; xx++) {
+                l_putpix(lfb, xx, box_y, 0xFFFFFFFF);
+                l_putpix(lfb, xx, box_y + box_h - 1, 0xFFFFFFFF);
+            }
+            for (int yy = box_y; yy < box_y + box_h; yy++) {
+                l_putpix(lfb, banner_x, yy, 0xFFFFFFFF);
+                l_putpix(lfb, banner_x + banner_w - 1, yy, 0xFFFFFFFF);
+            }
+
+            int text_w = text_width_5x5(curse_text, 1);
+            int text_x = banner_x + (banner_w - text_w) / 2;
+            if (text_x < banner_x + 1) text_x = banner_x + 1;
+            if (g->magician_curse_timer > 0) {
+                l_draw_text(lfb, text_x, text_y, curse_text, 1, 0xFFFFFFFF);
+            }
+        }
+    }
 }
 
 void render_player_shots(const game_t *g, lfb_t *lfb) {

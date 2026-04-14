@@ -2856,6 +2856,8 @@ static void setup_level(game_t *g, int level, int reset_score) {
     g->powerup_active = 0;
     g->powerup_timer = 0;
     g->powerup_spawn_timer = 0;
+    g->magician_curse_timer = 0;
+    g->magician_curse_pending = 0;
 
     g->player_x = 5;  // Spawn on left side
     g->player_y = LH - 30;
@@ -2933,6 +2935,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
         }
     } else {
         g->boss_type = BOSS_TYPE_CLASSIC;
+    }
+    if (level > 0 && g->boss_type == BOSS_TYPE_MAGICIAN) {
+        g->magician_curse_pending = 1;
     }
     g->boss_max_health = BOSS_MAX_HEALTH(level);
     g->boss_health = g->boss_max_health;
@@ -3126,6 +3131,14 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
     }
     if (g->perfect_text_timer > 0) {
         g->perfect_text_timer--;
+    }
+    if (g->magician_curse_timer > 0) {
+        g->magician_curse_timer--;
+    }
+    if (g->magician_curse_pending && !g->boss_intro_active &&
+        g->boss_alive && !g->boss_dying && g->boss_type == BOSS_TYPE_MAGICIAN) {
+        g->magician_curse_timer = 120;
+        g->magician_curse_pending = 0;
     }
 
     if (g->start_screen) {
