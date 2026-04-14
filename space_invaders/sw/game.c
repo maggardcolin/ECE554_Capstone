@@ -159,7 +159,7 @@ static const char *boss_intro_desc_line1(const game_t *g) {
                                  "HOMING LIGHTNING ATTACKS.";
     }
     if (g->boss_type == BOSS_TYPE_CHARIOT) return "SHOOTS IN AN ARC.";
-    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "FIRES BOUNCING ORBS AT ANGLES. HIT THEM.";
+    if (g->boss_type == BOSS_TYPE_MAGICIAN) return "FIRES BOUNCING ORBS AT ANGLES.";
     return (g->level >= 3) ? "EMPEROR ENTERS PHASE TWO PLASMA PATTERNS." :
                              "FIGHTS WITH HEAVY PLASMA FIRE.";
 }
