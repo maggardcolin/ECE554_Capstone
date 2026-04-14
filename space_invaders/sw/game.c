@@ -72,7 +72,7 @@
 #define PRACTICE_LEVEL_MAX (WIN_LEVEL - 1)
 #define PRACTICE_EXIT_INDEX BOSS_TYPE_COUNT
 #define PRACTICE_MENU_COUNT (BOSS_TYPE_COUNT + 1)
-#define DIFFICULTY_MENU_COUNT 3
+#define DIFFICULTY_MENU_COUNT 4
 #define MAIN_MENU_COUNT 3
 #define CREDITS_SCROLL_SPEED 1
 #define CREDITS_LINE_SPACING 12
@@ -3202,6 +3202,7 @@ void game_init(game_t *g) {
     g->main_menu_selection = 0;
     g->difficulty_menu_active = 0;
     g->difficulty_menu_selection = 0;
+    g->tutorial_mode = 0;
     g->credits_screen_active = 0;
     g->credits_scroll_y = LH;
     g->practice_menu_active = 0;
@@ -3214,7 +3215,7 @@ void game_init(game_t *g) {
     reset_boss_selection_history(g);
     reset_player_progression(g);
 
-    setup_level(g, 0, 1);
+    setup_level(g, g->tutorial_mode ? 0 : START_LEVEL, 1);
 }
 
 void game_reset(game_t *g) {
@@ -3243,8 +3244,9 @@ void game_reset(game_t *g) {
     g->paused = 0;
     reset_win_state(g);
     reset_player_progression(g);
+    g->overworld_current_node = -1;
 
-    setup_level(g, 0, 1);
+    setup_level(g, g->tutorial_mode ? 0 : START_LEVEL, 1);
 }
 
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
@@ -3342,7 +3344,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (select_pressed) {
                     if (g->main_menu_selection == 0) {
                         g->difficulty_menu_active = 1;
-                        g->difficulty_menu_selection = g->hard_mode ? 1 : 0;
+                        g->difficulty_menu_selection = g->hard_mode ? 2 : 1;
                     } else if (g->main_menu_selection == 1) {
                         g->practice_menu_active = 1;
                         g->practice_menu_selection = 0;
@@ -3363,11 +3365,12 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     if (g->difficulty_menu_selection >= DIFFICULTY_MENU_COUNT) g->difficulty_menu_selection = 0;
                 }
                 if (select_pressed) {
-                    if (g->difficulty_menu_selection == 2) {
+                    if (g->difficulty_menu_selection == 3) {
                         g->difficulty_menu_active = 0;
                         g->main_menu_selection = 0;
                     } else {
-                        g->hard_mode = (g->difficulty_menu_selection == 1);
+                        g->tutorial_mode = (g->difficulty_menu_selection == 0);
+                        g->hard_mode = (g->difficulty_menu_selection == 2);
                         g->difficulty_menu_active = 0;
                         game_reset(g);
                     }
@@ -3424,8 +3427,20 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 reset_player_progression(g);
                 setup_level(g, 0, 1);
             } else if (g->level == 0) {
-                // Skip shop after level 0 (tutorial)
-                setup_level(g, START_LEVEL, 0); // SET LEVEL
+                // Tutorial mode ends after tutorial fly-up and returns to difficulty select.
+                if (g->tutorial_mode) {
+                    g->start_screen = 1;
+                    g->start_screen_delay_timer = 0;
+                    g->main_menu_selection = 0;
+                    g->difficulty_menu_active = 1;
+                    g->difficulty_menu_selection = 0;
+                    g->tutorial_mode = 0;
+                    reset_player_progression(g);
+                    setup_level(g, 0, 1);
+                } else {
+                    // Legacy level-0 flow when not launched from tutorial mode.
+                    setup_level(g, START_LEVEL, 0);
+                }
             } else if ((g->level % 2) == 0) {
                 enter_shop(g);
             } else {
@@ -4877,14 +4892,14 @@ void game_render(game_t *g, lfb_t *lfb) {
             int hint_w = text_width_5x5(hint, 1);
             l_draw_text(lfb, (LW - hint_w) / 2, LH - 22, hint, 1, 0xFFBFBFBF);
         } else if (g->difficulty_menu_active) {
-            const char *entries[DIFFICULTY_MENU_COUNT] = {"EASY MODE", "HARD MODE", "BACK"};
+            const char *entries[DIFFICULTY_MENU_COUNT] = {"TUTORIAL", "EASY MODE", "HARD MODE", "BACK"};
 
             int base_y = 16;
             int row_h = 16;
             for (int i = 0; i < DIFFICULTY_MENU_COUNT; i++) {
                 int is_selected = (i == g->difficulty_menu_selection);
                 uint32_t color = is_selected ? 0xFFFFFFFF : 0xFF9A9A9A;
-                if (is_selected && i == 1) color = 0xFFFF0000;
+                if (is_selected && i == 2) color = 0xFFFF0000;
                 uint32_t cursor_color = is_selected ? 0xFF00FF00 : 0xFFFFFFFF;
                 int entry_y = base_y + i * row_h;
                 if (is_selected) {
@@ -4895,8 +4910,10 @@ void game_render(game_t *g, lfb_t *lfb) {
 
             int right_x = LW / 2 + 6;
             if (g->difficulty_menu_selection == 0) {
-                l_draw_text(lfb, right_x, 16, "THE CLASSIC EXPERIENCE.", 1, 0xFFFFFFFF);
+                l_draw_text(lfb, right_x, 16, "FOR FIRST TIME PLAYERS.", 1, 0xFFFFFFFF);
             } else if (g->difficulty_menu_selection == 1) {
+                l_draw_text(lfb, right_x, 16, "THE CLASSIC EXPERIENCE.", 1, 0xFFFFFFFF);
+            } else if (g->difficulty_menu_selection == 2) {
                 l_draw_text(lfb, right_x, 16, "NO HEALING.", 1, 0xFFFFFFFF);
                 l_draw_text(lfb, right_x, 28, "ONE LIFE.", 1, 0xFFFFFFFF);
             } else {
