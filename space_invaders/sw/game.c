@@ -2926,8 +2926,6 @@ static const char *credits_lines[] = {
     "SPECIAL THANKS:",
     "ECE 554",
     "GEORGE",
-    "",
-    "DEDICATED TO MJ"
 };
 
 static int credits_text_height(void) {
