@@ -72,6 +72,7 @@
 #define PRACTICE_LEVEL_MAX (WIN_LEVEL - 1)
 #define PRACTICE_EXIT_INDEX BOSS_TYPE_COUNT
 #define PRACTICE_MENU_COUNT (BOSS_TYPE_COUNT + 1)
+#define DIFFICULTY_MENU_COUNT 3
 #define MAIN_MENU_COUNT 3
 #define CREDITS_SCROLL_SPEED 1
 #define CREDITS_LINE_SPACING 12
@@ -2548,7 +2549,7 @@ static void reset_shop_state(game_t *g) {
 }
 
 static void reset_player_progression(game_t *g) {
-    g->lives = PLAYER_LIVES;
+    g->lives = g->hard_mode ? 1 : PLAYER_LIVES;
     g->player_speed = PLAYER_BASE_SPEED;
     g->fire_speed_bonus = 0;
     g->player_damage = PLAYER_BASE_DAMAGE;
@@ -2647,7 +2648,7 @@ static void enter_shop(game_t *g) {
     g->powerup_active = 0;
     g->powerup_timer = 0;
     g->powerup_spawn_timer = 0;
-    if (g->lives < PLAYER_LIVES) g->lives = PLAYER_LIVES;
+    if (!g->hard_mode && g->lives < PLAYER_LIVES) g->lives = PLAYER_LIVES;
 
     int to_node = overworld_shop_node_after_level(g->level);
     if (to_node >= 0) {
@@ -2665,7 +2666,9 @@ static void enter_shop(game_t *g) {
     shop_item_type_t shop_pool[6];
     int shop_pool_count = 0;
     shop_pool[shop_pool_count++] = SHOP_ITEM_FIRE_SPEED;
-    shop_pool[shop_pool_count++] = SHOP_ITEM_LIFE;
+    if (!g->hard_mode) {
+        shop_pool[shop_pool_count++] = SHOP_ITEM_LIFE;
+    }
     shop_pool[shop_pool_count++] = SHOP_ITEM_DAMAGE;
     if (!g->pierce_unlocked) {
         shop_pool[shop_pool_count++] = SHOP_ITEM_PIERCE;
@@ -3197,6 +3200,8 @@ void game_init(game_t *g) {
     g->start_screen = 1;
     g->start_screen_delay_timer = 0;
     g->main_menu_selection = 0;
+    g->difficulty_menu_active = 0;
+    g->difficulty_menu_selection = 0;
     g->credits_screen_active = 0;
     g->credits_scroll_y = LH;
     g->practice_menu_active = 0;
@@ -3223,6 +3228,8 @@ void game_reset(game_t *g) {
     g->start_screen = 0;
     g->start_screen_delay_timer = 0;
     g->main_menu_selection = 0;
+    g->difficulty_menu_active = 0;
+    g->difficulty_menu_selection = 0;
     g->credits_screen_active = 0;
     g->credits_scroll_y = LH;
     g->practice_menu_active = 0;
@@ -3317,7 +3324,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->main_menu_selection = 0;
                     }
                 }
-            } else if (!g->practice_menu_active) {
+            } else if (!g->practice_menu_active && !g->difficulty_menu_active) {
                 if (up_pressed || down_pressed) {
                     if (up_pressed) {
                         g->main_menu_selection--;
@@ -3334,7 +3341,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 }
                 if (select_pressed) {
                     if (g->main_menu_selection == 0) {
-                        game_reset(g);
+                        g->difficulty_menu_active = 1;
+                        g->difficulty_menu_selection = g->hard_mode ? 1 : 0;
                     } else if (g->main_menu_selection == 1) {
                         g->practice_menu_active = 1;
                         g->practice_menu_selection = 0;
@@ -3343,6 +3351,25 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                     } else {
                         g->credits_screen_active = 1;
                         g->credits_scroll_y = LH;
+                    }
+                }
+            } else if (g->difficulty_menu_active) {
+                if (up_pressed) {
+                    g->difficulty_menu_selection--;
+                    if (g->difficulty_menu_selection < 0) g->difficulty_menu_selection = DIFFICULTY_MENU_COUNT - 1;
+                }
+                if (down_pressed) {
+                    g->difficulty_menu_selection++;
+                    if (g->difficulty_menu_selection >= DIFFICULTY_MENU_COUNT) g->difficulty_menu_selection = 0;
+                }
+                if (select_pressed) {
+                    if (g->difficulty_menu_selection == 2) {
+                        g->difficulty_menu_active = 0;
+                        g->main_menu_selection = 0;
+                    } else {
+                        g->hard_mode = (g->difficulty_menu_selection == 1);
+                        g->difficulty_menu_active = 0;
+                        game_reset(g);
                     }
                 }
             } else {
@@ -4822,7 +4849,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         l_clear(lfb, 0xFF000000);
         if (g->credits_screen_active) {
             render_credits_screen(g, lfb);
-        } else if (!g->practice_menu_active) {
+        } else if (!g->practice_menu_active && !g->difficulty_menu_active) {
             const char *title = "ALIENS";
             const char *options[MAIN_MENU_COUNT] = {"START GAME", "PRACTICE MODE", "CREDITS"};
 
@@ -4849,6 +4876,36 @@ void game_render(game_t *g, lfb_t *lfb) {
             const char *hint = "UP/DOWN TO CHOOSE  SPACE TO SELECT";
             int hint_w = text_width_5x5(hint, 1);
             l_draw_text(lfb, (LW - hint_w) / 2, LH - 22, hint, 1, 0xFFBFBFBF);
+        } else if (g->difficulty_menu_active) {
+            const char *entries[DIFFICULTY_MENU_COUNT] = {"EASY MODE", "HARD MODE", "BACK"};
+
+            int base_y = 16;
+            int row_h = 16;
+            for (int i = 0; i < DIFFICULTY_MENU_COUNT; i++) {
+                int is_selected = (i == g->difficulty_menu_selection);
+                uint32_t color = is_selected ? 0xFFFFFFFF : 0xFF9A9A9A;
+                if (is_selected && i == 1) color = 0xFFFF0000;
+                uint32_t cursor_color = is_selected ? 0xFF00FF00 : 0xFFFFFFFF;
+                int entry_y = base_y + i * row_h;
+                if (is_selected) {
+                    l_draw_text(lfb, 16, entry_y, ">", 1, cursor_color);
+                }
+                l_draw_text(lfb, 26, entry_y, entries[i], 1, color);
+            }
+
+            int right_x = LW / 2 + 6;
+            if (g->difficulty_menu_selection == 0) {
+                l_draw_text(lfb, right_x, 16, "THE CLASSIC EXPERIENCE.", 1, 0xFFFFFFFF);
+            } else if (g->difficulty_menu_selection == 1) {
+                l_draw_text(lfb, right_x, 16, "NO HEALING.", 1, 0xFFFFFFFF);
+                l_draw_text(lfb, right_x, 28, "ONE LIFE.", 1, 0xFFFFFFFF);
+            } else {
+                l_draw_text(lfb, right_x, 16, "RETURN TO MAIN MENU.", 1, 0xFFFFFFFF);
+            }
+
+            const char *hint = "UP/DOWN DIFFICULTY  SPACE SELECT";
+            int hint_w = text_width_5x5(hint, 1);
+            l_draw_text(lfb, (LW - hint_w) / 2, LH - 18, hint, 1, 0xFFBFBFBF);
         } else {
             const char *entries[PRACTICE_MENU_COUNT] = {
                 boss_menu_label(BOSS_TYPE_MAGICIAN),

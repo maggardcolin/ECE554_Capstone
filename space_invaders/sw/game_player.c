@@ -270,7 +270,8 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
     int lives_x = x_text_x + text_width_5x5("x", 1) + 4;
     int lives = g->lives;
     if (lives < 0) lives = 0;
-    l_draw_score(lfb, lives_x, text_y, lives, 0xFFFFFFFF);
+    uint32_t lives_color = g->hard_mode ? 0xFFFF0000 : 0xFFFFFFFF;
+    l_draw_score(lfb, lives_x, text_y, lives, lives_color);
 
     int status_x = lives_x + digit_count(lives) * 4 + 8;
     int unlocked_icon_type[3];
@@ -311,38 +312,6 @@ void render_player_health_bar(const game_t *g, lfb_t *lfb) {
                 int cx = x0 + box_w / 2;
                 int cy = box_y + box_h / 2;
                 draw_crit_upgrade_icon(lfb, cx, cy);
-            }
-        }
-    }
-
-    {
-        int score_label_w = text_width_5x5("SCORE:", 1);
-        int score_label_x = (LW - 5) - score_label_w - 30;
-
-        int power_label_w = text_width_5x5("POWER:", 1);
-        int none_w = text_width_5x5("NONE", 1);
-        int power_total_w = power_label_w + 4 + none_w;
-        int power_x = score_label_x - 6 - power_total_w;
-
-        int item_boxes_right = box_x + (3 * box_w) + (2 * box_gap);
-        int banner_x = item_boxes_right + 4;
-        int banner_right = power_x - 4;
-        int banner_w = banner_right - banner_x;
-
-        if (banner_w > 4) {
-            for (int yy = box_y; yy < box_y + box_h; yy++) {
-                for (int xx = banner_x; xx < banner_x + banner_w; xx++) {
-                    l_putpix(lfb, xx, yy, 0xFF000000);
-                }
-            }
-
-            for (int xx = banner_x; xx < banner_x + banner_w; xx++) {
-                l_putpix(lfb, xx, box_y, 0xFFFFFFFF);
-                l_putpix(lfb, xx, box_y + box_h - 1, 0xFFFFFFFF);
-            }
-            for (int yy = box_y; yy < box_y + box_h; yy++) {
-                l_putpix(lfb, banner_x, yy, 0xFFFFFFFF);
-                l_putpix(lfb, banner_x + banner_w - 1, yy, 0xFFFFFFFF);
             }
         }
     }

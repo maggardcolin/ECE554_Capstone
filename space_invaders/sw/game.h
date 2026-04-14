@@ -120,6 +120,9 @@ typedef struct {
     int start_screen;
     int start_screen_delay_timer;
     int main_menu_selection;   // 0 = start game, 1 = practice mode, 2 = credits
+    int difficulty_menu_active;
+    int difficulty_menu_selection; // 0 = easy mode, 1 = hard mode, 2 = back
+    int hard_mode;
     int credits_screen_active;
     int credits_scroll_y;
     int practice_menu_active;
