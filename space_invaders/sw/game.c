@@ -3198,8 +3198,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         g->start_screen_delay_timer = 30;
     }
     
-    // Handle pause toggle (only in active gameplay)
-    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen && !g->boss_intro_active && !g->overworld_cutscene_active) {
+    // Handle pause toggle (active gameplay and boss intro)
+    if (!g->start_screen && !g->game_over && !g->level_complete && !g->in_shop && !g->win_screen && !g->overworld_cutscene_active) {
         if ((buttons & BTN_PAUSE) && !(old_buttons & BTN_PAUSE)) {
             g->paused = !g->paused;
         }
@@ -5113,6 +5113,13 @@ void game_render(game_t *g, lfb_t *lfb) {
         int desc2_y = LH - 18;
         l_draw_text(lfb, desc1_x, desc1_y, desc_line1, 1, desc_color);
         l_draw_text(lfb, desc2_x, desc2_y, desc_line2, 1, desc_color);
+
+        if (g->paused) {
+            const char *paused_text = "PAUSED";
+            int paused_w = text_width_5x5(paused_text, 1);
+            int paused_x = LW - paused_w - 5;
+            l_draw_text(lfb, paused_x, 5, paused_text, 1, 0xFFFFFFFF);
+        }
         return;
     }
 
