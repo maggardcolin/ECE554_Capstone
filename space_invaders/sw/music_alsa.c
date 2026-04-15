@@ -433,6 +433,51 @@ static const pattern_t PATTERN_BOSS_MAGICIAN = {
     .gain = 0.22f,
 };
 
+static const pattern_t PATTERN_TUTORIAL = {
+    .melody = {
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R
+    },
+    .bass = {
+        87.31f, R, R, R, R, R, R, R,
+        77.78f, R, R, R, R, R, R, R,
+
+        87.31f, R, R, R, R, R, R, R,
+        77.78f, R, R, R, R, R, R, R,
+
+        87.31f, R, R, R, R, R, R, R,
+        77.78f, R, R, R, R, R, R, R,
+
+        87.31f, R, R, R, R, R, R, R,
+        77.78f, R, R, R, R, R, R, R
+    },
+    .harm = {
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R,
+
+        R, R, R, R, R, R, R, R,
+        R, R, R, R, R, R, R, R
+    },
+    .len = 64,
+    .bpm = 128,
+    .gain = 0.20f,
+};
+
 static const pattern_t PATTERN_SHOP = {
     .melody = {},
     .bass = {164.81f, R, 196.00f, R, 220.00f, R, 196.00f, R,
@@ -509,6 +554,8 @@ static const pattern_t *pattern_for_mode(music_mode_t mode) {
         return &PATTERN_BOSS_CHARIOT;
     case MUSIC_MODE_BOSS_MAGICIAN:
         return &PATTERN_BOSS_MAGICIAN;
+    case MUSIC_MODE_TUTORIAL:
+        return &PATTERN_TUTORIAL;
     case MUSIC_MODE_SHOP:
         return &PATTERN_SHOP;
     case MUSIC_MODE_GAME_OVER:

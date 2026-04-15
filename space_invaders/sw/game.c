@@ -75,6 +75,16 @@
 #define PRACTICE_MENU_COUNT (BOSS_TYPE_COUNT + 1)
 #define DIFFICULTY_MENU_COUNT 4
 #define MAIN_MENU_COUNT 3
+#define TUTORIAL_POWERUP_COUNT 4
+#define TUTORIAL_LEAVE_ROW 1
+#define TUTORIAL_LEAVE_COL 0
+#define TUTORIAL_SHOOTER_ROW 1
+#define TUTORIAL_SHOOTER_COL 1
+#define TUTORIAL_CENTER_ROW_START 0
+#define TUTORIAL_CENTER_ROW_END 3
+#define TUTORIAL_CENTER_COL_START 3
+#define TUTORIAL_CENTER_COL_END 7
+#define TUTORIAL_RESPAWN_PERIOD_FRAMES 300
 #define CREDITS_SCROLL_SPEED 1
 #define CREDITS_LINE_SPACING 12
 #define CREDITS_ALIEN_GAP 24
@@ -151,6 +161,43 @@ static int any_powerup_active(const game_t *g) {
         if (g->powerup_slot_timer[i] > 0) return 1;
     }
     return 0;
+}
+
+static int tutorial_is_leave_alien(int r, int c) {
+    return r == TUTORIAL_LEAVE_ROW && c == TUTORIAL_LEAVE_COL;
+}
+
+static int tutorial_is_shooter_alien(int r, int c) {
+    return r == TUTORIAL_SHOOTER_ROW && c == TUTORIAL_SHOOTER_COL;
+}
+
+static int tutorial_is_center_pack_alien(int r, int c) {
+    if (r < TUTORIAL_CENTER_ROW_START || r > TUTORIAL_CENTER_ROW_END) return 0;
+    if (c < TUTORIAL_CENTER_COL_START || c > TUTORIAL_CENTER_COL_END) return 0;
+    return 1;
+}
+
+static powerup_type_t tutorial_powerup_type_for_index(int index) {
+    static const powerup_type_t tutorial_types[TUTORIAL_POWERUP_COUNT] = {
+        POWERUP_TRIPLE_SHOT,
+        POWERUP_RAPID_FIRE,
+        POWERUP_EXPLOSIVE,
+        POWERUP_SHIELD
+    };
+
+    if (index < 0 || index >= TUTORIAL_POWERUP_COUNT) return POWERUP_TRIPLE_SHOT;
+    return tutorial_types[index];
+}
+
+static void tutorial_powerup_icon_position(int index, int *x, int *y) {
+    int right_margin = 14;
+    int spacing = 22;
+    int y_fixed = TOP_HUD_SEPARATOR_Y + 18;
+    if (y_fixed > BOTTOM_HUD_SEPARATOR_Y - 12) y_fixed = BOTTOM_HUD_SEPARATOR_Y - 12;
+
+    int start_x = LW - right_margin - (TUTORIAL_POWERUP_COUNT - 1) * spacing;
+    *x = start_x + index * spacing;
+    *y = y_fixed;
 }
 
 static const char *boss_intro_special_attack_text(const game_t *g) {
@@ -1955,6 +2002,57 @@ static void reset_win_state(game_t *g) {
     }
 }
 
+static void tutorial_reset_layout(game_t *g) {
+    memset(g->alien_alive, 0, sizeof(g->alien_alive));
+    memset(g->alien_hermit_regen, 0, sizeof(g->alien_hermit_regen));
+    memset(g->alien_health, 0, sizeof(g->alien_health));
+    memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
+    memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
+    memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
+
+    for (int r = TUTORIAL_CENTER_ROW_START; r <= TUTORIAL_CENTER_ROW_END; r++) {
+        for (int c = TUTORIAL_CENTER_COL_START; c <= TUTORIAL_CENTER_COL_END; c++) {
+            g->alien_alive[r][c] = 1;
+            g->alien_health[r][c] = 1;
+        }
+    }
+
+    g->alien_alive[TUTORIAL_LEAVE_ROW][TUTORIAL_LEAVE_COL] = 1;
+    g->alien_health[TUTORIAL_LEAVE_ROW][TUTORIAL_LEAVE_COL] = 1;
+
+    g->alien_alive[TUTORIAL_SHOOTER_ROW][TUTORIAL_SHOOTER_COL] = 1;
+    g->alien_health[TUTORIAL_SHOOTER_ROW][TUTORIAL_SHOOTER_COL] = 1;
+    g->tutorial_grid_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
+    g->tutorial_shooter_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
+}
+
+static void tutorial_respawn_alien(game_t *g, int r, int c) {
+    g->alien_alive[r][c] = 1;
+    g->alien_health[r][c] = 1;
+    g->alien_hermit_regen[r][c] = 0;
+    g->yellow_boss_marked[r][c] = 0;
+    g->alien_explode_timer[r][c] = 0;
+    g->alien_explode_points[r][c] = 0;
+    g->alien_explode_hit_boss[r][c] = 0;
+}
+
+static int tutorial_center_pack_any_missing(const game_t *g) {
+    for (int r = TUTORIAL_CENTER_ROW_START; r <= TUTORIAL_CENTER_ROW_END; r++) {
+        for (int c = TUTORIAL_CENTER_COL_START; c <= TUTORIAL_CENTER_COL_END; c++) {
+            if (!g->alien_alive[r][c]) return 1;
+        }
+    }
+    return 0;
+}
+
+static void tutorial_respawn_center_pack(game_t *g) {
+    for (int r = TUTORIAL_CENTER_ROW_START; r <= TUTORIAL_CENTER_ROW_END; r++) {
+        for (int c = TUTORIAL_CENTER_COL_START; c <= TUTORIAL_CENTER_COL_END; c++) {
+            tutorial_respawn_alien(g, r, c);
+        }
+    }
+}
+
 static int player_invulnerable(const game_t *g) {
     if (g->player_dying) return 0;
     return g->player_exit_fly_active || (g->player_iframe_timer > 0) || shield_power_active(g);
@@ -2248,6 +2346,32 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
             handle_enemy_shot_collisions(g, &shots[si], 0, 1);
             continue;
         }
+
+        if (can_collect_powerup && g->level == 0 && !any_powerup_active(g)) {
+            for (int pi = 0; pi < TUTORIAL_POWERUP_COUNT; pi++) {
+                int px, py;
+                tutorial_powerup_icon_position(pi, &px, &py);
+                int dx = shots[si].x - px;
+                int dy = shots[si].y - py;
+                if ((dx * dx + dy * dy) > 36) continue;
+
+                for (int slot = 0; slot < 5; slot++) {
+                    g->powerup_slot_timer[slot] = 0;
+                }
+                g->powerup_slot_timer[0] = 600;
+                g->powerup_type_slot[0] = tutorial_powerup_type_for_index(pi);
+
+                // Picking up any powerup immediately suppresses the magician curse.
+                g->magician_curse_timer = 0;
+                g->magician_curse_announce_timer = 0;
+                g->powerup_active = 0;
+                g->powerup_timer = 0;
+                shots[si].alive = 0;
+                music_play_powerup();
+                break;
+            }
+        }
+        if (!shots[si].alive) continue;
 
         if (can_collect_powerup && g->powerup_active) {
             int dx = shots[si].x - g->powerup_x;
@@ -3029,17 +3153,9 @@ static void setup_level(game_t *g, int level, int reset_score) {
         return;
     }
 
-    // Level 0: tutorial level - only one alien in center
+    // Level 0: tutorial level with static instructional alien layout.
     if (level == 0) {
-        memset(g->alien_alive, 0, sizeof(g->alien_alive));
-        memset(g->alien_hermit_regen, 0, sizeof(g->alien_hermit_regen));
-        memset(g->alien_health, 0, sizeof(g->alien_health));
-        memset(g->alien_explode_timer, 0, sizeof(g->alien_explode_timer));
-        memset(g->alien_explode_points, 0, sizeof(g->alien_explode_points));
-        memset(g->alien_explode_hit_boss, 0, sizeof(g->alien_explode_hit_boss));
-        // Put one alien in center (row 4, column 5)
-        g->alien_alive[4][5] = 1;
-        g->alien_health[4][5] = 1;
+        tutorial_reset_layout(g);
     } else {
         memset(g->alien_alive, 1, sizeof(g->alien_alive));
         memset(g->alien_hermit_regen, 0, sizeof(g->alien_hermit_regen));
@@ -3055,7 +3171,7 @@ static void setup_level(game_t *g, int level, int reset_score) {
         }
     }
 
-    g->alien_origin_x = 50;
+    g->alien_origin_x = (level == 0) ? 58 : 50;
     g->alien_origin_y = 30;
     g->alien_dx = 1;
     g->alien_step_px = 2;
@@ -3649,6 +3765,28 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
+    if (g->level == 0) {
+        if (!g->alien_alive[TUTORIAL_SHOOTER_ROW][TUTORIAL_SHOOTER_COL]) {
+            if (g->tutorial_shooter_respawn_timer > 0) g->tutorial_shooter_respawn_timer--;
+            if (g->tutorial_shooter_respawn_timer <= 0) {
+                tutorial_respawn_alien(g, TUTORIAL_SHOOTER_ROW, TUTORIAL_SHOOTER_COL);
+                g->tutorial_shooter_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
+            }
+        } else {
+            g->tutorial_shooter_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
+        }
+
+        if (tutorial_center_pack_any_missing(g)) {
+            if (g->tutorial_grid_respawn_timer > 0) g->tutorial_grid_respawn_timer--;
+            if (g->tutorial_grid_respawn_timer <= 0) {
+                tutorial_respawn_center_pack(g);
+                g->tutorial_grid_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
+            }
+        } else {
+            g->tutorial_grid_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
+        }
+    }
+
     // No powerups on level 0 (tutorial). Also remove spawned powerups once the boss is dead.
     if (g->level != 0) {
         if (!g->boss_alive || g->boss_dying) {
@@ -3796,8 +3934,26 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         }
     }
 
-    // No alien shooting on tutorial level; regular levels shoot only while boss is alive.
-    if (g->level != 0 && g->boss_alive && !g->boss_dying) {
+    // Tutorial level uses one fixed shooter alien. Regular levels shoot only while boss is alive.
+    if (g->level == 0) {
+        const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int spacing_x = 6, spacing_y = 5;
+        if (g->alien_alive[TUTORIAL_SHOOTER_ROW][TUTORIAL_SHOOTER_COL] && (vsync_counter % 30u) == 0u) {
+            int ax = g->alien_origin_x + TUTORIAL_SHOOTER_COL * (AS->w + spacing_x);
+            int ay = g->alien_origin_y + TUTORIAL_SHOOTER_ROW * (AS->h + spacing_y);
+
+            if (!g->ashot.alive) {
+                g->ashot.alive = 1;
+                g->ashot.x = ax + AS->w / 2;
+                g->ashot.y = ay + AS->h + 1;
+            }
+        }
+
+        if (g->ashot.alive) {
+            g->ashot.y += 3;
+            if (g->ashot.y > LH) g->ashot.alive = 0;
+        }
+    } else if (g->boss_alive && !g->boss_dying) {
         static int col_cursor = 0;
         col_cursor = (col_cursor + 1) % ACOLS;
         int c = col_cursor;
@@ -4841,13 +4997,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
     if (!g->game_over && !g->boss_alive && !g->exit_available) {
         if (g->level == 0) {
-            int all_aliens_dead = 1;
-            for (int r = 0; r < AROWS && all_aliens_dead; r++) {
-                for (int c = 0; c < ACOLS && all_aliens_dead; c++) {
-                    if (g->alien_alive[r][c]) all_aliens_dead = 0;
-                }
-            }
-            if (all_aliens_dead) {
+            if (!g->alien_alive[TUTORIAL_LEAVE_ROW][TUTORIAL_LEAVE_COL]) {
                 g->exit_available = 1;
             }
         } else {
@@ -5497,7 +5647,9 @@ void game_render(game_t *g, lfb_t *lfb) {
 
             // Red if 3+, Green if 2, white if 1
             uint32_t alien_color;
-            if (g->yellow_boss_marked[r][c]) {
+            if (g->level == 0 && tutorial_is_leave_alien(r, c)) {
+                alien_color = 0xFFB266FF;
+            } else if (g->yellow_boss_marked[r][c]) {
                 alien_color = 0xFFFFFF00;
             } else if (g->alien_hermit_regen[r][c]) {
                 alien_color = 0xFFB266FF;
@@ -5506,6 +5658,17 @@ void game_render(game_t *g, lfb_t *lfb) {
             }
             draw_sprite1r(lfb, AS, ax, ay, alien_color);
         }
+    }
+
+    if (g->level == 0) {
+        const sprite1r_t *TS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+        int spacing_x = 6;
+        int leave_x = g->alien_origin_x + TUTORIAL_LEAVE_COL * (TS->w + spacing_x);
+        int leave_y = g->alien_origin_y + TUTORIAL_LEAVE_ROW * (TS->h + 5);
+        int label_w = text_width_5x5("LEAVE", 1);
+        int label_x = leave_x + (TS->w / 2) - (label_w / 2);
+        int label_y = leave_y - 9;
+        l_draw_text(lfb, label_x, label_y, "LEAVE", 1, 0xFFB266FF);
     }
 
     for (int r = 0; r < AROWS; r++) {
@@ -5532,7 +5695,15 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     render_player_shield_ring(g, lfb);
 
-    if (g->powerup_active) {
+    if (g->level == 0) {
+        if (!any_powerup_active(g)) {
+            for (int i = 0; i < TUTORIAL_POWERUP_COUNT; i++) {
+                int px, py;
+                tutorial_powerup_icon_position(i, &px, &py);
+                draw_powerup_icon(lfb, px, py, tutorial_powerup_type_for_index(i));
+            }
+        }
+    } else if (g->powerup_active) {
         draw_powerup_icon(lfb, g->powerup_x, g->powerup_y, g->powerup_type);
     }
 

@@ -153,6 +153,8 @@ typedef struct {
     int powerup_y;
     int powerup_timer;
     int powerup_spawn_timer;
+    int tutorial_grid_respawn_timer;
+    int tutorial_shooter_respawn_timer;
     powerup_type_t powerup_type;     // Currently active powerup type
     int powerup_slot_timer[5];       // Duration of each powerup slot (600 ticks = 10 seconds)
     int powerup_type_slot[5];        // Type of powerup in each slot
