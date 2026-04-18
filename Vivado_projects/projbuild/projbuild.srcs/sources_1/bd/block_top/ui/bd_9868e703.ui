@@ -1,0 +1,107 @@
+{
+   "ActiveEmotionalView":"Default View",
+   "Default View_ScaleFactor":"1.16629",
+   "Default View_TopLeft":"4174,274",
+   "ExpandedHierarchyInLayout":"",
+   "guistr":"# # String gsaved with Nlview 7.8.0 2024-04-26 e1825d835c VDI=44 GEI=38 GUI=JA:21.0 TLS
+#  -string -flagsOSRD
+preplace portBus PL_USER_LED -pg 1 -lvl 16 -x 5100 -y 60 -defaultsOSRD
+preplace portBus PL_LEDRGB0 -pg 1 -lvl 16 -x 5100 -y 90 -defaultsOSRD
+preplace portBus PL_LEDRGB1 -pg 1 -lvl 16 -x 5100 -y 120 -defaultsOSRD
+preplace portBus PL_LEDRGB2 -pg 1 -lvl 16 -x 5100 -y 150 -defaultsOSRD
+preplace portBus PL_LEDRGB3 -pg 1 -lvl 16 -x 5100 -y 180 -defaultsOSRD
+preplace portBus PL_USER_PB -pg 1 -lvl 0 -x -150 -y 550 -defaultsOSRD
+preplace portBus PL_USER_SW -pg 1 -lvl 0 -x -150 -y -140 -defaultsOSRD
+preplace inst zynq_ultra_ps_e_0 -pg 1 -lvl 6 -x 1898 -y 320 -defaultsOSRD
+preplace inst mmio_dma_0 -pg 1 -lvl 8 -x 2682 -y 210 -defaultsOSRD
+preplace inst axi_smc -pg 1 -lvl 7 -x 2390 -y 190 -defaultsOSRD
+preplace inst rst_ps8_0_95M -pg 1 -lvl 6 -x 1898 -y 500 -defaultsOSRD
+preplace inst Control_DMA_0 -pg 1 -lvl 9 -x 3030 -y 210 -defaultsOSRD
+preplace inst reset_synch_0 -pg 1 -lvl 8 -x 2682 -y 500 -defaultsOSRD
+preplace inst PB_breakout_0 -pg 1 -lvl 7 -x 2390 -y 550 -defaultsOSRD
+preplace inst dispatcher_0 -pg 1 -lvl 11 -x 3760 -y 390 -defaultsOSRD
+preplace inst sw_breakout_0 -pg 1 -lvl 8 -x 2682 -y -140 -defaultsOSRD
+preplace inst ledr_overlay_0 -pg 1 -lvl 10 -x 3370 -y -240 -defaultsOSRD
+preplace inst ilconstant_0 -pg 1 -lvl 1 -x 10 -y 440 -defaultsOSRD
+preplace inst regdst_debug_0 -pg 1 -lvl 9 -x 3030 -y 650 -defaultsOSRD
+preplace inst axi_dma_0 -pg 1 -lvl 6 -x 1898 -y -10 -defaultsOSRD
+preplace inst axi_smc_1 -pg 1 -lvl 4 -x 1130 -y 30 -defaultsOSRD
+preplace inst axi_smc_2 -pg 1 -lvl 4 -x 1130 -y 280 -defaultsOSRD
+preplace inst rendertilev4_0 -pg 1 -lvl 14 -x 4600 -y 510 -defaultsOSRD
+preplace inst enable_breakout_0 -pg 1 -lvl 12 -x 4100 -y 680 -defaultsOSRD
+preplace inst color_mapper_0 -pg 1 -lvl 3 -x 830 -y -250 -defaultsOSRD
+preplace inst int_upscaler_0 -pg 1 -lvl 4 -x 1130 -y -250 -defaultsOSRD
+preplace inst pixel_packet_ctrl_0 -pg 1 -lvl 5 -x 1420 -y -230 -defaultsOSRD
+preplace inst pixel_cntr_0 -pg 1 -lvl 6 -x 1898 -y -210 -defaultsOSRD
+preplace inst dma_vid_test_sequence_0 -pg 1 -lvl 2 -x 580 -y -250 -defaultsOSRD
+preplace inst blk_mem_gen_0 -pg 1 -lvl 15 -x 4970 -y 700 -defaultsOSRD
+preplace inst ilconstant_1 -pg 1 -lvl 14 -x 4600 -y 680 -defaultsOSRD
+preplace inst ilconstant_2 -pg 1 -lvl 13 -x 4310 -y 790 -defaultsOSRD
+preplace netloc Control_DMA_0_PL_LEDRGB0 1 9 7 3210 90 N 90 N 90 N 90 N 90 N 90 N
+preplace netloc Control_DMA_0_PL_LEDRGB1 1 9 7 3240 120 N 120 N 120 N 120 N 120 N 120 N
+preplace netloc Control_DMA_0_PL_LEDRGB2 1 9 7 3240 150 N 150 N 150 N 150 N 150 N 150 N
+preplace netloc Control_DMA_0_PL_LEDRGB3 1 9 7 N 180 N 180 N 180 N 180 N 180 N 180 N
+preplace netloc Control_DMA_0_PL_USER_LED 1 9 1 3200 -290n
+preplace netloc Control_DMA_0_datastream_valid 1 9 2 N 220 3540
+preplace netloc Control_DMA_0_instruction_valid 1 9 2 N 200 3570
+preplace netloc Control_DMA_0_ps_datastream 1 9 2 N 300 3510
+preplace netloc Control_DMA_0_ps_instruction 1 9 2 N 280 3560
+preplace netloc Control_DMA_0_tilemask 1 9 2 N 320 3500
+preplace netloc PB_breakout_0_PB0 1 7 1 NJ 520
+preplace netloc PL_USER_PB 1 0 7 N 550 N 550 N 550 N 550 N 550 1540 600 2240
+preplace netloc PL_USER_SW_0_1 1 0 8 NJ -140 N -140 N -140 N -140 N -140 1578 -130 NJ -130 2530
+preplace netloc dispatcher_0_enable 1 11 1 3960 410n
+preplace netloc dispatcher_0_instruction_to_rt 1 11 3 N 390 N 390 4420
+preplace netloc dispatcher_0_ledr_debug 1 9 3 3240 -120 NJ -120 3950
+preplace netloc enable_breakout_0_en0 1 12 2 4220 550 4430
+preplace netloc ilconstant_0_dout 1 1 5 NJ 440 N 440 N 440 N 440 1540
+preplace netloc ledr_overlay_0_LEDR 1 10 6 N -240 N -240 N -240 N -240 N -240 5080
+preplace netloc mmio_dma_0_interrupt 1 8 1 2830 360n
+preplace netloc mmio_dma_0_regdest 1 8 1 2840 360n
+preplace netloc mmio_dma_0_slv_reg0 1 8 1 N 40
+preplace netloc mmio_dma_0_slv_reg1 1 8 1 N 60
+preplace netloc mmio_dma_0_slv_reg2 1 8 1 N 80
+preplace netloc mmio_dma_0_slv_reg3 1 8 1 N 100
+preplace netloc mmio_dma_0_slv_reg4 1 8 1 N 120
+preplace netloc mmio_dma_0_slv_reg5 1 8 1 N 140
+preplace netloc mmio_dma_0_slv_reg6 1 8 1 N 160
+preplace netloc mmio_dma_0_slv_reg7 1 8 1 N 180
+preplace netloc mmio_dma_0_slv_reg8 1 8 1 N 200
+preplace netloc mmio_dma_0_slv_reg9 1 8 1 N 220
+preplace netloc mmio_dma_0_slv_reg10 1 8 1 N 240
+preplace netloc mmio_dma_0_slv_reg11 1 8 1 N 260
+preplace netloc mmio_dma_0_slv_reg12 1 8 1 N 280
+preplace netloc mmio_dma_0_slv_reg13 1 8 1 N 300
+preplace netloc mmio_dma_0_slv_reg14 1 8 1 N 320
+preplace netloc mmio_dma_0_slv_reg15 1 8 1 N 340
+preplace netloc regdst_debug_0_ledr 1 9 1 3220 -270n
+preplace netloc rendertilev4_0_LEDR_DEBUG 1 9 6 3230 -110 NJ -110 NJ -110 NJ -110 N -110 4770
+preplace netloc rst_ps8_0_95M_peripheral_aresetn 1 1 13 470 -320 710 -330 950 -330 1290 -320 1588 90 2220 270 2542 580 2860 540 N 540 3550 540 N 540 N 540 4410
+preplace netloc sw_breakout_0_SW0 1 8 2 N -210 N
+preplace netloc sw_breakout_0_SW1 1 8 2 N -190 N
+preplace netloc zynq_ultra_ps_e_0_pl_clk0 1 1 14 460 -330 700 -340 970 -340 1300 -310 1568 190 2230 280 2532 590 2850 530 N 530 3530 530 N 530 N 530 4400 400 4850
+preplace netloc zynq_ultra_ps_e_0_pl_resetn0 1 5 2 1598 610 2200
+preplace netloc rendertilev4_0_read_row 1 14 1 4860 460n
+preplace netloc rendertilev4_0_write_en 1 14 1 4800 500n
+preplace netloc ilconstant_1_dout 1 14 1 4790 680n
+preplace netloc rendertilev4_0_write_row 1 14 1 4820 520n
+preplace netloc rendertilev4_0_write_data 1 14 1 4780 540n
+preplace netloc ilconstant_2_dout 1 13 2 4400 620 4810J
+preplace netloc axi_dma_0_M_AXI_S2MM 1 3 4 980 -120 N -120 N -120 2200
+preplace netloc axi_smc_1_M00_AXI 1 4 2 1280 -50 N
+preplace netloc axi_smc_2_M00_AXI 1 4 2 N 280 1540
+preplace netloc axi_smc_M00_AXI 1 7 1 N 190
+preplace netloc color_mapper_0_M00_AXIS 1 3 1 960 -270n
+preplace netloc dma_vid_test_sequence_0_M00_AXIS 1 2 1 690 -270n
+preplace netloc int_upscaler_0_M00_AXIS 1 4 1 N -250
+preplace netloc pixel_cntr_0_M00_AXIS 1 5 2 1598 -290 2200
+preplace netloc pixel_packet_ctrl_0_M00_AXIS 1 5 1 N -230
+preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM0_FPD 1 6 1 2240 170n
+preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM1_FPD 1 3 4 990 -110 N -110 N -110 2210
+levelinfo -pg 1 -150 10 580 830 1130 1420 1898 2390 2682 3030 3370 3760 4100 4310 4600 4970 5100
+pagesize -pg 1 -db -bbox -sgen -320 -1630 5270 940
+"
+}
+{
+   "da_axi4_cnt":"3"
+}
