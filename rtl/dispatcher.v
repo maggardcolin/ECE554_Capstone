@@ -3,7 +3,7 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date: 04/14/2026
+// Create Date: 04/06/2026 10:07:32 PM
 // Design Name: 
 // Module Name: dispatcher
 // Project Name: 
@@ -26,13 +26,11 @@ module dispatcher(
     
     // Raw instruction in from PS side through MMIO DMA
     // The instruction is polled on rising edge of instruction_valid
-    // ACK is unused for now since the PL side will dispatch the instruction 
     // much, much faster than the PS side can issue a new one.
     input wire[63:0] instruction_in,
     input wire instruction_valid,
-    // Instruction ACK. This is sent to tell PS to deassert instruction valid
-    // This will then deassert.
-    output reg ack,
+    // Used to signal instruction complete
+    output wire ack,
     
     // Data stream that is used for shifting in data to the render tile sprite
     // and texture buffers. Each render tile will have its own chunk of BRAM
@@ -53,16 +51,39 @@ module dispatcher(
     
     // Decoded instruction to be sent to render tile
     // Tile mask will only be high for one cycle depending on the current state.
-    output reg[4:0] instruction_to_rt,
-    output reg[11:0] arg1_to_rt,
-    output reg[11:0] arg2_to_rt,
-    output reg[11:0] arg3_to_rt,
-    output reg[11:0] arg4_to_rt,
-    output reg[10:0] arg5_to_rt,
-    output reg[32:0] enable,
-    input wire busy,
-    input wire[3:0] error_code
+    output reg[63:0] instruction_to_rt,
+    output reg[31:0] enable,
+    input wire[31:0] busy,
+    input wire[3:0] error_code,
+    output reg[7:0] ledr_debug
     );
-    // 
-    
+    // Debug logic - show the instruction that was issued
+    always @(posedge clk, negedge rst_n) begin
+        if(!rst_n) begin
+            ledr_debug <= 8'b0;
+        end else if(instruction_valid) begin
+            ledr_debug <= {instruction_in[63:56]};
+        end
+    end
+    // Control the output enable signal
+    always @(posedge clk, negedge rst_n) begin
+        if(~rst_n) begin
+            enable <= 32'b0; // No render tiles active
+        end else if(instruction_valid) begin
+            // Flop and repeat the enable signal. This is used to control the tile mask
+            enable <= tilemask_in;
+        end else begin
+            enable <= 32'b0;
+        end
+    end
+    always @(posedge clk, negedge rst_n) begin
+        if(~rst_n) begin
+            instruction_to_rt <= 63'b0;
+        end else if(instruction_valid) begin
+            instruction_to_rt <= instruction_in;
+        end
+    end
+    // Signal instruction completion when all bits of busy are 0.
+    // This is driven straight from the render tile array
+    assign ack = |(~busy);
 endmodule

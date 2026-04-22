@@ -16,7 +16,7 @@ services:
     platform: linux/amd64
 
     # Setup the container from image with name
-    image: petalinux
+    image: docker.io/library/petalinux:latest
     container_name: petalinux
 
     # Setup google and cloudflare DNS for petalinux mirrors
