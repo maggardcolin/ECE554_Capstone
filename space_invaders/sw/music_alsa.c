@@ -62,6 +62,7 @@ typedef struct {
     pthread_mutex_t lock;
     int running;
     music_mode_t mode;
+    uint16_t active_tracks;  // Bitmask for which tracks are active (up to 16 tracks)
     int ding_pending;
     int boom_pending;
     int boom_long_pending;
@@ -580,17 +581,25 @@ static float square(float *phase, float freq, float duty) {
     return (*phase < duty) ? 1.0f : -1.0f;
 }
 
+// Per-mode synthesis state for supporting simultaneous track playback
+typedef struct 
+{
+    float phase1;        // Melody phase
+    float phase2;        // Bass phase
+    float phase3;        // Harmony phase
+    int step;            // Current step in pattern
+    int sample_in_step;  // Sample count within current step
+    int game_over_finished;  // For game over/win patterns
+} mode_state_t;
+
 static void *audio_thread(void *arg) {
     (void)arg;
 
     int16_t buffer[AUDIO_FRAMES];
-    float phase1 = 0.0f;
-    float phase2 = 0.0f;
-    float phase3 = 0.0f;
-    int step = 0;
-    int sample_in_step = 0;
-    int game_over_finished = 0;
-    music_mode_t active_mode = MUSIC_MODE_MENU;
+    mode_state_t mode_states[16];  // State for each possible music mode
+    memset(mode_states, 0, sizeof(mode_states));
+    uint16_t prev_active_tracks = 0;  // Track state transitions
+    
     int ding_samples_left = 0;
     float ding_phase = 0.0f;
     int boom_samples_left = 0;
@@ -607,7 +616,7 @@ static void *audio_thread(void *arg) {
     while (1) {
         pthread_mutex_lock(&g_music.lock);
         int running = g_music.running;
-        music_mode_t mode = g_music.mode;
+        uint16_t active_tracks = g_music.active_tracks;
         if (g_music.ding_pending) {
             ding_samples_left = DING_DURATION_SAMPLES;
             ding_phase = 0.0f;
@@ -645,39 +654,67 @@ static void *audio_thread(void *arg) {
             break;
         }
 
-        int music_paused = (mode == MUSIC_MODE_PAUSED);
-        music_mode_t sequencer_mode = music_paused ? active_mode : mode;
-        const pattern_t *pat = pattern_for_mode(sequencer_mode);
-        if (!music_paused && sequencer_mode != active_mode) {
-            active_mode = sequencer_mode;
-            step = 0;
-            sample_in_step = 0;
-            game_over_finished = 0;
-            phase1 = 0.0f;
-            phase2 = 0.0f;
-            phase3 = 0.0f;
-        }
-
-        int samples_per_step = (AUDIO_RATE * 60) / (pat->bpm * 4);
-        if (samples_per_step <= 0) {
-            samples_per_step = 1;
-        }
-
-        for (int i = 0; i < AUDIO_FRAMES; i++) {
-            float f1 = 0.0f;
-            float f2 = 0.0f;
-            float f3 = 0.0f;
-            if (!music_paused && !((sequencer_mode == MUSIC_MODE_GAME_OVER || sequencer_mode == MUSIC_MODE_WIN) && game_over_finished)) {
-                f1 = pat->melody[step];
-                f2 = pat->bass[step];
-                f3 = pat->harm[step];
+        // Reset state for tracks that are being activated (transition from inactive to active)
+        uint16_t transitions = active_tracks & ~prev_active_tracks;
+        for (int track = 0; track < 16; track++) {
+            if (transitions & (1 << track)) {
+                memset(&mode_states[track], 0, sizeof(mode_states[track]));
             }
+        }
+        prev_active_tracks = active_tracks;
 
-            float s1 = square(&phase1, f1, DUTY_MELODY);
-            float s2 = square(&phase2, f2, DUTY_BASS);
-            float s3 = square(&phase3, f3, DUTY_HARM);
-            float bass_mix_scale = (sequencer_mode == MUSIC_MODE_BOSS_MAGICIAN) ? 0.55f : 1.0f;
-            float music_mix = (0.10f * s1) + (0.20f * bass_mix_scale * s2) + (0.10f * s3);
+        // Generate audio frame
+        for (int i = 0; i < AUDIO_FRAMES; i++) {
+            float music_mix = 0.0f;
+            
+            // Process all active tracks
+            for (int track = 0; track < 16; track++) {
+                if (!(active_tracks & (1 << track))) {
+                    continue;  // Skip inactive tracks
+                }
+                
+                const pattern_t *pat = pattern_for_mode((music_mode_t)track);
+                mode_state_t *state = &mode_states[track];
+                
+                // Skip if this is a terminal pattern that has finished
+                if ((track == MUSIC_MODE_GAME_OVER || track == MUSIC_MODE_WIN) && state->game_over_finished) {
+                    continue;
+                }
+                
+                // Get frequencies for this step
+                float f1 = pat->melody[state->step];
+                float f2 = pat->bass[state->step];
+                float f3 = pat->harm[state->step];
+                
+                // Synthesize waveforms
+                float s1 = square(&state->phase1, f1, DUTY_MELODY);
+                float s2 = square(&state->phase2, f2, DUTY_BASS);
+                float s3 = square(&state->phase3, f3, DUTY_HARM);
+                
+                float bass_mix_scale = (track == MUSIC_MODE_BOSS_MAGICIAN) ? 0.55f : 1.0f;
+                float track_mix = (0.10f * s1) + (0.20f * bass_mix_scale * s2) + (0.10f * s3);
+                music_mix += track_mix * pat->gain;
+                
+                // Advance pattern step
+                int samples_per_step = (AUDIO_RATE * 60) / (pat->bpm * 4);
+                if (samples_per_step <= 0) samples_per_step = 1;
+                
+                state->sample_in_step++;
+                if (state->sample_in_step >= samples_per_step) {
+                    state->sample_in_step = 0;
+                    state->step++;
+                    if (state->step >= pat->len) {
+                        if (track == MUSIC_MODE_GAME_OVER || track == MUSIC_MODE_WIN) {
+                            state->step = pat->len - 1;
+                            state->game_over_finished = 1;
+                        } else {
+                            state->step = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Process sound effects
             float ding_mix = 0.0f;
             float boom_mix = 0.0f;
             float boom_long_mix = 0.0f;
@@ -734,29 +771,11 @@ static void *audio_thread(void *arg) {
                 powerup_samples_left--;
             }
 
-            float mixed = ((music_paused ? 0.0f : (music_mix * pat->gain)) + ding_mix + boom_mix + boom_long_mix + tower_asteroid_boom_mix + laser_mix + powerup_mix);
+            float mixed = music_mix + ding_mix + boom_mix + boom_long_mix + tower_asteroid_boom_mix + laser_mix + powerup_mix;
             int sample = (int)(mixed * 32767.0f);
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
             buffer[i] = (int16_t)sample;
-
-            if (!music_paused) {
-                sample_in_step++;
-                if (sample_in_step >= samples_per_step) {
-                    sample_in_step = 0;
-                    if (!((sequencer_mode == MUSIC_MODE_GAME_OVER || sequencer_mode == MUSIC_MODE_WIN) && game_over_finished)) {
-                        step++;
-                        if (step >= pat->len) {
-                            if (sequencer_mode == MUSIC_MODE_GAME_OVER || sequencer_mode == MUSIC_MODE_WIN) {
-                                step = pat->len - 1;
-                                game_over_finished = 1;
-                            } else {
-                                step = 0;
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         snd_pcm_sframes_t wrote = snd_pcm_writei(g_music.pcm, buffer, AUDIO_FRAMES);
@@ -782,7 +801,7 @@ int music_init(void) {
         return -1;
     }
 
-    int rc = snd_pcm_open(&g_music.pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    int rc = snd_pcm_open(&g_music.pcm, "hw:2,0", SND_PCM_STREAM_PLAYBACK, 0);
     if (rc < 0) {
         fprintf(stderr, "music: snd_pcm_open failed: %s\n", snd_strerror(rc));
         pthread_mutex_destroy(&g_music.lock);
@@ -821,6 +840,19 @@ void music_set_mode(music_mode_t mode) {
     pthread_mutex_lock(&g_music.lock);
     if (g_music.running) {
         g_music.mode = mode;
+    }
+    pthread_mutex_unlock(&g_music.lock);
+}
+
+void music_set_track_active(int track_index, int active) 
+{
+    pthread_mutex_lock(&g_music.lock);
+    if (g_music.running && track_index >= 0 && track_index < 16) 
+    {
+        if (active)
+            g_music.active_tracks |= (1 << track_index);
+        else
+            g_music.active_tracks &= ~(1 << track_index);
     }
     pthread_mutex_unlock(&g_music.lock);
 }
