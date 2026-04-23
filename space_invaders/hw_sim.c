@@ -22,7 +22,7 @@
 
 
 #define SHM_NAME "/pynq_fbmmio"
-#define DEFAULT_SCALE_FACTOR 2
+#define DEFAULT_SCALE_FACTOR 1
 
 static int read_scale_factor(void) {
     const char *s = getenv("HW_SIM_SCALE");
