@@ -178,6 +178,31 @@ module rendertilev4(
     
     // State machine
     
+    reg [5:0] rmw_row;
+    reg rmw_phase; // 0 = read, 1 = write
+    wire[255:0] rect_out;
+wire[255:0] fillrect_out;
+wire[255:0] horiz_out;
+wire[255:0] vert_out;
+
+    
+    always @(posedge clk, negedge rst_n) begin
+        if(~rst_n) begin
+            rmw_row <= 6'b0;
+            rmw_phase <= 1'b0;
+        end else if(state != STATE_RMW) begin
+            rmw_row <= 6'b0;
+            rmw_phase <= 1'b0;
+        end else begin
+            rmw_phase <= ~rmw_phase;
+            if(rmw_phase) begin
+                rmw_row <= rmw_row + 1;
+            end
+        end
+    end
+    
+
+
     
     // Main control FSM
     always@(*) begin
@@ -227,7 +252,10 @@ module rendertilev4(
             next_state = STATE_IDLE;
         end
         STATE_RMW: begin
-            
+            // Stay in RMW until all rows processed (including write phase)
+            if(rmw_row == 6'h3F && rmw_phase == 1'b1) begin
+                next_state = STATE_IDLE;
+            end
         end
         default: next_state = STATE_IDLE;
         endcase
@@ -236,10 +264,10 @@ module rendertilev4(
     assign LEDR_DEBUG = {en, 2'b0, state};
     
     // OR together the control signals
-    assign read_row = DMA_en ? DMA_row : putpixel_address;
-    assign write_row = putpixel_address|fillscreen_row;
-    assign write_en = putpixel_wen|fillscreen_wen;
-    assign write_data = ({256{putpixel_wen}}&putpixel_wdata) | ({256{fillscreen_wen}}&fillscreen_wdata);
+//    assign read_row = DMA_en ? DMA_row : putpixel_address;
+//    assign write_row = putpixel_address|fillscreen_row;
+//    assign write_en = putpixel_wen|fillscreen_wen;
+//    assign write_data = ({256{putpixel_wen}}&putpixel_wdata) | ({256{fillscreen_wen}}&fillscreen_wdata);
     
     
     reg DMA_en_latch;
@@ -252,11 +280,32 @@ module rendertilev4(
     end
     
     assign DMA_LED_DEBUG = {DMA_en_latch, 1'b0, DMA_row};
+    
+    wire rmw_wen = (state == STATE_RMW) && rmw_phase;
 
-wire[255:0] rect_out;
-wire[255:0] fillrect_out;
-wire[255:0] horiz_out;
-wire[255:0] vert_out;
+    wire [255:0] rmw_wdata =
+        (instr == INSTR_DRAWRECT)  ? rect_out  :
+        (instr == INSTR_FILLRECT)  ? fillrect_out :
+        (instr == INSTR_HORIZLINE) ? horiz_out :
+        (instr == INSTR_VERTLINE)  ? vert_out  :
+        read_data;
+
+    assign read_row =
+        DMA_en ? DMA_row :
+        (state == STATE_RMW ? rmw_row : putpixel_address);
+
+    assign write_row =
+        (state == STATE_RMW ? rmw_row : (putpixel_address|fillscreen_row));
+
+    assign write_en =
+        putpixel_wen | fillscreen_wen | rmw_wen;
+
+    assign write_data =
+        ({256{putpixel_wen}} & putpixel_wdata) |
+        ({256{fillscreen_wen}} & fillscreen_wdata) |
+        ({256{rmw_wen}} & rmw_wdata);
+
+
 
 DrawRect drawrect_inst(
     .buf_in(read_data),
