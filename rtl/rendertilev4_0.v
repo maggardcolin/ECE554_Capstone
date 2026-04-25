@@ -74,17 +74,23 @@ module rendertilev4(
     localparam STATE_PUTPIXEL_INTERMEDIATE = 5'b100;
     localparam STATE_PUTPIXEL_WRITE = 5'b101;
     
-    localparam INSTR_NOP = 5'b0;
-    localparam INSTR_SETCOORD = 5'b1;
-    localparam INSTR_FILLSCREEN = 5'b10;
-    localparam INSTR_PUTPIXEL = 5'b11;
-    
+    localparam INSTR_NOP = 5'b0; // Replaced the blit operation
+    localparam INSTR_SETCOORD = 5'b1; // SetCoord(X,Y,X_en, Y_en)
+    localparam INSTR_FILLSCREEN = 5'b10; // FillScreen(color)
+    localparam INSTR_PUTPIXEL = 5'b11; // PutPixel(X,Y,Color)
+    localparam INSTR_DRAWRECT = 5'b100; // DrawRect(X, Y, W, H, Color)
+    localparam INSTR_FILLRECT = 5'b101; // FillRect(X, Y, W, H, Color)
+    localparam INSTR_DRAWALIEN = 5'b110; // DrawAlien(X, Y, Color)
+    localparam INSTR_HORIZLINE = 5'b111; // HorizLine(X, Y, W, Color)
+    localparam INSTR_VERTLINE = 5'b1000; // VertLine(X, Y, H, Color)
 
     reg[4:0] state;
     reg[4:0] next_state; // Actually of type wire
 
     always @(posedge clk, negedge rst_n) begin
         if(~rst_n) begin
+            state <= STATE_IDLE;
+        end else if(DMA_en) begin
             state <= STATE_IDLE;
         end else begin
             state <= next_state;
@@ -234,4 +240,144 @@ module rendertilev4(
     
     assign DMA_LED_DEBUG = {DMA_en_latch, 1'b0, DMA_row};
 
+endmodule
+
+module VertLineDraw(
+    input wire[255:0] buf_in, // Buffer consisting of a 256 bit (64 pixel) slice of a row. One pixel tall.
+    input wire[5:0] buf_index_x, // X index of the start of this buffer. Since it's 64 bits, the X coordinate is buf_index_x << 6. It is guaranteed to be 64 pixel aligned.
+    input wire[11:0] buf_coord_y,// Y coordinate of this buffer. This is the full 12 bits.
+    input wire[11:0] line_x, // Starting X coordinate of the line
+    input wire[11:0] line_y, // Starting Y coordinate of the line
+    input wire[11:0] line_height, // Height of the line
+    input wire[3:0] line_color, // The color to draw. This is just an index and it will index into a color palette later
+    output wire[255:0] buf_out // The modified buf_in data to draw the line
+);
+    wire [11:0] line_end_y;
+    wire [5:0]  target_pixel_x;
+    wire        y_hit;
+    wire        x_hit;
+    wire        draw_en;
+    assign line_end_y = line_y + line_height;
+    assign y_hit = (buf_coord_y >= line_y) && (buf_coord_y < line_end_y);
+    assign x_hit = (line_x[11:6] == buf_index_x);
+    assign draw_en = x_hit && y_hit;
+    assign target_pixel_x = line_x[5:0];
+    genvar i;
+    generate
+        for (i = 0; i < 64; i = i + 1) begin
+            assign buf_out[i*4 +: 4] = (draw_en && (target_pixel_x == i)) ? 
+                                        line_color : 
+                                        buf_in[i*4 +: 4];
+        end
+    endgenerate
+endmodule
+
+module HorizLineDraw(
+    input wire[255:0] buf_in, // Buffer consisting of a 256 bit (64 pixel) slice of a row. One pixel tall.
+    input wire[5:0] buf_index_x, // X index of the start of this buffer. Since it's 64 bits, the X coordinate is buf_index_x << 6. It is guaranteed to be 64 pixel aligned.
+    input wire[11:0] buf_coord_y,// Y coordinate of this buffer. This is the full 12 bits.
+    input wire[11:0] line_x, // Starting X coordinate of the line
+    input wire[11:0] line_y, // Starting Y coordinate of the line
+    input wire[11:0] line_width, // Width of the line
+    input wire[3:0] line_color, // The color to draw. This is just an index and it will index into a color palette later
+    output wire[255:0] buf_out // The modified buf_in data to draw the line
+);
+    wire [11:0] line_end_x;
+    wire [11:0] buf_start_x;
+    wire [11:0] buf_end_x;
+    wire        y_hit;
+    assign line_end_x  = line_x + line_width;
+    assign buf_start_x = {buf_index_x, 6'd0};     // buf_index_x << 6
+    assign buf_end_x   = {buf_index_x, 6'd63};    // (buf_index_x << 6) + 63
+    assign y_hit = (buf_coord_y == line_y);
+    genvar i;
+    generate
+        for (i = 0; i < 64; i = i + 1) begin : pixel_logic
+            wire [11:0] current_pixel_x = buf_start_x + i;
+            wire x_hit;
+            assign x_hit = (current_pixel_x >= line_x) && (current_pixel_x < line_end_x);
+            assign buf_out[i*4 +: 4] = (y_hit && x_hit) ? 
+                                        line_color : 
+                                        buf_in[i*4 +: 4];
+        end
+    endgenerate
+endmodule
+
+module DrawRect( // Draw the outline of a rectangle, one pixel wide lines.
+    input wire[255:0] buf_in, // Buffer consisting of a 256 bit (64 pixel) slice of a row. One pixel tall.
+    input wire[5:0] buf_index_x, // X index of the start of this buffer. Since it's 64 bits, the X coordinate is buf_index_x << 6. It is guaranteed to be 64 pixel aligned.
+    input wire[11:0] buf_coord_y,// Y coordinate of this buffer. This is the full 12 bits.
+    input wire[11:0] rect_x, // Starting X coordinate of the rect
+    input wire[11:0] rect_y, // Starting Y coordinate of the rect
+    input wire[11:0] rect_w, // Width of the rect
+    input wire[11:0] rect_h, // Height of the rect
+    input wire[3:0] line_color, // The color to draw. This is just an index and it will index into a color palette later
+    output wire[255:0] buf_out // The modified buf_in data to draw the rect
+);
+    wire [11:0] rect_end_x = rect_x + rect_w - 1;
+    wire [11:0] rect_end_y = rect_y + rect_h - 1;
+    
+    wire [11:0] buf_start_x = {buf_index_x, 6'd0};
+
+    wire is_top_edge    = (buf_coord_y == rect_y);
+    wire is_bottom_edge = (buf_coord_y == rect_end_y);
+    wire is_within_y    = (buf_coord_y >= rect_y) && (buf_coord_y <= rect_end_y);
+
+    wire is_left_x_in_buf  = (rect_x[11:6] == buf_index_x);
+    wire is_right_x_in_buf = (rect_end_x[11:6] == buf_index_x);
+
+    genvar i;
+    generate
+        for (i = 0; i < 64; i = i + 1) begin : pixel_logic
+            wire [11:0] curr_x = buf_start_x + i;
+            
+            wire h_hit = (is_top_edge || is_bottom_edge) && 
+                         (curr_x >= rect_x && curr_x <= rect_end_x);
+         
+            wire v_hit = is_within_y && 
+                         ((is_left_x_in_buf  && (curr_x == rect_x)) || 
+                          (is_right_x_in_buf && (curr_x == rect_end_x)));
+
+            assign buf_out[i*4 +: 4] = (h_hit || v_hit) ? 
+                                        line_color : 
+                                        buf_in[i*4 +: 4];
+        end
+    endgenerate
+endmodule
+
+module FillRect( // Draw the outline of a rectangle, one pixel wide lines.
+    input wire[255:0] buf_in, // Buffer consisting of a 256 bit (64 pixel) slice of a row. One pixel tall.
+    input wire[5:0] buf_index_x, // X index of the start of this buffer. Since it's 64 bits, the X coordinate is buf_index_x << 6. It is guaranteed to be 64 pixel aligned.
+    input wire[11:0] buf_coord_y,// Y coordinate of this buffer. This is the full 12 bits.
+    input wire[11:0] rect_x, // Starting X coordinate of the rect
+    input wire[11:0] rect_y, // Starting Y coordinate of the rect
+    input wire[11:0] rect_w, // Width of the rect
+    input wire[11:0] rect_h, // Height of the rect
+    input wire[3:0] line_color, // The color to draw. This is just an index and it will index into a color palette later
+    output wire[255:0] buf_out // The modified buf_in data to draw the rect
+);
+wire [11:0] rect_end_x;
+    wire [11:0] rect_end_y;
+    wire [11:0] buf_start_x;
+    wire        y_hit;
+
+    assign rect_end_x  = rect_x + rect_w;
+    assign rect_end_y  = rect_y + rect_h;
+    assign buf_start_x = {buf_index_x, 6'd0};
+
+    assign y_hit = (buf_coord_y >= rect_y) && (buf_coord_y < rect_end_y);
+
+    genvar i;
+    generate
+        for (i = 0; i < 64; i = i + 1) begin : pixel_logic
+            wire [11:0] curr_x = buf_start_x + i;
+            wire x_hit;
+
+            assign x_hit = (curr_x >= rect_x) && (curr_x < rect_end_x);
+
+            assign buf_out[i*4 +: 4] = (y_hit && x_hit) ? 
+                                        line_color : 
+                                        buf_in[i*4 +: 4];
+        end
+    endgenerate
 endmodule
