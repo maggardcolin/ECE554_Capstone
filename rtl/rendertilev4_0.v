@@ -49,10 +49,10 @@ module rendertilev4(
     localparam STATE_PUTPIXEL = 5'b11;
     localparam STATE_PUTPIXEL_INTERMEDIATE = 5'b100;
     localparam STATE_PUTPIXEL_WRITE = 5'b101;
-    localparam STATE_DRAWRECT = 5'b110;
-    localparam STATE_FILLRECT = 5'b111;
-    localparam STATE_HORIZLINE = 5'b1000;
-    localparam STATE_VERTLINE = 5'b1001;
+//    localparam STATE_DRAWRECT = 5'b110;
+//    localparam STATE_FILLRECT = 5'b111;
+//    localparam STATE_HORIZLINE = 5'b1000;
+//    localparam STATE_VERTLINE = 5'b1001;
 
     localparam STATE_RMW = 5'b1010;
     
@@ -190,10 +190,10 @@ module rendertilev4(
                 INSTR_SETCOORD:    next_state = STATE_SETCOORD;
                 INSTR_FILLSCREEN:  next_state = STATE_FILLSCREEN;
                 INSTR_PUTPIXEL:    next_state = STATE_PUTPIXEL;
-                INSTR_DRAWRECT:    next_state = STATE_DRAWRECT;
-                INSTR_FILLRECT:    next_state = STATE_FILLRECT;
-                INSTR_HORIZLINE:   next_state = STATE_HORIZLINE;
-                INSTR_VERTLINE:    next_state = STATE_VERTLINE;
+                INSTR_DRAWRECT:    next_state = STATE_RMW;
+                INSTR_FILLRECT:    next_state = STATE_RMW;
+                INSTR_HORIZLINE:   next_state = STATE_RMW;
+                INSTR_VERTLINE:    next_state = STATE_RMW;
                 endcase
             end
         end
@@ -225,12 +225,6 @@ module rendertilev4(
         end
         STATE_PUTPIXEL_WRITE: begin
             next_state = STATE_IDLE;
-        end
-        STATE_DRAWRECT,
-        STATE_FILLRECT,
-        STATE_HORIZLINE,
-        STATE_VERTLINE: begin
-            next_state = STATE_RMW;
         end
         STATE_RMW: begin
             
