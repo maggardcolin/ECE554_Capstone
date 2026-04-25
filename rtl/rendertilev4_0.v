@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`default_nettype none
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
@@ -42,6 +43,32 @@ module rendertilev4(
         output wire [7:0] DMA_LED_DEBUG
     );
     
+    localparam STATE_IDLE = 5'b0;
+    localparam STATE_SETCOORD = 5'b1;
+    localparam STATE_FILLSCREEN = 5'b10;
+    localparam STATE_PUTPIXEL = 5'b11;
+    localparam STATE_PUTPIXEL_INTERMEDIATE = 5'b100;
+    localparam STATE_PUTPIXEL_WRITE = 5'b101;
+    localparam STATE_DRAWRECT = 5'b110;
+    localparam STATE_FILLRECT = 5'b111;
+    localparam STATE_HORIZLINE = 5'b1000;
+    localparam STATE_VERTLINE = 5'b1001;
+
+    localparam STATE_RMW = 5'b1010;
+    
+    localparam INSTR_NOP = 5'b0; // Replaced the blit operation
+    localparam INSTR_SETCOORD = 5'b1; // SetCoord(X,Y,X_en, Y_en)
+    localparam INSTR_FILLSCREEN = 5'b10; // FillScreen(color)
+    localparam INSTR_PUTPIXEL = 5'b11; // PutPixel(X,Y,Color)
+    localparam INSTR_DRAWRECT = 5'b100; // DrawRect(X, Y, W, H, Color)
+    localparam INSTR_FILLRECT = 5'b101; // FillRect(X, Y, W, H, Color)
+    localparam INSTR_DRAWALIEN = 5'b110; // DrawAlien(X, Y, Color)
+    localparam INSTR_HORIZLINE = 5'b111; // HorizLine(X, Y, W, Color)
+    localparam INSTR_VERTLINE = 5'b1000; // VertLine(X, Y, H, Color)
+    
+    reg[4:0] state;
+    reg[4:0] next_state; // Actually of type wire
+    
     reg[4:0] instr;
     reg[11:0] arg1;
     reg[11:0] arg2;
@@ -67,25 +94,9 @@ module rendertilev4(
         end
     end
     
-    localparam STATE_IDLE = 5'b0;
-    localparam STATE_SETCOORD = 5'b1;
-    localparam STATE_FILLSCREEN = 5'b10;
-    localparam STATE_PUTPIXEL = 5'b11;
-    localparam STATE_PUTPIXEL_INTERMEDIATE = 5'b100;
-    localparam STATE_PUTPIXEL_WRITE = 5'b101;
-    
-    localparam INSTR_NOP = 5'b0; // Replaced the blit operation
-    localparam INSTR_SETCOORD = 5'b1; // SetCoord(X,Y,X_en, Y_en)
-    localparam INSTR_FILLSCREEN = 5'b10; // FillScreen(color)
-    localparam INSTR_PUTPIXEL = 5'b11; // PutPixel(X,Y,Color)
-    localparam INSTR_DRAWRECT = 5'b100; // DrawRect(X, Y, W, H, Color)
-    localparam INSTR_FILLRECT = 5'b101; // FillRect(X, Y, W, H, Color)
-    localparam INSTR_DRAWALIEN = 5'b110; // DrawAlien(X, Y, Color)
-    localparam INSTR_HORIZLINE = 5'b111; // HorizLine(X, Y, W, Color)
-    localparam INSTR_VERTLINE = 5'b1000; // VertLine(X, Y, H, Color)
 
-    reg[4:0] state;
-    reg[4:0] next_state; // Actually of type wire
+
+ 
 
     always @(posedge clk, negedge rst_n) begin
         if(~rst_n) begin
@@ -175,18 +186,17 @@ module rendertilev4(
         STATE_IDLE: begin
             if(en) begin
                 case(instruction_in[63:59])
-                INSTR_NOP:
-                    next_state = STATE_IDLE;
-                INSTR_SETCOORD:
-                    next_state = STATE_SETCOORD;
-                INSTR_FILLSCREEN:
-                    next_state = STATE_FILLSCREEN;
-                INSTR_PUTPIXEL:
-                    next_state = STATE_PUTPIXEL;
+                INSTR_NOP:         next_state = STATE_IDLE;
+                INSTR_SETCOORD:    next_state = STATE_SETCOORD;
+                INSTR_FILLSCREEN:  next_state = STATE_FILLSCREEN;
+                INSTR_PUTPIXEL:    next_state = STATE_PUTPIXEL;
+                INSTR_DRAWRECT:    next_state = STATE_DRAWRECT;
+                INSTR_FILLRECT:    next_state = STATE_FILLRECT;
+                INSTR_HORIZLINE:   next_state = STATE_HORIZLINE;
+                INSTR_VERTLINE:    next_state = STATE_VERTLINE;
                 endcase
             end
         end
-
         STATE_SETCOORD: begin
             // Logic handled by external block
             // Single cycle latency
@@ -216,6 +226,15 @@ module rendertilev4(
         STATE_PUTPIXEL_WRITE: begin
             next_state = STATE_IDLE;
         end
+        STATE_DRAWRECT,
+        STATE_FILLRECT,
+        STATE_HORIZLINE,
+        STATE_VERTLINE: begin
+            next_state = STATE_RMW;
+        end
+        STATE_RMW: begin
+            
+        end
         default: next_state = STATE_IDLE;
         endcase
     end
@@ -239,6 +258,57 @@ module rendertilev4(
     end
     
     assign DMA_LED_DEBUG = {DMA_en_latch, 1'b0, DMA_row};
+
+wire[255:0] rect_out;
+wire[255:0] fillrect_out;
+wire[255:0] horiz_out;
+wire[255:0] vert_out;
+
+DrawRect drawrect_inst(
+    .buf_in(read_data),
+    .buf_index_x(x_index),
+    .buf_coord_y({y_index,read_row}),
+    .rect_x(arg1),
+    .rect_y(arg2),
+    .rect_w(arg3),
+    .rect_h(arg4),
+    .line_color(arg5[3:0]),
+    .buf_out(rect_out)
+);
+
+FillRect fillrect_inst(
+    .buf_in(read_data),
+    .buf_index_x(x_index),
+    .buf_coord_y({y_index,read_row}),
+    .rect_x(arg1),
+    .rect_y(arg2),
+    .rect_w(arg3),
+    .rect_h(arg4),
+    .line_color(arg5[3:0]),
+    .buf_out(fillrect_out)
+);
+
+HorizLineDraw horiz_inst(
+    .buf_in(read_data),
+    .buf_index_x(x_index),
+    .buf_coord_y({y_index,read_row}),
+    .line_x(arg1),
+    .line_y(arg2),
+    .line_width(arg3),
+    .line_color(arg4[3:0]),
+    .buf_out(horiz_out)
+);
+
+VertLineDraw vert_inst(
+    .buf_in(read_data),
+    .buf_index_x(x_index),
+    .buf_coord_y({y_index,read_row}),
+    .line_x(arg1),
+    .line_y(arg2),
+    .line_height(arg3),
+    .line_color(arg4[3:0]),
+    .buf_out(vert_out)
+);
 
 endmodule
 
@@ -381,3 +451,4 @@ wire [11:0] rect_end_x;
         end
     endgenerate
 endmodule
+`default_nettype wire
