@@ -23,6 +23,9 @@
 
 #define SHM_NAME "/pynq_fbmmio"
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+
 /// shm_total_size: Calculate total shared memory size needed
 /// Returns: Bytes needed = page-aligned registers + 2 framebuffers (double-buffered)
 static size_t shm_total_size(void) {
@@ -180,6 +183,8 @@ int fb_sim_main(void) {
 		return 1;
 	}
 
+	memset(fbp, 0, screensize);
+
 	while (running) {
 		struct timespec frame_start_time;
 		if (clock_gettime(CLOCK_MONOTONIC, &frame_start_time) != 0) {
@@ -225,10 +230,12 @@ int fb_sim_main(void) {
 				printf("Right!\n");
 				ev_btn |= 0x2; 
 				break;
+			case KEY_UP:
 			case KEY_W:
 				printf("Up!\n");
 				ev_btn |= BTN_UP; 
 				break;
+			case KEY_DOWN:
 			case KEY_S:
 				printf("Down!\n");
 				ev_btn |= BTN_DOWN; 
@@ -282,22 +289,30 @@ int fb_sim_main(void) {
         // SDL_RenderCopy(ren, tex, NULL, NULL);
         // SDL_RenderPresent(ren);
 	
-	int cw = (W < (int)vinfo.xres) ? W : (int)vinfo.xres;
-	int ch = (H < (int)vinfo.yres) ? H : (int)vinfo.yres;
+	int cw = MIN(W, vinfo.xres);
+	int ch = MIN(H, vinfo.yres);
+
+	uint8_t int_upscale = MAX(1,MIN((vinfo.xres / W), (vinfo.yres / H)));
+
+	int y_offset = 0;
+
+	if (ch * int_upscale < vinfo.yres) {
+		y_offset = (vinfo.yres - (ch * int_upscale)) / 2;
+	}
 
 	for (int y = 0; y < ch; y++) {
 		uint8_t *src = front + y * W * 4;
 		
-		for (int i = 0; i < 3; i++) {
-			uint16_t *dst = (uint16_t *)(fbp + (3*y+i) * finfo.line_length);
+		for (int i = 0; i < int_upscale; i++) {
+			uint16_t *dst = (uint16_t *)(fbp + (int_upscale*y+i+y_offset) * finfo.line_length);
 			for (int x = 0; x < cw; x++) {
-				for (int j = 0; j < 3; j++) {
+				for (int j = 0; j < int_upscale; j++) {
   					uint16_t b = src[4*x + 0];
   					uint16_t g = src[4*x + 1];
   					uint16_t r = src[4*x + 2];
   					uint16_t a = src[4*x + 3];
   
-  					dst[3*x + j] = ((b >> 3) & 31) | (((g >> 2) & 63) << 5) | (((r >> 3) & 31) << 11);
+  					dst[int_upscale*x + j] = ((b >> 3) & 31) | (((g >> 2) & 63) << 5) | (((r >> 3) & 31) << 11);
 				}
 			}
 		}

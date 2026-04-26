@@ -60,5 +60,6 @@ RUN update-ca-certificates
 RUN adduser petalinux
 
 RUN echo -e "\n\n[ -f /petalinux/settings.sh ] && source /petalinux/settings.sh" >> /home/petalinux/.bashrc
+RUN echo -e "\n[ -d /petalinux-build ] && cd /petalinux-build/projbuild/projbuild && make" >> /home/petalinux/.bashrc
 
 USER petalinux

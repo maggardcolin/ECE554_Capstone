@@ -1,107 +1,163 @@
 {
    "ActiveEmotionalView":"Default View",
-   "Default View_ScaleFactor":"1.16629",
-   "Default View_TopLeft":"4174,274",
+   "Default View_ScaleFactor":"0.441942",
+   "Default View_TopLeft":"1713,371",
    "ExpandedHierarchyInLayout":"",
    "guistr":"# # String gsaved with Nlview 7.8.0 2024-04-26 e1825d835c VDI=44 GEI=38 GUI=JA:21.0 TLS
 #  -string -flagsOSRD
-preplace portBus PL_USER_LED -pg 1 -lvl 16 -x 5100 -y 60 -defaultsOSRD
-preplace portBus PL_LEDRGB0 -pg 1 -lvl 16 -x 5100 -y 90 -defaultsOSRD
-preplace portBus PL_LEDRGB1 -pg 1 -lvl 16 -x 5100 -y 120 -defaultsOSRD
-preplace portBus PL_LEDRGB2 -pg 1 -lvl 16 -x 5100 -y 150 -defaultsOSRD
-preplace portBus PL_LEDRGB3 -pg 1 -lvl 16 -x 5100 -y 180 -defaultsOSRD
-preplace portBus PL_USER_PB -pg 1 -lvl 0 -x -150 -y 550 -defaultsOSRD
-preplace portBus PL_USER_SW -pg 1 -lvl 0 -x -150 -y -140 -defaultsOSRD
-preplace inst zynq_ultra_ps_e_0 -pg 1 -lvl 6 -x 1898 -y 320 -defaultsOSRD
-preplace inst mmio_dma_0 -pg 1 -lvl 8 -x 2682 -y 210 -defaultsOSRD
-preplace inst axi_smc -pg 1 -lvl 7 -x 2390 -y 190 -defaultsOSRD
-preplace inst rst_ps8_0_95M -pg 1 -lvl 6 -x 1898 -y 500 -defaultsOSRD
-preplace inst Control_DMA_0 -pg 1 -lvl 9 -x 3030 -y 210 -defaultsOSRD
-preplace inst reset_synch_0 -pg 1 -lvl 8 -x 2682 -y 500 -defaultsOSRD
-preplace inst PB_breakout_0 -pg 1 -lvl 7 -x 2390 -y 550 -defaultsOSRD
-preplace inst dispatcher_0 -pg 1 -lvl 11 -x 3760 -y 390 -defaultsOSRD
-preplace inst sw_breakout_0 -pg 1 -lvl 8 -x 2682 -y -140 -defaultsOSRD
-preplace inst ledr_overlay_0 -pg 1 -lvl 10 -x 3370 -y -240 -defaultsOSRD
-preplace inst ilconstant_0 -pg 1 -lvl 1 -x 10 -y 440 -defaultsOSRD
-preplace inst regdst_debug_0 -pg 1 -lvl 9 -x 3030 -y 650 -defaultsOSRD
-preplace inst axi_dma_0 -pg 1 -lvl 6 -x 1898 -y -10 -defaultsOSRD
-preplace inst axi_smc_1 -pg 1 -lvl 4 -x 1130 -y 30 -defaultsOSRD
-preplace inst axi_smc_2 -pg 1 -lvl 4 -x 1130 -y 280 -defaultsOSRD
-preplace inst rendertilev4_0 -pg 1 -lvl 14 -x 4600 -y 510 -defaultsOSRD
-preplace inst enable_breakout_0 -pg 1 -lvl 12 -x 4100 -y 680 -defaultsOSRD
-preplace inst color_mapper_0 -pg 1 -lvl 3 -x 830 -y -250 -defaultsOSRD
-preplace inst int_upscaler_0 -pg 1 -lvl 4 -x 1130 -y -250 -defaultsOSRD
-preplace inst pixel_packet_ctrl_0 -pg 1 -lvl 5 -x 1420 -y -230 -defaultsOSRD
-preplace inst pixel_cntr_0 -pg 1 -lvl 6 -x 1898 -y -210 -defaultsOSRD
-preplace inst dma_vid_test_sequence_0 -pg 1 -lvl 2 -x 580 -y -250 -defaultsOSRD
-preplace inst blk_mem_gen_0 -pg 1 -lvl 15 -x 4970 -y 700 -defaultsOSRD
-preplace inst ilconstant_1 -pg 1 -lvl 14 -x 4600 -y 680 -defaultsOSRD
-preplace inst ilconstant_2 -pg 1 -lvl 13 -x 4310 -y 790 -defaultsOSRD
-preplace netloc Control_DMA_0_PL_LEDRGB0 1 9 7 3210 90 N 90 N 90 N 90 N 90 N 90 N
-preplace netloc Control_DMA_0_PL_LEDRGB1 1 9 7 3240 120 N 120 N 120 N 120 N 120 N 120 N
-preplace netloc Control_DMA_0_PL_LEDRGB2 1 9 7 3240 150 N 150 N 150 N 150 N 150 N 150 N
-preplace netloc Control_DMA_0_PL_LEDRGB3 1 9 7 N 180 N 180 N 180 N 180 N 180 N 180 N
-preplace netloc Control_DMA_0_PL_USER_LED 1 9 1 3200 -290n
-preplace netloc Control_DMA_0_datastream_valid 1 9 2 N 220 3540
-preplace netloc Control_DMA_0_instruction_valid 1 9 2 N 200 3570
-preplace netloc Control_DMA_0_ps_datastream 1 9 2 N 300 3510
-preplace netloc Control_DMA_0_ps_instruction 1 9 2 N 280 3560
-preplace netloc Control_DMA_0_tilemask 1 9 2 N 320 3500
-preplace netloc PB_breakout_0_PB0 1 7 1 NJ 520
-preplace netloc PL_USER_PB 1 0 7 N 550 N 550 N 550 N 550 N 550 1540 600 2240
-preplace netloc PL_USER_SW_0_1 1 0 8 NJ -140 N -140 N -140 N -140 N -140 1578 -130 NJ -130 2530
-preplace netloc dispatcher_0_enable 1 11 1 3960 410n
-preplace netloc dispatcher_0_instruction_to_rt 1 11 3 N 390 N 390 4420
-preplace netloc dispatcher_0_ledr_debug 1 9 3 3240 -120 NJ -120 3950
-preplace netloc enable_breakout_0_en0 1 12 2 4220 550 4430
-preplace netloc ilconstant_0_dout 1 1 5 NJ 440 N 440 N 440 N 440 1540
-preplace netloc ledr_overlay_0_LEDR 1 10 6 N -240 N -240 N -240 N -240 N -240 5080
-preplace netloc mmio_dma_0_interrupt 1 8 1 2830 360n
-preplace netloc mmio_dma_0_regdest 1 8 1 2840 360n
-preplace netloc mmio_dma_0_slv_reg0 1 8 1 N 40
-preplace netloc mmio_dma_0_slv_reg1 1 8 1 N 60
-preplace netloc mmio_dma_0_slv_reg2 1 8 1 N 80
-preplace netloc mmio_dma_0_slv_reg3 1 8 1 N 100
-preplace netloc mmio_dma_0_slv_reg4 1 8 1 N 120
-preplace netloc mmio_dma_0_slv_reg5 1 8 1 N 140
-preplace netloc mmio_dma_0_slv_reg6 1 8 1 N 160
-preplace netloc mmio_dma_0_slv_reg7 1 8 1 N 180
-preplace netloc mmio_dma_0_slv_reg8 1 8 1 N 200
-preplace netloc mmio_dma_0_slv_reg9 1 8 1 N 220
-preplace netloc mmio_dma_0_slv_reg10 1 8 1 N 240
-preplace netloc mmio_dma_0_slv_reg11 1 8 1 N 260
-preplace netloc mmio_dma_0_slv_reg12 1 8 1 N 280
-preplace netloc mmio_dma_0_slv_reg13 1 8 1 N 300
-preplace netloc mmio_dma_0_slv_reg14 1 8 1 N 320
-preplace netloc mmio_dma_0_slv_reg15 1 8 1 N 340
-preplace netloc regdst_debug_0_ledr 1 9 1 3220 -270n
-preplace netloc rendertilev4_0_LEDR_DEBUG 1 9 6 3230 -110 NJ -110 NJ -110 NJ -110 N -110 4770
-preplace netloc rst_ps8_0_95M_peripheral_aresetn 1 1 13 470 -320 710 -330 950 -330 1290 -320 1588 90 2220 270 2542 580 2860 540 N 540 3550 540 N 540 N 540 4410
-preplace netloc sw_breakout_0_SW0 1 8 2 N -210 N
-preplace netloc sw_breakout_0_SW1 1 8 2 N -190 N
-preplace netloc zynq_ultra_ps_e_0_pl_clk0 1 1 14 460 -330 700 -340 970 -340 1300 -310 1568 190 2230 280 2532 590 2850 530 N 530 3530 530 N 530 N 530 4400 400 4850
-preplace netloc zynq_ultra_ps_e_0_pl_resetn0 1 5 2 1598 610 2200
-preplace netloc rendertilev4_0_read_row 1 14 1 4860 460n
-preplace netloc rendertilev4_0_write_en 1 14 1 4800 500n
-preplace netloc ilconstant_1_dout 1 14 1 4790 680n
-preplace netloc rendertilev4_0_write_row 1 14 1 4820 520n
-preplace netloc rendertilev4_0_write_data 1 14 1 4780 540n
-preplace netloc ilconstant_2_dout 1 13 2 4400 620 4810J
-preplace netloc axi_dma_0_M_AXI_S2MM 1 3 4 980 -120 N -120 N -120 2200
-preplace netloc axi_smc_1_M00_AXI 1 4 2 1280 -50 N
-preplace netloc axi_smc_2_M00_AXI 1 4 2 N 280 1540
-preplace netloc axi_smc_M00_AXI 1 7 1 N 190
-preplace netloc color_mapper_0_M00_AXIS 1 3 1 960 -270n
-preplace netloc dma_vid_test_sequence_0_M00_AXIS 1 2 1 690 -270n
-preplace netloc int_upscaler_0_M00_AXIS 1 4 1 N -250
-preplace netloc pixel_cntr_0_M00_AXIS 1 5 2 1598 -290 2200
-preplace netloc pixel_packet_ctrl_0_M00_AXIS 1 5 1 N -230
-preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM0_FPD 1 6 1 2240 170n
-preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM1_FPD 1 3 4 990 -110 N -110 N -110 2210
-levelinfo -pg 1 -150 10 580 830 1130 1420 1898 2390 2682 3030 3370 3760 4100 4310 4600 4970 5100
-pagesize -pg 1 -db -bbox -sgen -320 -1630 5270 940
+preplace portBus PL_USER_LED -pg 1 -lvl 11 -x 4660 -y 1100 -defaultsOSRD
+preplace portBus PL_LEDRGB0 -pg 1 -lvl 11 -x 4660 -y 130 -defaultsOSRD
+preplace portBus PL_LEDRGB1 -pg 1 -lvl 11 -x 4660 -y 160 -defaultsOSRD
+preplace portBus PL_LEDRGB2 -pg 1 -lvl 11 -x 4660 -y 190 -defaultsOSRD
+preplace portBus PL_LEDRGB3 -pg 1 -lvl 11 -x 4660 -y 220 -defaultsOSRD
+preplace portBus PL_USER_PB -pg 1 -lvl 0 -x -10 -y 910 -defaultsOSRD
+preplace portBus PL_USER_SW -pg 1 -lvl 0 -x -10 -y 1020 -defaultsOSRD
+preplace portBus RBP_GPIO_tri_io_0 -pg 1 -lvl 11 -x 4660 -y 390 -defaultsOSRD
+preplace inst zynq_ultra_ps_e_0 -pg 1 -lvl 6 -x 2530 -y 770 -defaultsOSRD
+preplace inst mmio_dma_0 -pg 1 -lvl 8 -x 3660 -y 230 -defaultsOSRD
+preplace inst axi_smc -pg 1 -lvl 7 -x 3050 -y 580 -defaultsOSRD
+preplace inst rst_ps8_0_95M -pg 1 -lvl 2 -x 470 -y 780 -defaultsOSRD
+preplace inst Control_DMA_0 -pg 1 -lvl 9 -x 4040 -y 230 -defaultsOSRD
+preplace inst PB_breakout_0 -pg 1 -lvl 1 -x 140 -y 910 -defaultsOSRD
+preplace inst dispatcher_0 -pg 1 -lvl 3 -x 920 -y 640 -defaultsOSRD
+preplace inst sw_breakout_0 -pg 1 -lvl 9 -x 4040 -y 1020 -defaultsOSRD
+preplace inst ledr_overlay_0 -pg 1 -lvl 10 -x 4450 -y 1100 -defaultsOSRD
+preplace inst ilconstant_0 -pg 1 -lvl 1 -x 140 -y 780 -defaultsOSRD
+preplace inst regdst_debug_0 -pg 1 -lvl 9 -x 4040 -y 780 -defaultsOSRD
+preplace inst axi_dma_0 -pg 1 -lvl 8 -x 3660 -y 960 -defaultsOSRD
+preplace inst axi_smc_1 -pg 1 -lvl 7 -x 3050 -y 760 -defaultsOSRD
+preplace inst axi_smc_2 -pg 1 -lvl 5 -x 1840 -y 750 -defaultsOSRD
+preplace inst enable_breakout_0 -pg 1 -lvl 4 -x 1270 -y 660 -defaultsOSRD
+preplace inst rendertile_packaged_0 -pg 1 -lvl 5 -x 1840 -y 1140 -defaultsOSRD
+preplace inst rendertile_packaged_1 -pg 1 -lvl 5 -x 1840 -y 1370 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_2 -pg 1 -lvl 5 -x 1840 -y 1590 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_3 -pg 1 -lvl 5 -x 1840 -y 1810 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_4 -pg 1 -lvl 5 -x 1840 -y 2030 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_5 -pg 1 -lvl 5 -x 1840 -y 2250 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_6 -pg 1 -lvl 5 -x 1840 -y 2470 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_7 -pg 1 -lvl 5 -x 1840 -y 2690 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_8 -pg 1 -lvl 5 -x 1840 -y 2910 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_9 -pg 1 -lvl 5 -x 1840 -y 3130 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_10 -pg 1 -lvl 5 -x 1840 -y 3350 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_11 -pg 1 -lvl 5 -x 1840 -y 3570 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_12 -pg 1 -lvl 5 -x 1840 -y 3790 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_13 -pg 1 -lvl 5 -x 1840 -y 4040 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_14 -pg 1 -lvl 5 -x 1840 -y 4260 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_15 -pg 1 -lvl 5 -x 1840 -y 4500 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_16 -pg 1 -lvl 5 -x 1840 -y 4720 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_17 -pg 1 -lvl 5 -x 1840 -y 4950 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_18 -pg 1 -lvl 5 -x 1840 -y 5180 -defaultsOSRD -resize 300 196
+preplace inst rendertile_packaged_19 -pg 1 -lvl 5 -x 1840 -y 5400 -defaultsOSRD -resize 300 196
+preplace inst ERROR_CODE_DELETE_ME -pg 1 -lvl 2 -x 470 -y 640 -defaultsOSRD
+preplace inst BUSY_DELETE_ME -pg 1 -lvl 2 -x 470 -y 530 -defaultsOSRD -resize 120 88
+preplace inst rendertile_column_sel_0 -pg 1 -lvl 6 -x 2530 -y 1310 -defaultsOSRD
+preplace inst bram_stream_controll_0 -pg 1 -lvl 7 -x 3050 -y 1330 -defaultsOSRD
+preplace inst audio_io_wrapper_0 -pg 1 -lvl 10 -x 4450 -y 390 -defaultsOSRD
+preplace netloc BUSY_DELETE_ME_dout 1 2 1 670 530n
+preplace netloc Control_DMA_0_PL_LEDRGB0 1 9 2 NJ 130 NJ
+preplace netloc Control_DMA_0_PL_LEDRGB1 1 9 2 NJ 150 4630J
+preplace netloc Control_DMA_0_PL_LEDRGB2 1 9 2 NJ 170 4630J
+preplace netloc Control_DMA_0_PL_LEDRGB3 1 9 2 NJ 190 4620J
+preplace netloc Control_DMA_0_PL_USER_LED 1 9 1 4270 110n
+preplace netloc Control_DMA_0_audio_bus 1 9 1 4260 350n
+preplace netloc Control_DMA_0_datastream_valid 1 2 8 690 370 NJ 370 NJ 370 NJ 370 NJ 370 3490J 460 NJ 460 4220
+preplace netloc Control_DMA_0_instruction_valid 1 2 8 700 380 NJ 380 NJ 380 NJ 380 NJ 380 3480J 470 NJ 470 4240
+preplace netloc Control_DMA_0_ps_datastream 1 2 8 710 390 NJ 390 NJ 390 NJ 390 NJ 390 3260J 480 NJ 480 4210
+preplace netloc Control_DMA_0_ps_instruction 1 2 8 720 400 NJ 400 NJ 400 NJ 400 NJ 400 3240J 490 NJ 490 4250
+preplace netloc Control_DMA_0_tilemask 1 2 8 730 410 NJ 410 NJ 410 NJ 410 NJ 410 3230J 500 NJ 500 4230
+preplace netloc ERROR_CODE_DELETE_ME_dout 1 2 1 650 640n
+preplace netloc PL_USER_PB 1 0 1 NJ 910
+preplace netloc PL_USER_SW_0_1 1 0 9 NJ 1020 NJ 1020 NJ 1020 1140J 990 NJ 990 NJ 990 NJ 990 3250J 1060 3840J
+preplace netloc audio_io_wrapper_0_RBP_GPIO_tri_io 1 10 1 N 390
+preplace netloc axi_dma_0_s2mm_prmry_reset_out_n 1 4 5 1660 1010 2030 1010 2850 1070 NJ 1070 3830
+preplace netloc bram_stream_controll_0_capture 1 5 3 2230 980 NJ 980 3230
+preplace netloc bram_stream_controll_0_rendertile_addr 1 5 3 2230 1600 NJ 1600 3220
+preplace netloc dispatcher_0_enable 1 3 1 NJ 660
+preplace netloc dispatcher_0_instruction_to_rt 1 3 2 1130J 1000 1420
+preplace netloc dispatcher_0_ledr_debug 1 3 7 1120J 940 NJ 940 NJ 940 NJ 940 3260J 1150 NJ 1150 4230
+preplace netloc enable_breakout_0_en0 1 4 1 1640 470n
+preplace netloc enable_breakout_0_en1 1 4 1 1630 490n
+preplace netloc enable_breakout_0_en2 1 4 1 1620 510n
+preplace netloc enable_breakout_0_en3 1 4 1 1610 530n
+preplace netloc enable_breakout_0_en4 1 4 1 1600 550n
+preplace netloc enable_breakout_0_en5 1 4 1 1590 570n
+preplace netloc enable_breakout_0_en6 1 4 1 1580 590n
+preplace netloc enable_breakout_0_en7 1 4 1 1570 610n
+preplace netloc enable_breakout_0_en8 1 4 1 1560 630n
+preplace netloc enable_breakout_0_en9 1 4 1 1540 650n
+preplace netloc enable_breakout_0_en10 1 4 1 1520 670n
+preplace netloc enable_breakout_0_en11 1 4 1 1510 690n
+preplace netloc enable_breakout_0_en12 1 4 1 1500 710n
+preplace netloc enable_breakout_0_en13 1 4 1 1490 730n
+preplace netloc enable_breakout_0_en14 1 4 1 1480 750n
+preplace netloc enable_breakout_0_en15 1 4 1 1470 770n
+preplace netloc enable_breakout_0_en16 1 4 1 1460 790n
+preplace netloc enable_breakout_0_en17 1 4 1 1450 810n
+preplace netloc enable_breakout_0_en18 1 4 1 1440 830n
+preplace netloc enable_breakout_0_en19 1 4 1 1430 850n
+preplace netloc ilconstant_0_dout 1 1 1 270J 780n
+preplace netloc ledr_overlay_0_LEDR 1 10 1 NJ 1100
+preplace netloc mmio_dma_0_interrupt 1 8 1 3860 380n
+preplace netloc mmio_dma_0_regdest 1 8 1 3870 380n
+preplace netloc mmio_dma_0_slv_reg0 1 8 1 N 60
+preplace netloc mmio_dma_0_slv_reg1 1 8 1 N 80
+preplace netloc mmio_dma_0_slv_reg2 1 8 1 N 100
+preplace netloc mmio_dma_0_slv_reg3 1 8 1 N 120
+preplace netloc mmio_dma_0_slv_reg4 1 8 1 N 140
+preplace netloc mmio_dma_0_slv_reg5 1 8 1 N 160
+preplace netloc mmio_dma_0_slv_reg6 1 8 1 N 180
+preplace netloc mmio_dma_0_slv_reg7 1 8 1 N 200
+preplace netloc mmio_dma_0_slv_reg8 1 8 1 N 220
+preplace netloc mmio_dma_0_slv_reg9 1 8 1 N 240
+preplace netloc mmio_dma_0_slv_reg10 1 8 1 N 260
+preplace netloc mmio_dma_0_slv_reg11 1 8 1 N 280
+preplace netloc mmio_dma_0_slv_reg12 1 8 1 N 300
+preplace netloc mmio_dma_0_slv_reg13 1 8 1 N 320
+preplace netloc mmio_dma_0_slv_reg14 1 8 1 N 340
+preplace netloc mmio_dma_0_slv_reg15 1 8 1 N 360
+preplace netloc pixel_cntr_0_DMA_en 1 4 4 1650 970 N 970 NJ 970 3220
+preplace netloc pixel_cntr_0_DMA_row 1 4 4 1670 1020 N 1020 N 1020 3210
+preplace netloc regdst_debug_0_ledr 1 9 1 4260 780n
+preplace netloc rendertile_column_sel_0_bram_out 1 6 1 N 1310
+preplace netloc rendertile_packaged_0_LEDR_DEBUG 1 5 5 2010 1000 NJ 1000 3240J 1160 NJ 1160 4270J
+preplace netloc rendertile_packaged_0_blk_mem_out 1 5 1 2020 1140n
+preplace netloc rendertile_packaged_10_blk_mem_out 1 5 1 2120 1340n
+preplace netloc rendertile_packaged_11_blk_mem_out 1 5 1 2130 1360n
+preplace netloc rendertile_packaged_12_blk_mem_out 1 5 1 2140 1380n
+preplace netloc rendertile_packaged_13_blk_mem_out 1 5 1 2150 1400n
+preplace netloc rendertile_packaged_14_blk_mem_out 1 5 1 2160 1420n
+preplace netloc rendertile_packaged_15_blk_mem_out 1 5 1 2170 1440n
+preplace netloc rendertile_packaged_16_blk_mem_out 1 5 1 2180 1460n
+preplace netloc rendertile_packaged_17_blk_mem_out 1 5 1 2190 1480n
+preplace netloc rendertile_packaged_18_blk_mem_out 1 5 1 2200 1500n
+preplace netloc rendertile_packaged_19_blk_mem_out 1 5 1 2210 1520n
+preplace netloc rendertile_packaged_1_blk_mem_out 1 5 1 2030 1160n
+preplace netloc rendertile_packaged_2_blk_mem_out 1 5 1 2040 1180n
+preplace netloc rendertile_packaged_3_blk_mem_out 1 5 1 2050 1200n
+preplace netloc rendertile_packaged_4_blk_mem_out 1 5 1 2060 1220n
+preplace netloc rendertile_packaged_5_blk_mem_out 1 5 1 2070 1240n
+preplace netloc rendertile_packaged_6_blk_mem_out 1 5 1 2080 1260n
+preplace netloc rendertile_packaged_7_blk_mem_out 1 5 1 2090 1280n
+preplace netloc rendertile_packaged_8_blk_mem_out 1 5 1 2100 1300n
+preplace netloc rendertile_packaged_9_blk_mem_out 1 5 1 2110 1320n
+preplace netloc rst_ps8_0_95M_peripheral_aresetn 1 2 7 680 890 1140J 920 1530 880 NJ 880 2870 660 3470 770 N
+preplace netloc sw_breakout_0_SW0 1 9 1 4250 950n
+preplace netloc sw_breakout_0_SW1 1 9 1 4240 970n
+preplace netloc zynq_ultra_ps_e_0_pl_clk0 1 1 8 290 880 660 900 1110 930 1550 830 2040 890 2880 900 3460 750 N
+preplace netloc zynq_ultra_ps_e_0_pl_resetn0 1 1 6 280 910 NJ 910 NJ 910 NJ 910 NJ 910 2830
+preplace netloc axi_dma_0_M_AXI_S2MM 1 4 5 1670 870 NJ 870 2890J 860 NJ 860 3830
+preplace netloc axi_smc_1_M00_AXI 1 7 1 3220 760n
+preplace netloc axi_smc_2_M00_AXI 1 5 1 2030 740n
+preplace netloc axi_smc_M00_AXI 1 7 1 3220 210n
+preplace netloc bram_stream_controll_0_M00_AXIS 1 7 1 3270 940n
+preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM0_FPD 1 6 1 2830 560n
+preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM1_FPD 1 6 1 2840 740n
+levelinfo -pg 1 -10 140 470 920 1270 1840 2530 3050 3660 4040 4450 4660
+pagesize -pg 1 -db -bbox -sgen -450 -160 4880 5520
 "
 }
 {
-   "da_axi4_cnt":"3"
+   "da_axi4_cnt":"3",
+   "da_board_cnt":"38",
+   "da_clkrst_cnt":"19"
 }

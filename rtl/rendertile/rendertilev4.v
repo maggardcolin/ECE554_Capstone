@@ -86,6 +86,8 @@ module rendertilev4(
     always @(posedge clk, negedge rst_n) begin
         if(~rst_n) begin
             state <= STATE_IDLE;
+        end else if(DMA_en) begin
+            state <= STATE_IDLE;
         end else begin
             state <= next_state;
         end
