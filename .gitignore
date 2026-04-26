@@ -23,3 +23,6 @@ Vivado_projects/*
 !Vivado_projects/create_project.sh
 
 bucky_kart/
+console_menu/hw_contract.h
+console_menu/hw_contract.h
+console_menu/hw_sim.c
