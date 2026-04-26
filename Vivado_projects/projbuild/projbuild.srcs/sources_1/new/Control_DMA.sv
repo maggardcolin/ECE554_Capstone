@@ -60,7 +60,8 @@ module Control_DMA(
         
         // REG BLOCK 5
         // REG BLOCK 6 reserved for future expansion
-        output wire[32:0] tilemask
+        output wire[32:0] tilemask,
+        output wire[31:0] audio_bus
     );
     assign PL_USER_LED = slv_reg0[7:0];
     assign PL_LEDRGB0 = slv_reg0[10:8];
@@ -75,5 +76,6 @@ module Control_DMA(
     assign instruction_valid = ((regdest == 4'h1) & interrupt);
     assign ps_datastream = {slv_reg4, slv_reg3};
     
-    assign tilemask = slv_reg5;
+    assign tilemask = {1'b0, slv_reg5}; // IDK why I made it 33 bits but whatever.
+    assign audio_bus = slv_reg6;
 endmodule

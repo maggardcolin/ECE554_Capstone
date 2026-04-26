@@ -37,9 +37,28 @@
     "boundary": {
       "ports": {
         "enable_in": [ { "direction": "in", "size_left": "31", "size_right": "0" } ],
-        "en0": [ { "direction": "out" } ]
+        "en0": [ { "direction": "out" } ],
+        "en1": [ { "direction": "out" } ],
+        "en2": [ { "direction": "out" } ],
+        "en3": [ { "direction": "out" } ],
+        "en4": [ { "direction": "out" } ],
+        "en5": [ { "direction": "out" } ],
+        "en6": [ { "direction": "out" } ],
+        "en7": [ { "direction": "out" } ],
+        "en8": [ { "direction": "out" } ],
+        "en9": [ { "direction": "out" } ],
+        "en10": [ { "direction": "out" } ],
+        "en11": [ { "direction": "out" } ],
+        "en12": [ { "direction": "out" } ],
+        "en13": [ { "direction": "out" } ],
+        "en14": [ { "direction": "out" } ],
+        "en15": [ { "direction": "out" } ],
+        "en16": [ { "direction": "out" } ],
+        "en17": [ { "direction": "out" } ],
+        "en18": [ { "direction": "out" } ],
+        "en19": [ { "direction": "out" } ]
       }
     }
   },
-  "checksum": "7ddd47aa"
+  "checksum": "0035e9b2"
 }

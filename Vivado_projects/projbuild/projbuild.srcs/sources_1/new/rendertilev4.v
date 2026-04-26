@@ -19,7 +19,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
 module rendertilev4(
         input wire clk,
         input wire rst_n,
@@ -37,7 +36,10 @@ module rendertilev4(
         output wire[255:0] write_data,
         
         // Debug output
-        output wire[7:0] LEDR_DEBUG
+        output wire[7:0] LEDR_DEBUG,
+        input wire DMA_en,
+        input wire [5:0] DMA_row,
+        output wire [7:0] DMA_LED_DEBUG
     );
     
     reg[4:0] instr;
@@ -69,7 +71,8 @@ module rendertilev4(
     localparam STATE_SETCOORD = 5'b1;
     localparam STATE_FILLSCREEN = 5'b10;
     localparam STATE_PUTPIXEL = 5'b11;
-    localparam STATE_PUTPIXEL_WRITE = 5'b100;
+    localparam STATE_PUTPIXEL_INTERMEDIATE = 5'b100;
+    localparam STATE_PUTPIXEL_WRITE = 5'b101;
     
     localparam INSTR_NOP = 5'b0;
     localparam INSTR_SETCOORD = 5'b1;
@@ -112,7 +115,7 @@ module rendertilev4(
         if(~rst_n) begin
             putpixel_address <= 5'b0;
         end else if(state == STATE_IDLE && next_state == STATE_PUTPIXEL) begin
-            putpixel_address <= arg2[5:0]; // Grab lower bits as the row to read/write
+            putpixel_address <= instruction_in[40:35]; // Grab lower bits as the row to read/write
         end else if(state == STATE_IDLE) begin
             putpixel_address <= 5'b0; // If we're in the idle state, deassert this to not mess with other blocks
         end
@@ -127,6 +130,34 @@ module rendertilev4(
     end
     wire putpixel_wen;
     assign putpixel_wen = (state == STATE_PUTPIXEL_WRITE);
+    
+    // FillScreen stuff
+    reg fillscreen_done;
+    reg[5:0] fillscreen_row;
+    wire fillscreen_wen;
+    wire[256:0] fillscreen_wdata;
+    always @(posedge clk, negedge rst_n) begin
+        if(~rst_n) begin
+            fillscreen_done <= 1'b0;
+        end else if(state == STATE_IDLE) begin
+            fillscreen_done <= 1'b0;
+        end else if(state == STATE_FILLSCREEN && fillscreen_row == 6'h3F) begin
+            fillscreen_done <= 1'b1;
+        end
+    end
+    always @(posedge clk, negedge rst_n) begin
+        if(~rst_n) begin
+            fillscreen_row <= 6'b0;
+        end else if(state == STATE_IDLE) begin
+            fillscreen_row <= 6'b0;
+        end else if(state == STATE_FILLSCREEN) begin
+            if(fillscreen_row != 6'h3F) begin
+                fillscreen_row <= fillscreen_row + 1;
+            end
+        end
+    end
+    assign fillscreen_wen = (state == STATE_FILLSCREEN);
+    assign fillscreen_wdata = {64{arg1[3:0]}};
     
     // State machine
     
@@ -157,18 +188,24 @@ module rendertilev4(
             next_state = STATE_IDLE;
         end
         STATE_FILLSCREEN: begin
-            // Stay here TODO
+            // Fill the screen
+            if(fillscreen_done) begin
+                next_state = STATE_IDLE;
+            end
         end
         STATE_PUTPIXEL: begin
             // By transitioning into this state, putpixel line will be set. Arguments will also have been captured by now.
             // First, read from the memory
             // This happens naturally as the address is presented during this clock on port A (read port)\
             if(PUTPIXEL_inrange) begin
-                next_state = STATE_PUTPIXEL_WRITE;
+                next_state = STATE_PUTPIXEL_INTERMEDIATE;
             end else begin
                 // No work to be done
                 next_state = STATE_IDLE;
             end
+        end
+        STATE_PUTPIXEL_INTERMEDIATE: begin
+            next_state = STATE_PUTPIXEL_WRITE;
         end
         STATE_PUTPIXEL_WRITE: begin
             next_state = STATE_IDLE;
@@ -180,9 +217,21 @@ module rendertilev4(
     assign LEDR_DEBUG = {en, 2'b0, state};
     
     // OR together the control signals
-    assign read_row = putpixel_address;
-    assign write_row = putpixel_address;
-    assign write_en = putpixel_wen;
-    assign write_data = putpixel_wdata;
+    assign read_row = DMA_en ? DMA_row : putpixel_address;
+    assign write_row = putpixel_address|fillscreen_row;
+    assign write_en = putpixel_wen|fillscreen_wen;
+    assign write_data = ({256{putpixel_wen}}&putpixel_wdata) | ({256{fillscreen_wen}}&fillscreen_wdata);
+    
+    
+    reg DMA_en_latch;
+    
+    always @(posedge clk, negedge rst_n) begin
+        if (~rst_n)
+            DMA_en_latch <= 1'b0;
+        else if (DMA_en)
+            DMA_en_latch <= 1'b1;
+    end
+    
+    assign DMA_LED_DEBUG = {DMA_en_latch, 1'b0, DMA_row};
 
 endmodule

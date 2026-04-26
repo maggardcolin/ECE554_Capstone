@@ -65,7 +65,8 @@
         "ping": [ { "direction": "out" } ],
         "ps_instruction": [ { "direction": "out", "size_left": "63", "size_right": "0" } ],
         "ps_datastream": [ { "direction": "out", "size_left": "63", "size_right": "0" } ],
-        "tilemask": [ { "direction": "out", "size_left": "32", "size_right": "0" } ]
+        "tilemask": [ { "direction": "out", "size_left": "32", "size_right": "0" } ],
+        "audio_bus": [ { "direction": "out", "size_left": "31", "size_right": "0" } ]
       },
       "interfaces": {
         "reset_pl": {
@@ -95,5 +96,5 @@
       }
     }
   },
-  "checksum": "e2fac2ea"
+  "checksum": "55529c94"
 }
