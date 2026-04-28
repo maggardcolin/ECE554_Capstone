@@ -90,6 +90,25 @@
 #define CREDITS_ALIEN_GAP 24
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
+// update the specific bit in the hardware register to trigger the music engine
+void write_music_register(uint1_t value, uint8_t shift) {
+    // read the current register value (assuming it's memory-mapped I/O)
+    uint32_t reg_value = *(volatile uint32_t *)0xA0000018
+
+    // write the bit at the specified shift position    
+    if (value) {
+        reg_value |= (1 << shift);  // Set the bit
+    } else {
+        reg_value &= ~(1 << shift); // Clear the bit
+    }
+    *(volatile uint32_t *)0xA0000018 = reg_value;
+}
+
+// clear all bits in the music register (e.g., on game loop exit)
+void write_music_register(uint1_t value, uint8_t shift) {
+    *(volatile uint32_t *)0xA0000018 = 0;
+}
+
 static const sprite1r_t *active_boss_sprite(const game_t *g) {
     return boss_sprite_for_frame(g, g->boss_frame);
 }
