@@ -82,6 +82,7 @@ int sw_sim_main(void) {
                 else mode = MUSIC_MODE_BOSS;
             }
             music_set_mode(mode);
+            write_music_register(1, (int) mode);
         }
 
         game_render(&game, &lfb);
@@ -92,9 +93,13 @@ int sw_sim_main(void) {
         shm.regs->swap_request = 1;
         while (shm.regs->swap_ack == last_ack) { /* spin */ }
         last_ack = shm.regs->swap_ack;
+
+        // Clear music trigger bits after each frame to prevent repeated triggers
+        if (music_ok) write_music_register(0, (int) mode);
     }
 
     if (music_ok) {
+        clear_music_register();
         music_shutdown();
     }
     lfb_free(&lfb);
