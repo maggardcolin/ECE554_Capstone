@@ -92,7 +92,7 @@
 
 // update the specific bit in the hardware register to trigger the music engine
 void write_music_register(uint1_t value, uint8_t shift) {
-    // read the current register value (assuming it's memory-mapped I/O)
+    // read the current register value
     uint32_t reg_value = *(volatile uint32_t *)0xA0000018
 
     // write the bit at the specified shift position    
@@ -105,7 +105,7 @@ void write_music_register(uint1_t value, uint8_t shift) {
 }
 
 // clear all bits in the music register (e.g., on game loop exit)
-void write_music_register(uint1_t value, uint8_t shift) {
+void clear_music_register() {
     *(volatile uint32_t *)0xA0000018 = 0;
 }
 
