@@ -821,7 +821,8 @@ int music_init(void) {
         return -1;
     }
 
-    int rc = snd_pcm_open(&g_music.pcm, "hw:2,0", SND_PCM_STREAM_PLAYBACK, 0);
+    int rc = snd_pcm_open(&g_music.pcm, "plughw:CARD=Headphones,DEV=0", SND_PCM_STREAM_PLAYBACK, 0);
+
     if (rc < 0) {
         fprintf(stderr, "music: snd_pcm_open failed: %s\n", snd_strerror(rc));
         pthread_mutex_destroy(&g_music.lock);
