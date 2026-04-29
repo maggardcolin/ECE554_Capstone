@@ -5681,10 +5681,15 @@ void game_render(game_t *g, lfb_t *lfb) {
 		}
 
 		const sprite1r_t *BS = active_boss_sprite(g);
+		const sprite1r_t *BT = boss_sprite_for_frame(g, !g->boss_frame);
 		int hide_for_chariot_explosion = (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active &&
 				g->boss_attack_type == CHARIOT_CHARGE_ATTACK && g->boss_special_timer > 0);
 		if (!hide_for_chariot_explosion) {
+			if (g->boss_prev_x != g->boss_x || g->boss_prev_y != g->boss_y) { 
+				draw_sprite1r(lfb, BT, g->boss_prev_x, g->boss_prev_y, 0xFF000000);
+			}
 			draw_sprite1r(lfb, BS, g->boss_x, g->boss_y, boss_color);
+			g->boss_prev_x = g->boss_x; g->boss_prev_y = g->boss_y;
 		}
 
 		if (g->boss_type == BOSS_TYPE_CHARIOT && g->boss_power_active && g->boss_attack_type == CHARIOT_CHARGE_ATTACK) {
@@ -5709,6 +5714,8 @@ void game_render(game_t *g, lfb_t *lfb) {
 
 	// aliens
 	const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
+	const sprite1r_t *AT = g->alien_frame ? &g->ALIEN_A : &g->ALIEN_B;
+
 	int spacing_x = 6, spacing_y = 5;
 	for (int r = 0; r < AROWS; r++) {
 		for (int c = 0; c < ACOLS; c++) {
@@ -5731,7 +5738,7 @@ void game_render(game_t *g, lfb_t *lfb) {
 			}
 
 			if (ax != axx || ay != ayy) {
-				draw_sprite1r(lfb, AS, axx, ayy, 0xFF000000);
+				draw_sprite1r(lfb, AT, axx, ayy, 0xFF000000);
 			}
 			draw_sprite1r(lfb, AS, ax, ay, alien_color);
 		}
