@@ -28,6 +28,7 @@
 #define REG_INSTR_LOW 0x04
 #define REG_INSTR_HI 0x08
 #define REG_TILEMASK 0x14
+#define REG_MUSIC 0x18
 
 #define CNTRL_OFF  0x30
 #define STATUS_OFF 0x34
@@ -52,6 +53,10 @@ long get_size(char *path) {
 
 	fclose(fp);
 	return size;
+}
+
+void set_music_gpio(void *mmio, uint32_t music_mask) {
+	*((uint32_t *)(mmio + REG_MUSIC)) = music_mask;
 }
 
 void send_instruction_2(void *mmio, uint64_t ins) {

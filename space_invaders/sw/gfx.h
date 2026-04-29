@@ -40,6 +40,8 @@ void l_putpix(lfb_t *lfb, int x, int y, uint32_t argb);
 
 void l_putrect(int x, int y, int w, int h, uint32_t argb);
 
+void toggle_music(uint32_t music_mask);
+
 #endif
 
 

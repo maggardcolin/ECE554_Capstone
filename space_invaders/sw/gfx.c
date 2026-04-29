@@ -240,4 +240,10 @@ void l_putrect(int x, int y, int w, int h, uint32_t argb) {
 	cache_ins(0x5ULL, x, y, w, h, color);
 }
 
+void toggle_music(uint32_t music_mask) {
+	if (!initialized) init();
+
+	set_music_gpio(MMIO_MAP, music_mask);
+}
+
 #endif
