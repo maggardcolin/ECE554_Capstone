@@ -48,9 +48,9 @@ LDFLAGS += $(shell pkg-config --libs libevdev)
 CFLAGS += $(shell pkg-config --cflags alsa)
 LDFLAGS += $(shell pkg-config --libs alsa)
 
-CFLAGS += -O3 -lrt -lpthread
+CFLAGS += -O3 -lrt -lpthread -DNO_ALSA
 
-SW_SRC := sw/font.c sw/gfx.c sw/shm_map.c sw/sprite.c sw/boss.c sw/game.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c sw/main.c 
+SW_SRC := sw/petalinux.c sw/font.c sw/gfx.c sw/shm_map.c sw/sprite.c sw/boss.c sw/game.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c sw/main.c 
 HW_SRC := fb_sim.c
 SRC := $(HW_SRC) $(SW_SRC) $(APP).c
 APP_OBJS = $(SRC:.c=.o)
@@ -60,10 +60,10 @@ all: build
 build: $(APP)
 
 $(APP): $(APP_OBJS)
-	$(CC) $^ -o $@ $(CFLAGS) $(LDFLAGS) $(LDLIBS) -lpthread
+	$(CC) -DFB $^ -o $@ $(CFLAGS) $(LDFLAGS) $(LDLIBS) -lpthread
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) -DFB $(CFLAGS) -c $< -o $@
 
 clean:
 	-rm -f $(APP) $(APP_OBJS)

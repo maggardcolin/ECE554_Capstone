@@ -5,6 +5,8 @@
 #pragma once
 #include <stdint.h>
 
+#include "sw/gfx.h"
+
 #define W 1280
 #define H 720
 #define BYTES_PER_PIXEL 4

@@ -107,6 +107,8 @@ int find_keyboard_event(char *out_path, size_t out_size) {
 	return -1;
 }
 
+//extern void commit_ins();
+
 /// main: Hardware simulator main loop
 /// Creates shared memory and MMIO registers, initializes SDL2 window/renderer,
 /// polls keyboard input, increments vsync counter, handles buffer swaps,
@@ -281,42 +283,44 @@ int fb_sim_main(void) {
             regs->swap_ack = regs->vsync_counter;
         }
 
-        uint32_t fi = regs->front_idx % FB_COUNT;
-        uint8_t *front = fb_base + (size_t)fi * (size_t)FB_SIZE;
-
-        // SDL_UpdateTexture(tex, NULL, front, W * 4);
-        // SDL_RenderClear(ren);
-        // SDL_RenderCopy(ren, tex, NULL, NULL);
-        // SDL_RenderPresent(ren);
+//        uint32_t fi = regs->front_idx % FB_COUNT;
+//        uint8_t *front = fb_base + (size_t)fi * (size_t)FB_SIZE;
+//
+//        // SDL_UpdateTexture(tex, NULL, front, W * 4);
+//        // SDL_RenderClear(ren);
+//        // SDL_RenderCopy(ren, tex, NULL, NULL);
+//        // SDL_RenderPresent(ren);
+//	
+//	int cw = MIN(W, vinfo.xres);
+//	int ch = MIN(H, vinfo.yres);
+//
+//	uint8_t int_upscale = MAX(1,MIN((vinfo.xres / W), (vinfo.yres / H)));
+//
+//	int y_offset = 0;
+//
+//	if (ch * int_upscale < vinfo.yres) {
+//		y_offset = (vinfo.yres - (ch * int_upscale)) / 2;
+//	}
+//
+//	for (int y = 0; y < ch; y++) {
+//		uint8_t *src = front + y * W * 4;
+//		
+//		for (int i = 0; i < int_upscale; i++) {
+//			uint16_t *dst = (uint16_t *)(fbp + (int_upscale*y+i+y_offset) * finfo.line_length);
+//			for (int x = 0; x < cw; x++) {
+//				for (int j = 0; j < int_upscale; j++) {
+//  					uint16_t b = src[4*x + 0];
+//  					uint16_t g = src[4*x + 1];
+//  					uint16_t r = src[4*x + 2];
+//  					uint16_t a = src[4*x + 3];
+//  
+//  					dst[int_upscale*x + j] = ((b >> 3) & 31) | (((g >> 2) & 63) << 5) | (((r >> 3) & 31) << 11);
+//				}
+//			}
+//		}
+//	}
 	
-	int cw = MIN(W, vinfo.xres);
-	int ch = MIN(H, vinfo.yres);
-
-	uint8_t int_upscale = MAX(1,MIN((vinfo.xres / W), (vinfo.yres / H)));
-
-	int y_offset = 0;
-
-	if (ch * int_upscale < vinfo.yres) {
-		y_offset = (vinfo.yres - (ch * int_upscale)) / 2;
-	}
-
-	for (int y = 0; y < ch; y++) {
-		uint8_t *src = front + y * W * 4;
-		
-		for (int i = 0; i < int_upscale; i++) {
-			uint16_t *dst = (uint16_t *)(fbp + (int_upscale*y+i+y_offset) * finfo.line_length);
-			for (int x = 0; x < cw; x++) {
-				for (int j = 0; j < int_upscale; j++) {
-  					uint16_t b = src[4*x + 0];
-  					uint16_t g = src[4*x + 1];
-  					uint16_t r = src[4*x + 2];
-  					uint16_t a = src[4*x + 3];
-  
-  					dst[int_upscale*x + j] = ((b >> 3) & 31) | (((g >> 2) & 63) << 5) | (((r >> 3) & 31) << 11);
-				}
-			}
-		}
-	}
+	commit_ins();
 
 	if (delta_time_sec < target_frame_time_sec) {
 		double sleep_sec = target_frame_time_sec - delta_time_sec;

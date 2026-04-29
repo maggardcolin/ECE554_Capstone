@@ -52,3 +52,80 @@ void upscale_to_physical(uint32_t *dst, const lfb_t *src) {
         }
     }
 }
+
+#ifdef FB
+
+#define MMIO_DEVICE "/dev/uio4"
+#define MMIO_MAP_SIZE_PATH "/sys/class/uio/uio4/maps/map0/size"
+void* MMIO_MAP = NULL;
+
+#define UIO_DEVICE "/dev/uio5"
+#define UIO_MAP_SIZE_PATH "/sys/class/uio/uio5/maps/map0/size"
+void* DMA_MAP = NULL;
+
+#define DMA_DEVICE "/dev/udmabuf0"
+#define DMA_ADDR_PATH "/sys/class/u-dma-buf/udmabuf0/phys_addr"
+#define DMA_SIZE_PATH "/sys/class/u-dma-buf/udmabuf0/size"
+
+uint64_t **instruction = NULL;
+
+
+void commit_ins(void) {
+	if (instruction == NULL) return;
+
+	for (int i = 0; i < 12; i++) {
+		send_instruction(MMIO_MAP, 1, 0, i, 0, 1, 0);
+
+		int index = 0;
+		while (instruction[i][index] != 0) {
+			send_instruction_2(MMIO_MAP, instruction[i][index]);
+			// instruction[i][index] = 0;
+			index++;
+		}
+
+		poll_dma(DMA_MAP, i);
+	}
+
+	write_to_fb();
+}
+
+void cache_ins(uint64_t x, uint64_t y, uint64_t color) {
+	uint64_t word = 0;
+        word |= (uint64_t) ((0x3u & 0x1F))  	<< 59;
+        word |= (x & 0xFFF)    	<< 47;
+        word |= (y & 0xFFF)    	<< 35;
+        word |= (color & 0xFFF) << 23;
+        word |= (0x0u & 0xFFF)  << 11;
+        word |= (0x0u & 0x7FF);
+
+	int index = ((int)(y / 64));
+
+	int fifo_index = 0;
+	for (fifo_index = 0; fifo_index < 1280*64-1; fifo_index++) {
+		if (instruction[index][fifo_index] == 0) break;
+	}
+
+	instruction[index][fifo_index] = word;
+}
+
+void l_putpix(lfb_t *lfb, int x, int y, uint32_t argb) {
+	if (MMIO_MAP == NULL) initialize_uio(MMIO_DEVICE, MMIO_MAP_SIZE_PATH);
+	if (DMA_MAP == NULL) initialize_uio(UIO_DEVICE, UIO_MAP_SIZE_PATH);
+	if (instruction == NULL) {
+		instruction = malloc(sizeof(uint64_t*) * 12);
+		for (int i = 0; i < 12; i++) {
+			instruction[i] = calloc(1280*64, sizeof(uint64_t));
+		}
+	}
+
+        uint8_t color;
+        if ((argb & 0x00FFFFFF) != 0x000000) {
+                color = 15;
+        } else {
+                color = 0;
+        }
+
+	cache_ins(x, y, color);
+}
+
+#endif
