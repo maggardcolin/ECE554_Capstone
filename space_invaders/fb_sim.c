@@ -219,17 +219,17 @@ int fb_sim_main(void) {
 	while ((rc = libevdev_next_event(dev, LIBEVDEV_READ_FLAG_NORMAL, &ev)) == 0) {
 		uint32_t ev_btn = 0;
 
-		printf("Key pressed: %d\t Mode: %d\n", ev.code, ev.value);
+		// printf("Key pressed: %d\t Mode: %d\n", ev.code, ev.value);
 
 		switch (ev.code) {
 			case KEY_LEFT:
 			case KEY_A:
-				printf("Left!\n");
+				// printf("Left!\n");
 				ev_btn |= 0x1; 
 				break;
 			case KEY_RIGHT:
 			case KEY_D:
-				printf("Right!\n");
+				// printf("Right!\n");
 				ev_btn |= 0x2; 
 				break;
 			case KEY_UP:
@@ -239,19 +239,19 @@ int fb_sim_main(void) {
 				break;
 			case KEY_DOWN:
 			case KEY_S:
-				printf("Down!\n");
+				// printf("Down!\n");
 				ev_btn |= BTN_DOWN; 
 				break;
 			case KEY_SPACE:
-				printf("Fire!\n");
+				// printf("Fire!\n");
 				ev_btn |= (BTN_FIRE | BTN_SEL); 
 				break;
 			case KEY_ESC:
-				printf("Quit!\n");
+				// printf("Quit!\n");
 				ev_btn |= BTN_QUIT;
 				break;
 	        	case KEY_P:
-				printf("Pause!\n");
+				// printf("Pause!\n");
 				ev_btn |= BTN_PAUSE;
 				break;
 			case KEY_R:
@@ -267,7 +267,7 @@ int fb_sim_main(void) {
 		if (ev.value == 1 || ev.value == 2) regs->buttons |= ev_btn;
 		else if (ev.value == 0) regs->buttons &= ~ev_btn;
 
-		printf("0b%032b\n", regs->buttons);
+		// printf("0b%032b\n", regs->buttons);
 	}
 
         if (regs->buttons & BTN_QUIT) running = false;

@@ -55,7 +55,7 @@ long get_size(char *path) {
 }
 
 void send_instruction_2(void *mmio, uint64_t ins) {
-	*((uint32_t *)(mmio + REG_TILEMASK)) = 0xFFFFFFFFu;
+	// *((uint32_t *)(mmio + REG_TILEMASK)) = 0xFFFFFFFFu;
 
 	uint32_t hi = (uint32_t)(ins >> 32);
 	uint32_t lo = (uint32_t)(ins & 0xFFFFFFFFu);
@@ -64,7 +64,7 @@ void send_instruction_2(void *mmio, uint64_t ins) {
 	*((uint32_t *)(mmio + REG_INSTR_LOW)) = lo;
 }
 
-void send_instruction(void *mmio, uint64_t instr, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5) {
+void send_instruction(void *mmio, uint64_t instr, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint32_t tilemask) {
 	uint64_t word = 0;
 	word |= (instr & 0x1F)  << 59;
 	word |= (a1 & 0xFFF)    << 47;
@@ -73,7 +73,7 @@ void send_instruction(void *mmio, uint64_t instr, uint64_t a1, uint64_t a2, uint
 	word |= (a4 & 0xFFF)    << 11;
 	word |= (a5 & 0x7FF);
 
-	*((uint32_t *)(mmio + REG_TILEMASK)) = 0xFFFFFFFFu;
+	*((uint32_t *)(mmio + REG_TILEMASK)) = tilemask;
 
 	uint32_t hi = (uint32_t)(word >> 32);
 	uint32_t lo = (uint32_t)(word & 0xFFFFFFFFu);
@@ -102,41 +102,100 @@ void* initialize_uio(char *dev_path, char *size_path) {
 
 #define dma_addr get_size(DMA_ADDR_PATH)
 
+volatile uint32_t *addr_ptr = NULL;
+volatile uint32_t *length_ptr = NULL;
+volatile uint32_t *status_ptr = NULL;
+
 void poll_dma(void *DMA, int y) {
-	*((uint32_t *)(DMA + ADDR_OFF)) = (uint32_t) (((uint32_t) dma_addr) + (0x28000u * y));
-	*((uint32_t *)(DMA + LENGTH_OFF)) = (uint32_t) 0xFFFFFFFFu;
-	while ((*((uint32_t *)(DMA + STATUS_OFF)) & 0x4002) == 0);
-	if ((*((uint32_t *)(DMA + STATUS_OFF)) & 0x4000) != 0) {
+	if (addr_ptr == NULL) {
+		addr_ptr = DMA + ADDR_OFF;
+	}
+	if (length_ptr == NULL) {
+		length_ptr = DMA + LENGTH_OFF;
+	}
+	if (status_ptr == NULL) {
+		status_ptr = DMA + STATUS_OFF;
+	}
+
+	*addr_ptr = (uint32_t) (((uint32_t) dma_addr) + (0x28000u * y));
+	*length_ptr = (uint32_t) 0xFFFFFFFFu;
+	while ((*status_ptr & 0x4002) == 0);
+	if ((*status_ptr & 0x4000) != 0) {
 		perror("DMA ERROR");
 	}
 }
 
+int fb_fd = 0;
+int dma_fd = 0;
+
+struct fb_var_screeninfo vinfo;
+struct fb_fix_screeninfo finfo;
+
+int screeninfo_init = 0;
+
+long screensize = 0;
+
+uint16_t *buffer = NULL;
+size_t game_size = sizeof(uint16_t) * 320 * 256;
+uint16_t *game_buffer = NULL;
+
 void write_to_fb() {
-	int fb_fd;
-	int dma_fd;
+	if (fb_fd == 0) {
+		fb_fd = open("/dev/fb0", O_RDWR);
+		if (fb_fd < 0) { perror("Unable to open fb0"); }
+	}
+	
+	if (screeninfo_init == 0) {
+		ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo);
+		ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo);
+		screeninfo_init = 1;
+	}
 
-	fb_fd = open("/dev/fb0", O_RDWR);
-	if (fb_fd < 0) { perror("Unable to open fb0"); }
+	if (dma_fd == 0) {
+		dma_fd = open("/dev/udmabuf0", O_RDWR);
+		if (dma_fd < 0) { perror("Unable to open dma"); }
+	}
 
-	struct fb_var_screeninfo vinfo;
-	struct fb_fix_screeninfo finfo;
+	if (screensize == 0) {
+		screensize = finfo.line_length * vinfo.yres;
+	}
 
-	ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo);
-	ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo);
+	if (buffer == NULL) {
+		buffer = malloc(screensize);
+		if (!buffer) { perror("malloc"); }
+		memset(buffer, 0, screensize);
+	}
 
-	long screensize = finfo.line_length * vinfo.yres;
-
-	dma_fd = open("/dev/udmabuf0", O_RDWR);
-	if (dma_fd < 0) { perror("Unable to open dma"); }
-
-	void *buffer = malloc(screensize);
-	if (!buffer) { perror("malloc"); }
+	if (game_buffer == NULL) {
+		game_buffer = malloc(game_size);
+		if (!game_buffer) { perror("malloc"); }
+	}
 
 	lseek(dma_fd, 0, SEEK_SET);
 	lseek(fb_fd, 0, SEEK_SET);
 
-	ssize_t n = read(dma_fd, buffer, screensize);
-	if (n != screensize) { perror("unable to read dma"); }
+	ssize_t n = read(dma_fd, game_buffer, game_size);
+	if (n != game_size) { perror("unable to read dma"); }
+
+	for (int y = 0; y < 180; y++) {
+		// De‑interlace mapping
+		int physY = (y % 64) * 1280 + (y / 64) * 320;
+
+		for (int x = 0; x < 320; x++) {
+
+			int srcIndex = physY + x;
+
+			for (int i = 0; i < 4; i++) {
+				int dstIndex = (y*4+i) * 1280 + (x * 4);
+
+				buffer[dstIndex]   = game_buffer[srcIndex];
+				buffer[dstIndex+1] = game_buffer[srcIndex];
+				buffer[dstIndex+2] = game_buffer[srcIndex];
+				buffer[dstIndex+3] = game_buffer[srcIndex];
+			}
+		}
+	}
+
 
 	ssize_t w = write(fb_fd, buffer, screensize);
 	if (w != screensize) { perror("unable to write to fb"); }

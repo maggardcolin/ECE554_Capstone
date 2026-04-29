@@ -38,6 +38,7 @@ typedef enum {
 
 typedef struct {
     int x, y;
+    int prev_x, prev_y;
     int dy;
     int alive;
     int reflected;
@@ -115,6 +116,8 @@ typedef struct {
 )
 
 typedef struct {
+    int scene;
+    int prev_scene;
     int score;
     int level;
     int start_screen;
@@ -166,6 +169,7 @@ typedef struct {
     sprite1r_t *bunkers[4];
 
     int player_x, player_y;
+    int player_prev_x, player_prev_y;
 
     uint8_t alien_alive[AROWS][ACOLS];
     uint8_t alien_hermit_regen[AROWS][ACOLS];
