@@ -5253,23 +5253,23 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         uint32_t type_color = WHITE;
         if (g->boss_type == BOSS_TYPE_BLUE) {
-            uint32_t blue_flicker_palette[2] = {BLUE, WHITE};
+            uint32_t blue_flicker_palette[1] = {BLUE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = blue_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_YELLOW) {
-            uint32_t yellow_flicker_palette[2] = {YELLOW, WHITE};
+            uint32_t yellow_flicker_palette[1] = {YELLOW};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = yellow_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
-            uint32_t tower_flicker_palette[2] = {BROWN, WHITE};
+            uint32_t tower_flicker_palette[1] = {BROWN};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = tower_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
-            uint32_t hermit_flicker_palette[2] = {PURPLE, WHITE};
+            uint32_t hermit_flicker_palette[1] = {PURPLE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = hermit_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
-            uint32_t chariot_flicker_palette[2] = {ORANGE, WHITE};
+            uint32_t chariot_flicker_palette[1] = {ORANGE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = chariot_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
