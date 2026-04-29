@@ -179,6 +179,7 @@ typedef struct {
     int alien_explode_hit_boss[AROWS][ACOLS];
 
     int alien_origin_x, alien_origin_y;
+    int alien_old_x, alien_old_y;
     int alien_dx;
     int alien_step_px, alien_drop_px;
     int alien_frame;

@@ -350,9 +350,6 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 						l_putpix(lfb, g->pshot[s].prev_x, pyy, 0xFF000000);
 						l_putpix(lfb, g->pshot[s].prev_x - 1, pyy, 0xFF000000);
 						l_putpix(lfb, g->pshot[s].prev_x + 1, pyy, 0xFF000000);
-						
-						g->pshot[s].prev_x = g->pshot[s].x;
-						g->pshot[s].prev_y = g->pshot[s].y;
 					}
 
 					l_putpix(lfb, g->pshot[s].x, py, bullet_color);
@@ -370,9 +367,6 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 							l_putpix(lfb, g->pshot[s].prev_x - 1, pyy, 0xFF000000);
 							l_putpix(lfb, g->pshot[s].prev_x + 1, pyy, 0xFF000000);
 						}
-						
-						g->pshot[s].prev_x = g->pshot[s].x;
-						g->pshot[s].prev_y = g->pshot[s].y;
 					}
 
 					l_putpix(lfb, g->pshot[s].x, py, bullet_color);
@@ -382,17 +376,21 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 					}
 				}
 			}
+
+			g->pshot[s].prev_x = g->pshot[s].x;
+			g->pshot[s].prev_y = g->pshot[s].y;
 		}
 		if (g->pshot_left[s].alive) {
 			if (g->pshot_left[s].reflected == 1) {
 				if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
 					for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].prev_x, g->pshot_left[s].prev_y + i, 0xFF000000);
-
-					g->pshot_left[s].prev_x = g->pshot_left[s].x;
-					g->pshot_left[s].prev_y = g->pshot_left[s].y;
 				}
 
 				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x, g->pshot_left[s].y + i, 0xFF00E5FF);
+
+				g->pshot_left[s].prev_x = g->pshot_left[s].x;
+				g->pshot_left[s].prev_y = g->pshot_left[s].y;
+
 				continue;
 			}
 			if (g->pshot_left[s].pierce_active) {
@@ -403,15 +401,16 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 						l_putpix(lfb, g->pshot_left[s].prev_x, pyy, 0xFF000000);
 						l_putpix(lfb, g->pshot_left[s].prev_x - 1, pyy, 0xFF000000);
 						l_putpix(lfb, g->pshot_left[s].prev_x + 1, pyy, 0xFF000000);
-
-						g->pshot_left[s].prev_x = g->pshot_left[s].x;
-						g->pshot_left[s].prev_y = g->pshot_left[s].y;
 					}
 
 					l_putpix(lfb, g->pshot_left[s].x, py, 0xFF66CCFF);
 					l_putpix(lfb, g->pshot_left[s].x - 1, py, 0xFF66CCFF);
 					l_putpix(lfb, g->pshot_left[s].x + 1, py, 0xFF66CCFF);
 				}
+
+				g->pshot_left[s].prev_x = g->pshot_left[s].x;
+				g->pshot_left[s].prev_y = g->pshot_left[s].y;
+
 				continue;
 			}
 			if (g->pshot_left[s].reflected == 2) {
@@ -423,24 +422,26 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 
 					if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
 						l_putpix(lfb, xx, yy, 0xFF000000);
-
-						g->pshot_left[s].prev_x = g->pshot_left[s].x;
-						g->pshot_left[s].prev_y = g->pshot_left[s].y;
 					}
 					l_putpix(lfb, x, y, side_bullet_color);
 				}
+
+				g->pshot_left[s].prev_x = g->pshot_left[s].x;
+				g->pshot_left[s].prev_y = g->pshot_left[s].y;
+
 				continue;
 			}
 
 			if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
 				for (int i = 0; i < 5; i++)
 					l_putpix(lfb, g->pshot_left[s].prev_x - (i / 4), g->pshot_left[s].prev_y - i, 0xFF000000);
-
-				g->pshot_left[s].prev_x = g->pshot_left[s].x;
-				g->pshot_left[s].prev_y = g->pshot_left[s].y;
 			}
 
 			for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - (i / 4), g->pshot_left[s].y - i, side_bullet_color);
+
+			g->pshot_left[s].prev_x = g->pshot_left[s].x;
+			g->pshot_left[s].prev_y = g->pshot_left[s].y;
+
 		}
 		if (g->pshot_right[s].alive) {
 			if (g->pshot_right[s].reflected == 1) {
@@ -464,15 +465,16 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 						l_putpix(lfb, g->pshot_right[s].prev_x, pyy, 0xFF000000);
 						l_putpix(lfb, g->pshot_right[s].prev_x - 1, pyy, 0xFF000000);
 						l_putpix(lfb, g->pshot_right[s].prev_x + 1, pyy, 0xFF000000);
-
-						g->pshot_right[s].prev_x = g->pshot_right[s].x;
-						g->pshot_right[s].prev_y = g->pshot_right[s].y;
 					}
 
 					l_putpix(lfb, g->pshot_right[s].x, py, 0xFF66CCFF);
 					l_putpix(lfb, g->pshot_right[s].x - 1, py, 0xFF66CCFF);
 					l_putpix(lfb, g->pshot_right[s].x + 1, py, 0xFF66CCFF);
 				}
+
+				g->pshot_right[s].prev_x = g->pshot_right[s].x;
+				g->pshot_right[s].prev_y = g->pshot_right[s].y;
+
 				continue;
 			}
 			if (g->pshot_right[s].reflected == 3) {
@@ -484,13 +486,14 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 
 					if (g->pshot_right[s].prev_x != g->pshot_right[s].x || g->pshot_right[s].prev_y != g->pshot_right[s].y) {
 						l_putpix(lfb, xx, yy, 0xFF000000);
-
-						g->pshot_right[s].prev_x = g->pshot_right[s].x;
-						g->pshot_right[s].prev_y = g->pshot_right[s].y;
 					}
 
 					l_putpix(lfb, x, y, side_bullet_color);
 				}
+
+				g->pshot_right[s].prev_x = g->pshot_right[s].x;
+				g->pshot_right[s].prev_y = g->pshot_right[s].y;
+
 				continue;
 			}
 

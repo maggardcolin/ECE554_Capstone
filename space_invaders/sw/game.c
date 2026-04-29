@@ -90,6 +90,8 @@
 #define CREDITS_ALIEN_GAP 24
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
+int do_clear = 0;
+
 static const sprite1r_t *active_boss_sprite(const game_t *g) {
 	return boss_sprite_for_frame(g, g->boss_frame);
 }
@@ -3088,8 +3090,10 @@ static int credits_total_height(const game_t *g) {
 
 static void render_credits_screen(const game_t *g, lfb_t *lfb) {
 	int y = g->credits_scroll_y;
+	int yy = g->credits_scroll_y + CREDITS_SCROLL_SPEED;
 	for (int i = 0; i < (int)(sizeof(credits_lines) / sizeof(credits_lines[0])); i++) {
 		int line_w = text_width_5x5(credits_lines[i], 1);
+		l_draw_text(lfb, (LW - line_w) / 2, yy + i * CREDITS_LINE_SPACING, credits_lines[i], 1, 0xFF000000);
 		l_draw_text(lfb, (LW - line_w) / 2, y + i * CREDITS_LINE_SPACING, credits_lines[i], 1, 0xFFBFBFBF);
 	}
 
@@ -3124,6 +3128,7 @@ static void setup_practice_run(game_t *g, int boss_type) {
 }
 
 static void setup_level(game_t *g, int level, int reset_score) {
+	do_clear = 1;
 	if (reset_score) g->score = 0;
 	g->level = level;
 	g->level_complete = 0;
@@ -3461,6 +3466,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
 			if (g->credits_screen_active) {
 				if (select_pressed) {
+					do_clear = 1;
 					g->credits_screen_active = 0;
 					g->main_menu_selection = 0;
 				} else {
@@ -3475,9 +3481,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 			} else if (!g->practice_menu_active && !g->difficulty_menu_active) {
 				if (up_pressed || down_pressed) {
 					if (up_pressed) {
+						do_clear = 1;
 						g->main_menu_selection--;
 					}
 					if (down_pressed) {
+						do_clear = 1;
 						g->main_menu_selection++;
 					}
 					if (g->main_menu_selection < 0) {
@@ -3488,6 +3496,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 					}
 				}
 				if (select_pressed) {
+					do_clear = 1;
 					if (g->main_menu_selection == 0) {
 						g->difficulty_menu_active = 1;
 						g->difficulty_menu_selection = g->hard_mode ? 2 : 1;
@@ -3506,14 +3515,17 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 				}
 			} else if (g->difficulty_menu_active) {
 				if (up_pressed) {
+					do_clear = 1;
 					g->difficulty_menu_selection--;
 					if (g->difficulty_menu_selection < 0) g->difficulty_menu_selection = DIFFICULTY_MENU_COUNT - 1;
 				}
 				if (down_pressed) {
+					do_clear = 1;
 					g->difficulty_menu_selection++;
 					if (g->difficulty_menu_selection >= DIFFICULTY_MENU_COUNT) g->difficulty_menu_selection = 0;
 				}
 				if (select_pressed) {
+					do_clear = 1;
 					if (g->difficulty_menu_selection == 3) {
 						g->difficulty_menu_active = 0;
 						g->main_menu_selection = 0;
@@ -3526,19 +3538,23 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 				}
 			} else {
 				if (left_pressed) {
+					do_clear = 1;
 					g->practice_level_selection--;
 					if (g->practice_level_selection < PRACTICE_LEVEL_MIN) g->practice_level_selection = PRACTICE_LEVEL_MAX;
 				}
 				if (right_pressed) {
+					do_clear = 1;
 					g->practice_level_selection++;
 					if (g->practice_level_selection > PRACTICE_LEVEL_MAX) g->practice_level_selection = PRACTICE_LEVEL_MIN;
 				}
 				if (up_pressed) {
+					do_clear = 1;
 					g->practice_menu_selection--;
 					if (g->practice_menu_selection < 0) g->practice_menu_selection = PRACTICE_MENU_COUNT - 1;
 					g->practice_preview_timer = BOSS_INTRO_FRAMES;
 				}
 				if (down_pressed) {
+					do_clear = 1;
 					g->practice_menu_selection++;
 					if (g->practice_menu_selection >= PRACTICE_MENU_COUNT) g->practice_menu_selection = 0;
 					g->practice_preview_timer = BOSS_INTRO_FRAMES;
@@ -3550,6 +3566,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 				}
 
 				if (select_pressed) {
+					do_clear = 1;
 					if (g->practice_menu_selection == PRACTICE_EXIT_INDEX) {
 						g->practice_menu_active = 0;
 						g->main_menu_selection = 0;
@@ -3708,6 +3725,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 			g->overworld_cutscene_timer--;
 		}
 		if (g->overworld_cutscene_timer <= 0) {
+			do_clear = 1;
 			g->overworld_cutscene_active = 0;
 			if (!g->in_shop) {
 				g->boss_intro_active = 1;
@@ -3756,6 +3774,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 				g->alien_cleanup_timer--;
 			}
 			if (g->alien_cleanup_timer <= 0) {
+				do_clear = 1;
 				trigger_random_alien_cleanup_explosion(g);
 				g->alien_cleanup_timer = 2 + (rand() % 4);
 			}
@@ -3765,6 +3784,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 	if (g->exit_blink_toggles_remaining > 0) {
 		g->exit_blink_timer--;
 		if (g->exit_blink_timer <= 0) {
+			do_clear = 1;
 			g->exit_blink_timer = EXIT_BLINK_INTERVAL_FRAMES;
 			g->exit_blink_toggles_remaining--;
 		}
@@ -3797,6 +3817,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 		if (!g->alien_alive[TUTORIAL_SHOOTER_ROW][TUTORIAL_SHOOTER_COL]) {
 			if (g->tutorial_shooter_respawn_timer > 0) g->tutorial_shooter_respawn_timer--;
 			if (g->tutorial_shooter_respawn_timer <= 0) {
+				do_clear = 1;
 				tutorial_respawn_alien(g, TUTORIAL_SHOOTER_ROW, TUTORIAL_SHOOTER_COL);
 				g->tutorial_shooter_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
 			}
@@ -3807,6 +3828,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 		if (tutorial_center_pack_any_missing(g)) {
 			if (g->tutorial_grid_respawn_timer > 0) g->tutorial_grid_respawn_timer--;
 			if (g->tutorial_grid_respawn_timer <= 0) {
+				do_clear = 1;
 				tutorial_respawn_center_pack(g);
 				g->tutorial_grid_respawn_timer = TUTORIAL_RESPAWN_PERIOD_FRAMES;
 			}
@@ -5051,6 +5073,10 @@ void check_scene(game_t *g) {
 
 void game_render(game_t *g, lfb_t *lfb) {
 	check_scene(g);
+	if (do_clear) {
+		l_clear_2();
+		do_clear = 0;
+	}
 	if (g->start_screen) {
 		g->scene = 0;
 		l_clear(lfb, 0xFF000000);
@@ -5688,7 +5714,9 @@ void game_render(game_t *g, lfb_t *lfb) {
 		for (int c = 0; c < ACOLS; c++) {
 			if (!g->alien_alive[r][c]) continue;
 			int ax = g->alien_origin_x + c * (AS->w + spacing_x);
+			int axx = g->alien_old_x + c * (AS->w + spacing_x);
 			int ay = g->alien_origin_y + r * (AS->h + spacing_y);
+			int ayy = g->alien_old_y + r * (AS->h + spacing_y);
 
 			// Red if 3+, Green if 2, white if 1
 			uint32_t alien_color;
@@ -5701,9 +5729,16 @@ void game_render(game_t *g, lfb_t *lfb) {
 			} else {
 				alien_color = (g->alien_health[r][c] >= 3) ? 0xFFFF0000 : (g->alien_health[r][c] == 2) ? 0xFF00FF00 : 0xFFFFFFFF;
 			}
+
+			if (ax != axx || ay != ayy) {
+				draw_sprite1r(lfb, AS, axx, ayy, 0xFF000000);
+			}
 			draw_sprite1r(lfb, AS, ax, ay, alien_color);
 		}
 	}
+
+	g->alien_old_x = g->alien_origin_x;
+	g->alien_old_y = g->alien_origin_y;
 
 	if (g->level == 0) {
 		const sprite1r_t *TS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
