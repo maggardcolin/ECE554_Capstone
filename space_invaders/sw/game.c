@@ -2016,6 +2016,10 @@ static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int po
 	if (timer > 0) {
 		render_explosion_points(lfb, cx, cy, points);
 	}
+
+	if (timer <= 1) {
+		draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFF000000, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+	}
 }
 
 static void reset_win_state(game_t *g) {
@@ -2113,8 +2117,28 @@ static int projectile_hits_player_shield(const game_t *g, int px, int py) {
 	return (dx * dx + dy * dy) <= (r * r);
 }
 
+uint8_t shield_deactivated = 1;
+
 static void render_player_shield_ring(const game_t *g, lfb_t *lfb) {
+	if (!shield_deactivated && !shield_power_active(g)) {
+		shield_deactivated = 1;
+		
+		int cxx = g->player_prev_x + g->PLAYER.w / 2;
+		int cyy = g->player_prev_y + g->PLAYER.h / 2;
+		int k = player_shield_radius(g);
+		for (int y = -k; y <= k; y++) {
+			for (int x = -k; x <= k; x++) {
+				int d = x * x + y * y;
+				if (d <= (k * k) && d >= ((k - 1) * (k - 1))) {
+					l_putpix(lfb, cxx + x, cyy + y, 0xFF000000);
+				}
+			}
+		}
+	}
+
 	if (!shield_power_active(g) || g->player_dying) return;
+
+	shield_deactivated = 0;
 
 	int cx = g->player_x + g->PLAYER.w / 2;
 	int cxx = g->player_prev_x + g->PLAYER.w / 2;
@@ -2409,6 +2433,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 				g->powerup_active = 0;
 				g->powerup_timer = 0;
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 				music_play_powerup();
 				break;
 			}
@@ -2432,6 +2457,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 				g->magician_curse_announce_timer = 0;
 				g->powerup_active = 0;
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 			}
 		}
 		if (!shots[si].alive) continue;
@@ -2454,6 +2480,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 				}
 				trigger_critical_hit_banner(g, &shots[si]);
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 			}
 		}
 		if (!shots[si].alive) continue;
@@ -2489,6 +2516,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 			if (bomb_hit) {
 				trigger_critical_hit_banner(g, &shots[si]);
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 				g->boss_bomb.hits_taken++;
 				if (!g->boss_bomb.reversed && g->boss_bomb.hits_taken >= BOSS_BOMB_HITS_TO_REVERSE) {
 					g->boss_bomb.reversed = 1;
@@ -2515,6 +2543,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 				int dmg = player_shot_damage_for_hit(g, &shots[si]);
 				if (dmg <= 0) {
 					shots[si].alive = 0;
+					for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 					continue;
 				}
 				if (explosive_shot_active(g)) {
@@ -2526,6 +2555,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 					start_tower_asteroid_explosion(g, ai);
 				}
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 			}
 		}
 		if (!shots[si].alive) continue;
@@ -2548,6 +2578,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 				}
 				trigger_critical_hit_banner(g, &shots[si]);
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 			}
 		}
 		if (!shots[si].alive) continue;
@@ -2601,6 +2632,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 					}
 				}
 				shots[si].alive = 0;
+				for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 			}
 		}
 		if (!shots[si].alive) continue;
@@ -2630,6 +2662,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 					int dmg = player_shot_damage_for_hit(g, &shots[si]);
 					if (dmg <= 0) {
 						shots[si].alive = 0;
+						for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 						hit = 1;
 						continue;
 					}
@@ -2649,6 +2682,7 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
 						hit = shots[si].alive ? 0 : 1;
 					} else {
 						shots[si].alive = 0;
+						for (int i = 0; i < 5; i++) l_putpix(NULL, shots[si].x, shots[si].y + i, 0xFF000000);
 						hit = 1;
 					}
 				}
@@ -4457,12 +4491,15 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 	for (int i = 0; i < MAX_PSHOTS; i++) {
 		if (g->pshot[i].alive && g->pshot[i].y <= TOP_HUD_SEPARATOR_Y) {
 			g->pshot[i].alive = 0;
+			for (int j = 0; j < 5; j++) l_putpix(NULL, g->pshot[i].x, g->pshot[i].y - j, 0xFF000000);
 		}
 		if (g->pshot_left[i].alive && g->pshot_left[i].y <= TOP_HUD_SEPARATOR_Y) {
 			g->pshot_left[i].alive = 0;
+			for (int j = 0; j < 5; j++) l_putpix(NULL, g->pshot_left[i].x, g->pshot_left[i].y - j, 0xFF000000);
 		}
 		if (g->pshot_right[i].alive && g->pshot_right[i].y <= TOP_HUD_SEPARATOR_Y) {
 			g->pshot_right[i].alive = 0;
+			for (int j = 0; j < 5; j++) l_putpix(NULL, g->pshot_right[i].x, g->pshot_right[i].y - j, 0xFF000000);
 		}
 	}
 
@@ -4788,9 +4825,11 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 	// Only active projectiles are culled here; explosion effects are left intact.
 	if (g->ashot.alive && g->ashot.y >= BOTTOM_HUD_SEPARATOR_Y) {
 		g->ashot.alive = 0;
+		for (int i = 0; i < 5; i++) l_putpix(NULL, g->ashot.x, g->ashot.y + i, 0xFF000000);
 	}
 	if (g->boss_shot.alive && g->boss_shot.y >= BOTTOM_HUD_SEPARATOR_Y) {
 		g->boss_shot.alive = 0;
+		for (int i = 0; i < 5; i++) l_putpix(NULL, g->boss_shot.x, g->boss_shot.y + i, 0xFF000000);
 	}
 	for (int i = 0; i < 3; i++) {
 		if (g->boss_triple_shot[i].alive && g->boss_triple_shot[i].y >= BOTTOM_HUD_SEPARATOR_Y) {
@@ -5517,6 +5556,7 @@ void game_render(game_t *g, lfb_t *lfb) {
 
 	// Boss health bar on the left side of screen
 	if (g->boss_alive) {
+		g->scene = 12;
 		uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
 			(g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
 			(g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
