@@ -57,11 +57,11 @@ long get_size(char *path) {
 void send_instruction_2(void *mmio, uint64_t ins) {
 	*((uint32_t *)(mmio + REG_TILEMASK)) = 0xFFFFFFFFu;
 
-        uint32_t hi = (uint32_t)(ins >> 32);
-        uint32_t lo = (uint32_t)(ins & 0xFFFFFFFFu);
+	uint32_t hi = (uint32_t)(ins >> 32);
+	uint32_t lo = (uint32_t)(ins & 0xFFFFFFFFu);
 
 	*((uint32_t *)(mmio + REG_INSTR_HI))  = hi;
-        *((uint32_t *)(mmio + REG_INSTR_LOW)) = lo;
+	*((uint32_t *)(mmio + REG_INSTR_LOW)) = lo;
 }
 
 void send_instruction(void *mmio, uint64_t instr, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5) {
@@ -88,15 +88,13 @@ void* initialize_uio(char *dev_path, char *size_path) {
 	long map_size;
 
 	map_size = get_size(size_path);
-	if (map_size < 0) { perror("Unable to get mmio size"); return 0; }
+	if (map_size < 0) { fprintf(stderr, "Unable to get %s size\n", size_path); return 0; }
 
 	mmio_fd = open(dev_path, O_RDWR);
-	if (mmio_fd < 0) { perror("Unable to open mmio"); return 0; }
+	if (mmio_fd < 0) { fprintf(stderr, "Unable to open %s\n", dev_path); return 0; }
 
 	mmio_ptr = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, mmio_fd, 0);
-	if (mmio_ptr == MAP_FAILED) { perror("Unable to map mmio"); return 0; }
-
-	close(mmio_fd);
+	if (mmio_ptr == MAP_FAILED) { fprintf(stderr, "Unable to map mmio"); return 0; }
 
 	return mmio_ptr;
 }

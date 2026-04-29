@@ -109,8 +109,8 @@ void cache_ins(uint64_t x, uint64_t y, uint64_t color) {
 }
 
 void l_putpix(lfb_t *lfb, int x, int y, uint32_t argb) {
-	if (MMIO_MAP == NULL) initialize_uio(MMIO_DEVICE, MMIO_MAP_SIZE_PATH);
-	if (DMA_MAP == NULL) initialize_uio(UIO_DEVICE, UIO_MAP_SIZE_PATH);
+	if (MMIO_MAP == NULL) MMIO_MAP=initialize_uio(MMIO_DEVICE, MMIO_MAP_SIZE_PATH);
+	if (DMA_MAP == NULL) DMA_MAP=initialize_uio(UIO_DEVICE, UIO_MAP_SIZE_PATH);
 	if (instruction == NULL) {
 		instruction = malloc(sizeof(uint64_t*) * 12);
 		for (int i = 0; i < 12; i++) {

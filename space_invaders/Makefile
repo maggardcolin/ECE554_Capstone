@@ -48,7 +48,7 @@ LDFLAGS += $(shell pkg-config --libs libevdev)
 CFLAGS += $(shell pkg-config --cflags alsa)
 LDFLAGS += $(shell pkg-config --libs alsa)
 
-CFLAGS += -O3 -lrt -lpthread -DNO_ALSA
+CFLAGS += -O3 -lrt -lpthread -DNO_ALSA -g
 
 SW_SRC := sw/petalinux.c sw/font.c sw/gfx.c sw/shm_map.c sw/sprite.c sw/boss.c sw/game.c sw/game_helpers.c sw/game_player.c sw/music_alsa.c sw/main.c 
 HW_SRC := fb_sim.c

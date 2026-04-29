@@ -90,25 +90,6 @@
 #define CREDITS_ALIEN_GAP 24
 #define OVERWORLD_TOTAL_FRAMES (OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES + OVERWORLD_PIXELATE_FRAMES)
 
-// update the specific bit in the hardware register to trigger the music engine
-void write_music_register(uint1_t value, uint8_t shift) {
-    // read the current register value
-    uint32_t reg_value = *(volatile uint32_t *)0xA0000018
-
-    // write the bit at the specified shift position    
-    if (value) {
-        reg_value |= (1 << shift);  // Set the bit
-    } else {
-        reg_value &= ~(1 << shift); // Clear the bit
-    }
-    *(volatile uint32_t *)0xA0000018 = reg_value;
-}
-
-// clear all bits in the music register (e.g., on game loop exit)
-void clear_music_register() {
-    *(volatile uint32_t *)0xA0000018 = 0;
-}
-
 static const sprite1r_t *active_boss_sprite(const game_t *g) {
     return boss_sprite_for_frame(g, g->boss_frame);
 }
@@ -687,7 +668,6 @@ static void start_tower_asteroid_explosion(game_t *g, int ai) {
     g->tower_asteroid_explode_timer[ai] = TOWER_ASTEROID_EXPLOSION_FRAMES;
     g->tower_asteroid_boss_damage_applied[ai] = 0;
     music_play_tower_asteroid_boom();
-    write_music_register(1, MUSIC_MODE_TOWER_ASTEROID_BOOM);
 }
 
 static int boss_bomb_explosion_radius(const game_t *g) {
@@ -2140,7 +2120,6 @@ static void apply_player_damage(game_t *g, int damage) {
     if (g->lives > 0) {
         g->player_iframe_timer = PLAYER_IFRAMES;
         music_play_boom();
-        write_music_register(1, MUSIC_MODE_BOOM);
     }
     clear_player_shots(g);
     if (g->lives <= 0) {
@@ -2153,7 +2132,6 @@ static void apply_chariot_explosion_player_damage(game_t *g) {
     apply_player_damage(g, 1);
     if (g->lives < lives_before && g->lives <= 0) {
         music_play_boom();
-        write_music_register(1, MUSIC_MODE_BOOM);
     }
 }
 
@@ -2166,7 +2144,6 @@ static void trigger_player_death(game_t *g) {
     clear_boss_projectiles(g);
     clear_player_shots(g);
     music_play_boom_long();
-    write_music_register(1, MUSIC_MODE_BOOM_LONG);
 }
 
 static int count_aliens_remaining(const game_t *g) {
@@ -2391,7 +2368,6 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                 g->powerup_timer = 0;
                 shots[si].alive = 0;
                 music_play_powerup();
-                write_music_register(1, MUSIC_MODE_POWERUP);
                 break;
             }
         }
@@ -2406,7 +2382,6 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                         g->powerup_slot_timer[i] = 600;
                         g->powerup_type_slot[i] = g->powerup_type;
                         music_play_powerup();
-                        write_music_register(1, MUSIC_MODE_POWERUP);
                         break;
                     }
                 }
@@ -2566,7 +2541,6 @@ static void handle_player_shot_collisions(game_t *g, bullet_t *shots, int spread
                         g->boss_special_y = g->boss_y;
                         g->boss_special_timer = CHARIOT_CHARGE_EXPLOSION_FRAMES;
                         music_play_boom_long();
-                        write_music_register(1, MUSIC_MODE_BOOM_LONG);
                         g->boss_special_hit_applied = 1;
                         apply_chariot_charge_explosion_to_aliens(
                             g,
@@ -4025,7 +3999,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
             g->boss_power_timer = 0;
             g->boss_power_active = 0;
             music_play_ding();
-            write_music_register(1, MUSIC_MODE_DING);
         }
 
         update_yellow_boss_health(g);
@@ -4202,10 +4175,8 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                 if (g->boss_type == BOSS_TYPE_CLASSIC &&
                     (g->boss_attack_type == 0 || g->boss_attack_type == 1)) {
                     music_play_tower_asteroid_boom();
-                    write_music_register(1, MUSIC_MODE_TOWER_ASTEROID_BOOM);
                 } else {
                     music_play_laser();
-                    write_music_register(1, MUSIC_MODE_LASER);
                 }
             }
             
@@ -4262,7 +4233,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->boss_y = g->boss_special_y;
                         g->boss_special_timer = CHARIOT_CHARGE_EXPLOSION_FRAMES;
                         music_play_boom_long();
-                        write_music_register(1, MUSIC_MODE_BOOM_LONG);
                         apply_chariot_charge_explosion_to_aliens(
                             g,
                             g->boss_x + boss_w / 2,
@@ -4383,7 +4353,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
                         g->boss_bomb.explode_timer = BOSS_BOMB_EXPLOSION_FRAMES;
                         g->boss_bomb.dy = 0;
                         music_play_boom_long();
-                        write_music_register(1, MUSIC_MODE_BOOM_LONG);
                     }
                 } else {
                     if (g->boss_bomb.explode_timer > 0) {
@@ -5041,7 +5010,6 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
         g->exit_blink_timer = EXIT_BLINK_INTERVAL_FRAMES;
         g->exit_blink_toggles_remaining = EXIT_BLINK_TOGGLES;
         music_play_ding();
-        write_music_register(1, MUSIC_MODE_DING);
     }
     g->exit_was_available = g->exit_available;
 }

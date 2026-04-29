@@ -7,25 +7,6 @@
 
 #define SHM_NAME "/pynq_fbmmio"
 
-// update the specific bit in the hardware register to trigger the music engine
-void write_music_register(uint1_t value, uint8_t shift) {
-    // read the current register value
-    uint32_t reg_value = *(volatile uint32_t *)0xA0000018
-
-    // write the bit at the specified shift position    
-    if (value) {
-        reg_value |= (1 << shift);  // Set the bit
-    } else {
-        reg_value &= ~(1 << shift); // Clear the bit
-    }
-    *(volatile uint32_t *)0xA0000018 = reg_value;
-}
-
-// clear all bits in the music register (e.g., on game loop exit)
-void clear_music_register(void) {
-    *(volatile uint32_t *)0xA0000018 = 0;
-}
-
 /// main: Software game loop - connects to hardware simulator and runs game
 /// Parameters: none (no command-line arguments)
 /// Returns: 0 on normal exit, 1 if initialization fails
@@ -48,7 +29,6 @@ int sw_sim_main(void) {
     game_init(&game);
 
     int music_ok = (music_init() == 0);
-    clear_music_register();
     if (!music_ok) {
         fprintf(stderr, "music: disabled (ALSA init failed)\n");
     }
@@ -82,7 +62,6 @@ int sw_sim_main(void) {
                 else mode = MUSIC_MODE_BOSS;
             }
             music_set_mode(mode);
-            write_music_register(1, (int) mode);
         }
 
         game_render(&game, &lfb);
@@ -93,13 +72,9 @@ int sw_sim_main(void) {
         shm.regs->swap_request = 1;
         while (shm.regs->swap_ack == last_ack) { /* spin */ }
         last_ack = shm.regs->swap_ack;
-
-        // Clear music trigger bits after each frame to prevent repeated triggers
-        if (music_ok) write_music_register(0, (int) mode);
     }
 
     if (music_ok) {
-        clear_music_register();
         music_shutdown();
     }
     lfb_free(&lfb);
