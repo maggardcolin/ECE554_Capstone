@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include "color.h"
 
 #define EXIT_BLINK_INTERVAL_FRAMES 8
 #define EXIT_BLINK_TOGGLES 6
@@ -129,17 +130,17 @@ static int practice_menu_boss_type_for_index(int menu_index) {
 }
 
 static uint32_t practice_menu_boss_color(int boss_type) {
-    if (boss_type == BOSS_TYPE_BLUE) return 0xFF3399FF;
-    if (boss_type == BOSS_TYPE_YELLOW) return 0xFFFFFF00;
-    if (boss_type == BOSS_TYPE_TOWER) return 0xFF8B5A2B;
-    if (boss_type == BOSS_TYPE_HERMIT) return 0xFFB266FF;
-    if (boss_type == BOSS_TYPE_CHARIOT) return 0xFFFF8C00;
-    if (boss_type == BOSS_TYPE_MAGICIAN) return 0xFF00E5FF;
-    return 0xFF00FF00;
+    if (boss_type == BOSS_TYPE_BLUE) return BLUE;
+    if (boss_type == BOSS_TYPE_YELLOW) return YELLOW;
+    if (boss_type == BOSS_TYPE_TOWER) return BROWN;
+    if (boss_type == BOSS_TYPE_HERMIT) return PURPLE;
+    if (boss_type == BOSS_TYPE_CHARIOT) return ORANGE;
+    if (boss_type == BOSS_TYPE_MAGICIAN) return CYAN;
+    return GREEN;
 }
 
 static uint32_t magician_color_for_special_state(int special_active) {
-    return special_active ? 0xFF00E5FF : 0xFFA8A8A8;
+    return special_active ? CYAN : GRAY;
 }
 
 static const char *boss_intro_main_attack_text(const game_t *g) {
@@ -976,11 +977,11 @@ static void update_magician_wave(game_t *g, uint32_t vsync_counter) {
 static void render_magician_wave(const game_t *g, lfb_t *lfb) {
     const magician_wave_t *w = &g->magician_wave;
     if (!w->active) return;
-    draw_filled_circle_clipped_y(lfb, w->x, w->y, MAGICIAN_ORB_RADIUS, 0xFF8E8E8E,
+    draw_filled_circle_clipped_y(lfb, w->x, w->y, MAGICIAN_ORB_RADIUS, GRAY,
                                  GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-    draw_filled_circle_clipped_y(lfb, w->x, w->y, MAGICIAN_ORB_RADIUS - 3, 0xFFC0C0C0,
+    draw_filled_circle_clipped_y(lfb, w->x, w->y, MAGICIAN_ORB_RADIUS - 3, WHITE,
                                  GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-    draw_filled_circle_clipped_y(lfb, w->x - 3, w->y - 3, 2, 0xFFE0E0E0,
+    draw_filled_circle_clipped_y(lfb, w->x - 3, w->y - 3, 2, WHITE,
                                  GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
 }
 
@@ -1160,17 +1161,17 @@ static void render_intro_ring_points(lfb_t *lfb, int cx, int cy, int radius, uin
 }
 
 static void render_black_hole_explosion(lfb_t *lfb, int cx, int cy, int r) {
-    draw_filled_circle(lfb, cx, cy, r, 0xFF1A1A28);
-    draw_filled_circle(lfb, cx, cy, r - 3, 0xFF06070D);
+    draw_filled_circle(lfb, cx, cy, r, DARK_GRAY);
+    draw_filled_circle(lfb, cx, cy, r - 3, BLACK);
     int ring_r = r - 1;
     if (ring_r > 1) {
-        render_intro_ring_points(lfb, cx, cy, ring_r, 0xFF66CCFF);
+        render_intro_ring_points(lfb, cx, cy, ring_r, BLUE);
     }
 }
 
 static void render_black_hole_explosion_clipped(lfb_t *lfb, int cx, int cy, int r) {
-    draw_filled_circle_clipped_y(lfb, cx, cy, r, 0xFF1A1A28, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-    draw_filled_circle_clipped_y(lfb, cx, cy, r - 3, 0xFF06070D, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    draw_filled_circle_clipped_y(lfb, cx, cy, r, DARK_GRAY, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    draw_filled_circle_clipped_y(lfb, cx, cy, r - 3, BLACK, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
 
     int ring_r = r - 1;
     if (ring_r <= 1) return;
@@ -1182,23 +1183,23 @@ static void render_black_hole_explosion_clipped(lfb_t *lfb, int cx, int cy, int 
     for (int i = 0; i < 20; i++) {
         int px = cx + (ring_dx[i] * ring_r) / 16;
         int py = cy + (ring_dy[i] * ring_r) / 16;
-        putpix_clipped_y(lfb, px, py, 0xFF66CCFF, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        putpix_clipped_y(lfb, px, py, BLUE, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     }
 }
 
 static void render_tower_asteroid(lfb_t *lfb, int cx, int cy, int spin) {
-    draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS, 0xFF8B5A2B);
-    draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS - 2, 0xFF6A4421);
+    draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS, BROWN_DARK);
+    draw_filled_circle(lfb, cx, cy, TOWER_ASTEROID_RADIUS - 2, BROWN);
 
     int phase = (spin / 4) & 3;
     if (phase == 0) {
-        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + i, cy + (i / 2), 0xFFC08A4B);
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + i, cy + (i / 2), BROWN);
     } else if (phase == 1) {
-        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + (i / 2), cy + i, 0xFFC08A4B);
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + (i / 2), cy + i, BROWN);
     } else if (phase == 2) {
-        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + i, cy - (i / 2), 0xFFC08A4B);
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx + i, cy - (i / 2), BROWN);
     } else {
-        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx - (i / 2), cy + i, 0xFFC08A4B);
+        for (int i = -5; i <= 5; i++) l_putpix(lfb, cx - (i / 2), cy + i, BROWN);
     }
 }
 
@@ -1228,10 +1229,10 @@ static void render_tower_walls(lfb_t *lfb, const game_t *g) {
 
     for (int y = top; y <= bottom; y++) {
         for (int x = 0; x < g->tower_wall_left; x++) {
-            l_putpix(lfb, x, y, 0xFF4A2E12);
+            l_putpix(lfb, x, y, BROWN_DARK);
         }
         for (int x = g->tower_wall_right; x < LW; x++) {
-            l_putpix(lfb, x, y, 0xFF4A2E12);
+            l_putpix(lfb, x, y, BROWN_DARK);
         }
     }
 }
@@ -1246,13 +1247,13 @@ static void render_magician_side_walls(lfb_t *lfb, const game_t *g) {
 
     for (int y = top; y <= bottom; y++) {
         for (int x = 0; x < wall; x++) {
-            uint32_t c = 0xFFB0B0B0;
-            if (x == wall - 1 && ((y & 3) == 0)) c = 0xFFE0E0E0;
+            uint32_t c = GRAY;
+            if (x == wall - 1 && ((y & 3) == 0)) c = DARK_GRAY;
             l_putpix(lfb, x, y, c);
         }
         for (int x = LW - wall; x < LW; x++) {
-            uint32_t c = 0xFFB0B0B0;
-            if (x == LW - wall && ((y & 3) == 0)) c = 0xFFE0E0E0;
+            uint32_t c = GRAY;
+            if (x == LW - wall && ((y & 3) == 0)) c = DARK_GRAY;
             l_putpix(lfb, x, y, c);
         }
     }
@@ -1326,7 +1327,7 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
                 int wave = (local / 4 + i * 2) % 4;
                 x += wave - 2;
             }
-            draw_sprite1r(lfb, AS, x, row_y, 0xFFFFFF00);
+            draw_sprite1r(lfb, AS, x, row_y, YELLOW);
         }
 
         if ((elapsed >= t0 && elapsed < t1) || (elapsed >= t2 && elapsed < t3)) {
@@ -1334,7 +1335,7 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
             int beam_y = start_y + local * 2;
             for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
                 int beam_x = start_x + i * (AS->w + spacing) + AS->w / 2;
-                render_intro_regular_shot(lfb, beam_x, beam_y, 0xFFFFFF00);
+                render_intro_regular_shot(lfb, beam_x, beam_y, YELLOW);
             }
         }
         return;
@@ -1344,22 +1345,22 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
         if (elapsed >= t0 && elapsed < t1) {
             int local = elapsed - t0;
             int y = start_y + local * 2;
-            render_intro_regular_shot(lfb, center_x - 4 - local / 2, y, 0xFF3399FF);
-            render_intro_regular_shot(lfb, center_x, y, 0xFF3399FF);
-            render_intro_regular_shot(lfb, center_x + 4 + local / 2, y, 0xFF3399FF);
+            render_intro_regular_shot(lfb, center_x - 4 - local / 2, y, BLUE);
+            render_intro_regular_shot(lfb, center_x, y, BLUE);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 2, y, BLUE);
         } else if (elapsed >= t2 && elapsed < t3) {
             int local = elapsed - t2;
             int y = start_y + local * 2;
-            render_intro_regular_shot(lfb, center_x - 4 - local / 2, y, 0xFF3399FF);
-            render_intro_regular_shot(lfb, center_x, y, 0xFF3399FF);
-            render_intro_regular_shot(lfb, center_x + 4 + local / 2, y, 0xFF3399FF);
+            render_intro_regular_shot(lfb, center_x - 4 - local / 2, y, BLUE);
+            render_intro_regular_shot(lfb, center_x, y, BLUE);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 2, y, BLUE);
         } else if (elapsed >= t4 && elapsed < t5) {
             int local = elapsed - t4;
             int fall_frames = 18;
             if (local < fall_frames) {
                 int by = start_y + local * 3;
-                draw_filled_circle(lfb, center_x, by, 4, 0xFF66CCFF);
-                draw_filled_circle(lfb, center_x, by, 2, 0xFFB8ECFF);
+                draw_filled_circle(lfb, center_x, by, 4, BLUE);
+                draw_filled_circle(lfb, center_x, by, 2, CYAN);
             } else {
                 int ex = center_x;
                 int ey = start_y + fall_frames * 3;
@@ -1369,12 +1370,12 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
                 if (blue_black_hole_enabled(g)) {
                     render_black_hole_explosion(lfb, ex, ey, r);
                 } else {
-                    draw_filled_circle(lfb, ex, ey, r, 0xFF0B3A8F);
-                    draw_filled_circle(lfb, ex, ey, r - 3, 0xFF1E6AD6);
+                    draw_filled_circle(lfb, ex, ey, r, BLUE);
+                    draw_filled_circle(lfb, ex, ey, r - 3, CYAN);
                     if ((exp_local & 1) == 0) {
                         int core = r - 7;
                         if (core < 1) core = 1;
-                        draw_filled_circle(lfb, ex, ey, core, 0xFF66CCFF);
+                        draw_filled_circle(lfb, ex, ey, core, CYAN);
                     }
                 }
             }
@@ -1395,8 +1396,8 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
             int wall_left = TOWER_WALL_WIDTH;
             int wall_right = LW - TOWER_WALL_WIDTH;
             for (int y = 0; y < LH; y++) {
-                for (int x = 0; x < wall_left; x++) l_putpix(lfb, x, y, 0xFF4A2E12);
-                for (int x = wall_right; x < LW; x++) l_putpix(lfb, x, y, 0xFF4A2E12);
+                for (int x = 0; x < wall_left; x++) l_putpix(lfb, x, y, BROWN);
+                for (int x = wall_right; x < LW; x++) l_putpix(lfb, x, y, BROWN);
             }
         }
         return;
@@ -1409,7 +1410,7 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
             int local_clamped = (local < travel_frames) ? local : travel_frames;
             int tip_x = center_x + (((local_clamped & 1) == 0) ? -2 : 2);
             int tip_y = start_y + local_clamped * 2;
-            uint32_t bolt_color = (local >= travel_frames) ? 0xFFFFFF00 : 0xFF8000FF;
+            uint32_t bolt_color = (local >= travel_frames) ? YELLOW : PURPLE;
             draw_zigzag_segment(lfb, center_x, start_y, tip_x, tip_y, 2, 6, bolt_color);
         } else if (elapsed >= t2 && elapsed < t3) {
             int local = elapsed - t2;
@@ -1417,7 +1418,7 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
             int local_clamped = (local < travel_frames) ? local : travel_frames;
             int tip_x = center_x + (((local_clamped & 1) == 0) ? 2 : -2);
             int tip_y = start_y + local_clamped * 2;
-            uint32_t bolt_color = (local >= travel_frames) ? 0xFFFFFF00 : 0xFF8000FF;
+            uint32_t bolt_color = (local >= travel_frames) ? YELLOW : PURPLE;
             draw_zigzag_segment(lfb, center_x, start_y, tip_x, tip_y, 2, 6, bolt_color);
         } else if (elapsed >= t4 && elapsed < t5) {
             const sprite1r_t *AS = g->alien_frame ? &g->ALIEN_B : &g->ALIEN_A;
@@ -1427,13 +1428,13 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
             int rise = (local < 10) ? (10 - local) : 0;
 
             if (spawn_count == 1) {
-                draw_sprite1r(lfb, AS, center_x - AS->w / 2, spawn_y - rise, 0xFFB266FF);
+                draw_sprite1r(lfb, AS, center_x - AS->w / 2, spawn_y - rise, PURPLE);
             } else {
                 int spacing = AS->w + 10;
                 int left_x = center_x - spacing / 2 - AS->w / 2;
                 int right_x = center_x + spacing / 2 - AS->w / 2;
-                draw_sprite1r(lfb, AS, left_x, spawn_y - rise, 0xFFB266FF);
-                draw_sprite1r(lfb, AS, right_x, spawn_y - rise, 0xFFB266FF);
+                draw_sprite1r(lfb, AS, left_x, spawn_y - rise, PURPLE);
+                draw_sprite1r(lfb, AS, right_x, spawn_y - rise, PURPLE);
             }
         }
         return;
@@ -1443,31 +1444,31 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
         if (elapsed >= t0 && elapsed < t1) {
             int local = elapsed - t0;
             int y = start_y + local * 2;
-            render_intro_regular_shot(lfb, center_x - 8 - local / 2, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x - 4 - local / 3, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x + 4 + local / 3, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x + 8 + local / 2, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x - 8 - local / 2, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x - 4 - local / 3, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 3, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x + 8 + local / 2, y, ORANGE);
         } else if (elapsed >= t2 && elapsed < t3) {
             int local = elapsed - t2;
             int y = start_y + local * 2;
-            render_intro_regular_shot(lfb, center_x - 8 - local / 2, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x - 4 - local / 3, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x + 4 + local / 3, y, 0xFFFF8C00);
-            render_intro_regular_shot(lfb, center_x + 8 + local / 2, y, 0xFFFF8C00);
+            render_intro_regular_shot(lfb, center_x - 8 - local / 2, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x - 4 - local / 3, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x + 4 + local / 3, y, ORANGE);
+            render_intro_regular_shot(lfb, center_x + 8 + local / 2, y, ORANGE);
         } else if (elapsed >= t4 && elapsed < t5) {
             int local = elapsed - t4;
             int rush_y = boss_y + local * 3;
             if (rush_y < LH - 30) {
-                draw_sprite1r(lfb, BS, boss_x, rush_y, 0xFFFF8C00);
+                draw_sprite1r(lfb, BS, boss_x, rush_y, ORANGE);
             } else {
                 int ex = center_x;
                 int ey = LH - 30;
                 int r = 8 + ((local - 18) > 0 ? (local - 18) : 0) / 2;
                 if (r > 22) r = 22;
-                draw_filled_circle(lfb, ex, ey, r, 0xFFFF4500);
-                draw_filled_circle(lfb, ex, ey, r - 3, 0xFFFFA500);
+                draw_filled_circle(lfb, ex, ey, r, RED_ORANGE);
+                draw_filled_circle(lfb, ex, ey, r - 3, ORANGE);
             }
         }
         return;
@@ -1477,15 +1478,15 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
         if (elapsed >= t0 && elapsed < t1) {
             int local = elapsed - t0;
             int oy = start_y + local * 2;
-            draw_filled_circle(lfb, center_x, oy, 7, 0xFF8E8E8E);
-            draw_filled_circle(lfb, center_x, oy, 4, 0xFFC0C0C0);
-            draw_filled_circle(lfb, center_x - 2, oy - 2, 1, 0xFFE0E0E0);
+            draw_filled_circle(lfb, center_x, oy, 7, DARK_GRAY);
+            draw_filled_circle(lfb, center_x, oy, 4, GRAY);
+            draw_filled_circle(lfb, center_x - 2, oy - 2, 1, WHITE);
         } else if (elapsed >= t2 && elapsed < t3) {
             int local = elapsed - t2;
             int oy = start_y + local * 2;
-            draw_filled_circle(lfb, center_x, oy, 7, 0xFF8E8E8E);
-            draw_filled_circle(lfb, center_x, oy, 4, 0xFFC0C0C0);
-            draw_filled_circle(lfb, center_x - 2, oy - 2, 1, 0xFFE0E0E0);
+            draw_filled_circle(lfb, center_x, oy, 7, DARK_GRAY);
+            draw_filled_circle(lfb, center_x, oy, 4, GRAY);
+            draw_filled_circle(lfb, center_x - 2, oy - 2, 1, WHITE);
         } else if (elapsed >= t4 && elapsed < t5) {
             int local = elapsed - t4;
             draw_sprite1r(lfb, BS, boss_x, boss_y, magician_color_for_special_state(1));
@@ -1493,24 +1494,24 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
             int half_w = MAGICIAN_MIRROR_WIDTH_BOSS / 2;
             for (int x = center_x - half_w; x <= center_x + half_w; x++) {
                 if (iabs_int(x - center_x) <= MAGICIAN_MIRROR_NOTCH_HALF_BOSS) continue;
-                l_putpix(lfb, x, mirror_y, 0xFFB0B0B0);
-                if ((x & 3) == 0) l_putpix(lfb, x, mirror_y + 1, 0xFFE0E0E0);
+                l_putpix(lfb, x, mirror_y, GRAY);
+                if ((x & 3) == 0) l_putpix(lfb, x, mirror_y + 1, WHITE);
             }
 
-            // Show reflection behavior: player shot goes up (white) then comes back down (red).
+            // Show reflection behavior: player shot goes up (white) then comes back down (cyan).
             {
                 int shot_x = center_x - 10;
                 int up_frames = 12;
                 if (local < up_frames) {
                     int tip_y = mirror_y + 2 + (up_frames - local) * 2;
                     for (int i = 0; i < 5; i++) {
-                        l_putpix(lfb, shot_x, tip_y - i, 0xFFFFFFFF);
+                        l_putpix(lfb, shot_x, tip_y - i, WHITE);
                     }
                 } else {
                     int down_local = local - up_frames;
                     int tip_y = mirror_y + 2 + down_local * 2;
                     for (int i = 0; i < 5; i++) {
-                        l_putpix(lfb, shot_x, tip_y + i, 0xFF00E5FF);
+                        l_putpix(lfb, shot_x, tip_y + i, CYAN);
                     }
                 }
             }
@@ -1521,16 +1522,16 @@ static void render_intro_boss_attack_preview(const game_t *g, lfb_t *lfb, int bo
     // Multicolor boss preview.
     if (elapsed >= t0 && elapsed < t1) {
         int local = elapsed - t0;
-        render_intro_regular_shot(lfb, center_x, start_y + local * 2, 0xFFFF0000);
+        render_intro_regular_shot(lfb, center_x, start_y + local * 2, RED);
     } else if (elapsed >= t2 && elapsed < t3) {
         int local = elapsed - t2;
-        render_intro_regular_shot(lfb, center_x, start_y + local * 2, 0xFFFF0000);
+        render_intro_regular_shot(lfb, center_x, start_y + local * 2, RED);
     } else if (elapsed >= t4 && elapsed < t5) {
         int local = elapsed - t4;
-        render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, 0xFF8000FF);
+        render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, PURPLE);
     } else if (g->level >= 3 && elapsed >= t5 && elapsed < t6) {
         int local = elapsed - t5;
-        render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, 0xFF00FF00);
+        render_intro_plasma_beam(lfb, center_x, start_y + local * 3, BS->w, GREEN);
     }
 }
 
@@ -1544,74 +1545,74 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
     if (preview.boss_intro_timer < 0) preview.boss_intro_timer = 0;
     preview.boss_frame = ((BOSS_INTRO_FRAMES - preview.boss_intro_timer) / 12) & 1;
 
-    uint32_t preview_type_color = 0xFFFFFFFF;
+    uint32_t preview_type_color = WHITE;
     if (boss_type == BOSS_TYPE_BLUE) {
-        preview_type_color = 0xFF3399FF;
+        preview_type_color = BLUE;
     } else if (boss_type == BOSS_TYPE_YELLOW) {
-        preview_type_color = 0xFFFFFF00;
+        preview_type_color = YELLOW;
     } else if (boss_type == BOSS_TYPE_TOWER) {
-        preview_type_color = 0xFF8B5A2B;
+        preview_type_color = BROWN;
     } else if (boss_type == BOSS_TYPE_HERMIT) {
-        preview_type_color = 0xFFB266FF;
+        preview_type_color = PURPLE;
     } else if (boss_type == BOSS_TYPE_CHARIOT) {
-        preview_type_color = 0xFFFF8C00;
+        preview_type_color = ORANGE;
     } else if (boss_type == BOSS_TYPE_MAGICIAN) {
-        preview_type_color = 0xFF00E5FF;
+        preview_type_color = CYAN;
     } else {
         if (preview.boss_intro_timer > 0) {
-            uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
+            uint32_t flicker_palette[4] = {GREEN, YELLOW, RED, PURPLE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - preview.boss_intro_timer) / 8) & 3;
             preview_type_color = flicker_palette[flicker_idx];
         } else {
-            preview_type_color = 0xFF00FF00;
+            preview_type_color = GREEN;
         }
     }
 
     int right_x = LW / 2 + 6;
-    l_draw_text(lfb, right_x, 16, "TYPE:", 1, 0xFFFFFFFF);
+    l_draw_text(lfb, right_x, 16, "TYPE:", 1, WHITE);
     l_draw_text(lfb, right_x + 34, 16, boss_intro_type_text(&preview), 1, preview_type_color);
 
-    l_draw_text(lfb, right_x, 28, "MAIN:", 1, 0xFFFFFFFF);
+    l_draw_text(lfb, right_x, 28, "MAIN:", 1, WHITE);
     l_draw_text(lfb, right_x + 34, 28, boss_intro_main_attack_text(&preview), 1,
-                (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                (boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF :
-                (boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                (boss_type == BOSS_TYPE_MAGICIAN) ? 0xFFA8A8A8 : 0xFFFF0000);
+                (boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                (boss_type == BOSS_TYPE_YELLOW) ? YELLOW :
+                (boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                (boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                (boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                (boss_type == BOSS_TYPE_MAGICIAN) ? CYAN : RED);
 
-    l_draw_text(lfb, right_x, 40, "SPECIAL:", 1, 0xFFFFFFFF);
+    l_draw_text(lfb, right_x, 40, "SPECIAL:", 1, WHITE);
     if (boss_type == BOSS_TYPE_CLASSIC && preview.level >= 3) {
         const char *spec1 = "PLASMA";
         const char *spec2 = "HEAL";
         int sx = right_x + 46;
         int spec1_w = text_width_5x5(spec1, 1);
-        l_draw_text(lfb, sx, 40, spec1, 1, 0xFF8000FF);
-        l_draw_text(lfb, sx + spec1_w + 4, 40, spec2, 1, 0xFF00FF00);
+        l_draw_text(lfb, sx, 40, spec1, 1, PURPLE);
+        l_draw_text(lfb, sx + spec1_w + 4, 40, spec2, 1, GREEN);
     } else {
         l_draw_text(lfb, right_x + 46, 40, boss_intro_special_attack_text(&preview), 1,
-                    (boss_type == BOSS_TYPE_BLUE) ? 0xFF66CCFF :
-                    (boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                    (boss_type == BOSS_TYPE_TOWER) ? 0xFF4A2E12 :
-                    (boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF :
-                    (boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                    (boss_type == BOSS_TYPE_MAGICIAN) ? 0xFF00E5FF : 0xFF8000FF);
+                    (boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                    (boss_type == BOSS_TYPE_YELLOW) ? YELLOW :
+                    (boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                    (boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                    (boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                    (boss_type == BOSS_TYPE_MAGICIAN) ? CYAN : RED);
     }
 
     char level_text[20];
     snprintf(level_text, sizeof(level_text), "LEVEL: %d", preview.level);
-    l_draw_text(lfb, right_x, 52, level_text, 1, 0xFFFFFFFF);
+    l_draw_text(lfb, right_x, 52, level_text, 1, WHITE);
 
     const sprite1r_t *BS = boss_sprite_for_frame(&preview, preview.boss_frame);
     int pane_center_x = LW * 3 / 4;
     int boss_x = pane_center_x - BS->w / 2;
     int boss_y = 84;
     if (boss_type != BOSS_TYPE_YELLOW) {
-        uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                              (boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                              (boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
-                              (boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                              (boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(magician_intro_special_anim_active(&preview)) : 0xFF00FF00;
+        uint32_t boss_color = (boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                              (boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                              (boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                              (boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                              (boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(magician_intro_special_anim_active(&preview)) : GREEN;
         if (boss_type == BOSS_TYPE_CLASSIC) boss_color = preview_type_color;
         if (!chariot_intro_charge_anim_active(&preview)) {
             draw_sprite1r(lfb, BS, boss_x, boss_y, boss_color);
@@ -1631,7 +1632,7 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
                 int wave = ((elapsed / 4) + i * 2) % 4;
                 x += wave - 2;
             }
-            draw_sprite1r(lfb, AS, x, swarm_y, 0xFFFFFF00);
+            draw_sprite1r(lfb, AS, x, swarm_y, YELLOW);
         }
 
         int shot_start_y = swarm_y + AS->h + 2;
@@ -1640,7 +1641,7 @@ static void render_practice_boss_preview(const game_t *g, lfb_t *lfb, int boss_t
             int beam_y = shot_start_y + local * 2;
             for (int i = 0; i < YELLOW_BOSS_ALIENS; i++) {
                 int beam_x = swarm_x0 + i * (AS->w + spacing) + AS->w / 2;
-                render_intro_regular_shot(lfb, beam_x, beam_y, 0xFFFFFF00);
+                render_intro_regular_shot(lfb, beam_x, beam_y, YELLOW);
             }
         }
     }
@@ -1701,13 +1702,13 @@ static void overworld_node_position(int idx, int *x, int *y) {
 }
 
 static void render_overworld_background(lfb_t *lfb, int elapsed) {
-    l_clear(lfb, 0xFF02070E);
+    l_clear(lfb, BLACK);
 
     for (int y = 0; y < LH; y += 18) {
         for (int x = 0; x < LW; x += 18) {
             int seed = (x * 1103 + y * 917 + elapsed * 7) & 63;
             if (seed < 5) {
-                uint32_t c = (seed & 1) ? 0xFF35567A : 0xFF5D85B4;
+                uint32_t c = (seed & 1) ? BLUE : CYAN;
                 l_putpix(lfb, x, y, c);
                 if (x + 1 < LW) l_putpix(lfb, x + 1, y, c);
             }
@@ -1723,15 +1724,15 @@ static void render_ship_with_vertical_thruster(const game_t *g,
                                                int elapsed) {
     int draw_x = ship_x - g->PLAYER.w / 2;
     int draw_y = ship_y - g->PLAYER.h / 2;
-    draw_sprite1r(lfb, &g->PLAYER, draw_x, draw_y, 0xFF00FF00);
+    draw_sprite1r(lfb, &g->PLAYER, draw_x, draw_y, GREEN);
 
     if (!moving_vertically) return;
 
     int flame_x = ship_x;
     int flame_y = draw_y + g->PLAYER.h;
     int flicker = elapsed & 3;
-    uint32_t core_color = 0xFFFFFF66;
-    uint32_t flame_color = (flicker == 0 || flicker == 2) ? 0xFFFFA500 : 0xFFFF6A00;
+    uint32_t core_color = WHITE;
+    uint32_t flame_color = (flicker == 0 || flicker == 2) ? ORANGE : RED;
     int flame_len = 2 + ((elapsed >> 1) & 1);
 
     l_putpix(lfb, flame_x, flame_y, core_color);
@@ -1753,7 +1754,7 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
 
     const char *title = "DEFEAT THE ALIENS";
     int title_w = text_width_5x5(title, 1);
-    l_draw_text(lfb, (LW - title_w) / 2, 8, title, 1, 0xFFFFFFFF);
+    l_draw_text(lfb, (LW - title_w) / 2, 8, title, 1, WHITE);
 
     for (int i = 0; i < OVERWORLD_LEVEL_COUNT - 1; i++) {
         int x0, y0, x1, y1;
@@ -1766,7 +1767,7 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
         for (int s = 0; s <= steps; s++) {
             int px = x0 + (dx * s) / steps;
             int py = y0 + (dy * s) / steps;
-            l_putpix(lfb, px, py, 0xFF1A3556);
+            l_putpix(lfb, px, py, WHITE);
         }
     }
 
@@ -1795,30 +1796,30 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
             int shop_order = overworld_shop_order_from_node(i);
             int completed = (shop_order >= 0) ? (shop_order < shops_cleared) : 0;
             if (completed) {
-                draw_filled_circle(lfb, x, y, 4, 0xFF0A5A1A);
-                draw_filled_circle(lfb, x, y, 2, 0xFF3CFF68);
+                draw_filled_circle(lfb, x, y, 4, GREEN);
+                draw_filled_circle(lfb, x, y, 2, GREEN);
             } else {
                 int r = 3 + pulse_r;
-                draw_filled_circle(lfb, x, y, r, 0xFF2A0E3C);
-                draw_filled_circle(lfb, x, y, 3, 0xFFC56BFF);
+                draw_filled_circle(lfb, x, y, r, PURPLE);
+                draw_filled_circle(lfb, x, y, 3, PURPLE);
             }
-            l_draw_text(lfb, x - 2, y - 10, "S", 1, 0xFFFFFFFF);
+            l_draw_text(lfb, x - 2, y - 10, "S", 1, WHITE);
         } else {
             int level_label = overworld_node_level_label(i);
             int completed = (level_label > 0 && current_level_node > i);
 
             if (completed) {
-                draw_filled_circle(lfb, x, y, 4, 0xFF0A5A1A);
-                draw_filled_circle(lfb, x, y, 2, 0xFF3CFF68);
+                draw_filled_circle(lfb, x, y, 4, GREEN);
+                draw_filled_circle(lfb, x, y, 2, GREEN);
             } else {
                 int r = 3 + pulse_r;
-                draw_filled_circle(lfb, x, y, r, 0xFF4C1010);
-                draw_filled_circle(lfb, x, y, 3, 0xFFFF3A3A);
+                draw_filled_circle(lfb, x, y, r, RED);
+                draw_filled_circle(lfb, x, y, 3, RED_ORANGE);
             }
 
             char label[4];
             snprintf(label, sizeof(label), "%d", level_label);
-            l_draw_text(lfb, x - 2, y - 10, label, 1, 0xFFFFFFFF);
+            l_draw_text(lfb, x - 2, y - 10, label, 1, WHITE);
         }
     }
 
@@ -1843,7 +1844,7 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
 
     if (elapsed >= OVERWORLD_FLY_FRAMES) {
         int ring_r = 6 + pulse_r;
-        render_intro_ring_points(lfb, to_x, to_y, ring_r, 0xFFFF8A8A);
+        render_intro_ring_points(lfb, to_x, to_y, ring_r, WHITE);
     }
 
     int transition_start = OVERWORLD_FLY_FRAMES + OVERWORLD_HOLD_FRAMES;
@@ -1860,7 +1861,7 @@ static void render_overworld_cutscene(const game_t *g, lfb_t *lfb) {
                 if (seed > threshold) continue;
                 for (int yy = y; yy < y + cell && yy < LH; yy++) {
                     for (int xx = x; xx < x + cell && xx < LW; xx++) {
-                        l_putpix(lfb, xx, yy, 0xFF000000);
+                        l_putpix(lfb, xx, yy, BLACK);
                     }
                 }
             }
@@ -1916,10 +1917,10 @@ static void render_player_explosion_at(lfb_t *lfb, int cx, int cy, int age) {
     int frame = age / 12;
     int base_r = 3 + frame * 2;
 
-    draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 2, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-    draw_filled_circle_clipped_y(lfb, cx, cy, base_r, 0xFFFF8C00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 2, RED, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+    draw_filled_circle_clipped_y(lfb, cx, cy, base_r, RED_ORANGE, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     if ((age & 1) == 0) {
-        draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 2) ? (base_r - 2) : 1, 0xFFFFFF00,
+        draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 2) ? (base_r - 2) : 1, YELLOW,
                                      GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     }
 
@@ -1927,7 +1928,7 @@ static void render_player_explosion_at(lfb_t *lfb, int cx, int cy, int age) {
     for (int i = 0; i < 8; i++) {
         int dx = ((i * 7 + age * 3) % (spark_r * 2 + 1)) - spark_r;
         int dy = ((i * 11 + age * 5) % (spark_r * 2 + 1)) - spark_r;
-        uint32_t c = (i & 1) ? 0xFFFFA500 : 0xFFFFFF00;
+        uint32_t c = (i & 1) ? ORANGE : YELLOW;
         putpix_clipped_y(lfb, cx + dx, cy + dy, c, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     }
 }
@@ -1950,19 +1951,19 @@ static void render_exit_indicator(lfb_t *lfb, int exit_y) {
 
     int arrow_x = LW - right_margin - arrow_w;
     int exit_x = arrow_x - arrow_gap - exit_w;
-    l_draw_text(lfb, exit_x, exit_y, exit_label, 1, 0xFFFF0000);
+    l_draw_text(lfb, exit_x, exit_y, exit_label, 1, RED);
 
     int arrow_mid_y = exit_y + 2;
     for (int y = -1; y <= 1; y++) {
         for (int x = 0; x < arrow_shaft_w; x++) {
-            l_putpix(lfb, arrow_x + x, arrow_mid_y + y, 0xFFFF0000);
+            l_putpix(lfb, arrow_x + x, arrow_mid_y + y, RED);
         }
     }
     for (int i = 0; i < arrow_head_w; i++) {
         int hx = arrow_x + arrow_shaft_w + i;
         int half_h = arrow_head_w - 1 - i;
         for (int y = -half_h; y <= half_h; y++) {
-            l_putpix(lfb, hx, arrow_mid_y + y, 0xFFFF0000);
+            l_putpix(lfb, hx, arrow_mid_y + y, RED);
         }
     }
 }
@@ -1972,18 +1973,18 @@ static void render_alien_explosion(lfb_t *lfb, int cx, int cy, int timer, int po
     int base_r = 2 + (age / 3);
 
     if (clip_to_gameplay) {
-        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 2, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-        draw_filled_circle_clipped_y(lfb, cx, cy, base_r, 0xFFFF8C00, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r + 2, RED, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+        draw_filled_circle_clipped_y(lfb, cx, cy, base_r, ORANGE, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
     } else {
-        draw_filled_circle(lfb, cx, cy, base_r + 2, 0xFFFF4500);
-        draw_filled_circle(lfb, cx, cy, base_r, 0xFFFF8C00);
+        draw_filled_circle(lfb, cx, cy, base_r + 2, RED);
+        draw_filled_circle(lfb, cx, cy, base_r, ORANGE);
     }
     if ((age & 1) == 0) {
         if (clip_to_gameplay) {
-            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00,
+            draw_filled_circle_clipped_y(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, YELLOW,
                                          GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
         } else {
-            draw_filled_circle(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, 0xFFFFFF00);
+            draw_filled_circle(lfb, cx, cy, (base_r > 1) ? (base_r - 1) : 1, YELLOW);
         }
     }
 
@@ -2093,7 +2094,7 @@ static void render_player_shield_ring(const game_t *g, lfb_t *lfb) {
     int cx = g->player_x + g->PLAYER.w / 2;
     int cy = g->player_y + g->PLAYER.h / 2;
     int r = player_shield_radius(g);
-    uint32_t ring_color = ((g->powerup_spawn_timer / 4) & 1) ? 0xFF66CCFF : 0xFF3399FF;
+    uint32_t ring_color = BLUE;
 
     for (int y = -r; y <= r; y++) {
         for (int x = -r; x <= r; x++) {
@@ -2941,11 +2942,11 @@ static void shop_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 }
 
 static void shop_render(game_t *g, lfb_t *lfb) {
-    l_clear(lfb, 0xFF000000);
+    l_clear(lfb, BLACK);
 
     // Shopkeeper (purple animated alien) at top-left
     const sprite1r_t *SK = g->shopkeeper_frame ? &g->ALIEN_B : &g->ALIEN_A;
-    draw_sprite1r_scaled(lfb, SK, 12, 24, 0xFF8000FF, 2);
+    draw_sprite1r_scaled(lfb, SK, 12, 24, PURPLE, 2);
 
     // Draw shop items
     int item_w = 18;
@@ -2957,34 +2958,34 @@ static void shop_render(game_t *g, lfb_t *lfb) {
 
         // Border
         for (int x = 0; x <= item_w; x++) {
-            l_putpix(lfb, x0 + x, y0 - 1, 0xFFFFFFFF);
-            l_putpix(lfb, x0 + x, y0 + item_h, 0xFFFFFFFF);
+            l_putpix(lfb, x0 + x, y0 - 1, WHITE);
+            l_putpix(lfb, x0 + x, y0 + item_h, WHITE);
         }
         for (int y = 0; y <= item_h; y++) {
-            l_putpix(lfb, x0 - 1, y0 + y, 0xFFFFFFFF);
-            l_putpix(lfb, x0 + item_w, y0 + y, 0xFFFFFFFF);
+            l_putpix(lfb, x0 - 1, y0 + y, WHITE);
+            l_putpix(lfb, x0 + item_w, y0 + y, WHITE);
         }
 
         // Draw icon based on item type (ASCII sprites)
         int center_x = g->shop_items[i].x;
         int center_y = g->shop_items[i].y;
         const sprite1r_t *icon = NULL;
-        uint32_t icon_color = 0xFFFFFFFF;
+        uint32_t icon_color = WHITE;
         if (g->shop_items[i].type == SHOP_ITEM_LIFE) {
             icon = &g->SHOP_LIFE;
-            icon_color = 0xFF00FF00;
+            icon_color = GREEN;
         } else if (g->shop_items[i].type == SHOP_ITEM_FIRE_SPEED) {
             icon = &g->SHOP_FIRE;
-            icon_color = 0xFFFFA500;
+            icon_color = ORANGE;
         } else if (g->shop_items[i].type == SHOP_ITEM_MOVE_SPEED) {
             icon = &g->SHOP_MOVE;
-            icon_color = 0xFF00FF00;
+            icon_color = GREEN;
         } else if (g->shop_items[i].type == SHOP_ITEM_DAMAGE) {
             icon = &g->SHOP_DMG;
-            icon_color = 0xFFFF0000;
+            icon_color = RED;
         } else if (g->shop_items[i].type == SHOP_ITEM_PIERCE) {
             icon = &g->SHOP_PIERCE;
-            icon_color = 0xFF66CCFF;
+            icon_color = BLUE;
         }
         if (icon) {
             int icon_x = center_x - icon->w / 2;
@@ -2999,12 +3000,12 @@ static void shop_render(game_t *g, lfb_t *lfb) {
         // Label and price
         const char *label = shop_item_label(g->shop_items[i].type);
         int label_w = text_width_5x5(label, 1);
-        l_draw_text(lfb, g->shop_items[i].x - label_w / 2, y0 - 10, label, 1, 0xFFFFFFFF);
+        l_draw_text(lfb, g->shop_items[i].x - label_w / 2, y0 - 10, label, 1, WHITE);
 
         char price_text[16];
         snprintf(price_text, sizeof(price_text), "%d", g->shop_items[i].price);
         int price_w = text_width_5x5(price_text, 1);
-        l_draw_text(lfb, g->shop_items[i].x - price_w / 2, y0 + item_h + 2, price_text, 1, 0xFFFFFFFF);
+        l_draw_text(lfb, g->shop_items[i].x - price_w / 2, y0 + item_h + 2, price_text, 1, WHITE);
     }
 
     // Exit sign in shop.
@@ -3023,11 +3024,11 @@ static void shop_render(game_t *g, lfb_t *lfb) {
     // SHOP sign on top-left
     {
         const char *shop_label = "SHOP";
-        l_draw_text(lfb, 5, 5, shop_label, 1, 0xFF8000FF);
+        l_draw_text(lfb, 5, 5, shop_label, 1, PURPLE);
 
         const char *heal_label = "FULLY HEALED";
         int heal_w = text_width_5x5(heal_label, 1);
-        l_draw_text(lfb, (LW - heal_w) / 2, 5, heal_label, 1, 0xFF3CFF68);
+        l_draw_text(lfb, (LW - heal_w) / 2, 5, heal_label, 1, GREEN);
     }
 
     // PLAYER 1 label and health bar
@@ -3046,6 +3047,7 @@ static const char *credits_lines[] = {
     "HARDWARE SUPPORT: MICHAEL",
     "LINUX SUPPORT: JOSH 2",
     "COMPATABILITY: JOSH 2",
+    "AUDIO: JOSH 1"
     "",
     "SPECIAL THANKS:",
     "ECE 554",
@@ -3066,7 +3068,7 @@ static void render_credits_screen(const game_t *g, lfb_t *lfb) {
     int y = g->credits_scroll_y;
     for (int i = 0; i < (int)(sizeof(credits_lines) / sizeof(credits_lines[0])); i++) {
         int line_w = text_width_5x5(credits_lines[i], 1);
-        l_draw_text(lfb, (LW - line_w) / 2, y + i * CREDITS_LINE_SPACING, credits_lines[i], 1, 0xFFBFBFBF);
+        l_draw_text(lfb, (LW - line_w) / 2, y + i * CREDITS_LINE_SPACING, credits_lines[i], 1, GRAY);
     }
 
     const sprite1r_t *SK = ((g->credits_scroll_y / 8) & 1) ? &g->ALIEN_B : &g->ALIEN_A;
@@ -3075,7 +3077,7 @@ static void render_credits_screen(const game_t *g, lfb_t *lfb) {
     int sh = SK->h * scale;
     int alien_x = (LW - sw) / 2;
     int alien_y = y + credits_text_height() + CREDITS_ALIEN_GAP;
-    draw_sprite1r_scaled(lfb, SK, alien_x, alien_y, 0xFF8000FF, scale);
+    draw_sprite1r_scaled(lfb, SK, alien_x, alien_y, PURPLE, scale);
 }
 
 static void bunkers_rebuild(game_t *g);
@@ -5016,7 +5018,7 @@ void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {
 
 void game_render(game_t *g, lfb_t *lfb) {
     if (g->start_screen) {
-        l_clear(lfb, 0xFF000000);
+        l_clear(lfb, BLACK);
         if (g->credits_screen_active) {
             render_credits_screen(g, lfb);
         } else if (!g->practice_menu_active && !g->difficulty_menu_active) {
@@ -5027,7 +5029,7 @@ void game_render(game_t *g, lfb_t *lfb) {
             int title_w = text_width_5x5(title, title_scale);
             int title_x = (LW - title_w) / 2;
             int title_y = 38;
-            l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
+            l_draw_text(lfb, title_x, title_y, title, title_scale, GREEN);
 
             int option_scale = 2;
             int option_base_y = title_y + 42;
@@ -5037,15 +5039,15 @@ void game_render(game_t *g, lfb_t *lfb) {
                 int opt_x = (LW - opt_w) / 2;
                 int opt_y = option_base_y + i * 28;
                 if (is_selected) {
-                    l_draw_text(lfb, opt_x - 18, opt_y, ">", option_scale, 0xFFFFFFFF);
+                    l_draw_text(lfb, opt_x - 18, opt_y, ">", option_scale, WHITE);
                 }
                 l_draw_text(lfb, opt_x, opt_y, options[i], option_scale,
-                            is_selected ? 0xFFFFFFFF : 0xFF9A9A9A);
+                            is_selected ? WHITE : GRAY);
             }
 
             const char *hint = "UP/DOWN TO CHOOSE  SPACE TO SELECT";
             int hint_w = text_width_5x5(hint, 1);
-            l_draw_text(lfb, (LW - hint_w) / 2, LH - 22, hint, 1, 0xFFBFBFBF);
+            l_draw_text(lfb, (LW - hint_w) / 2, LH - 22, hint, 1, GRAY);
         } else if (g->difficulty_menu_active) {
             const char *entries[DIFFICULTY_MENU_COUNT] = {"TUTORIAL", "EASY MODE", "HARD MODE", "BACK"};
 
@@ -5053,9 +5055,9 @@ void game_render(game_t *g, lfb_t *lfb) {
             int row_h = 16;
             for (int i = 0; i < DIFFICULTY_MENU_COUNT; i++) {
                 int is_selected = (i == g->difficulty_menu_selection);
-                uint32_t color = is_selected ? 0xFFFFFFFF : 0xFF9A9A9A;
-                if (is_selected && i == 2) color = 0xFFFF0000;
-                uint32_t cursor_color = is_selected ? 0xFF00FF00 : 0xFFFFFFFF;
+                uint32_t color = is_selected ? WHITE : GRAY;
+                if (is_selected && i == 2) color = RED;
+                uint32_t cursor_color = is_selected ? GREEN : WHITE;
                 int entry_y = base_y + i * row_h;
                 if (is_selected) {
                     l_draw_text(lfb, 16, entry_y, ">", 1, cursor_color);
@@ -5065,19 +5067,19 @@ void game_render(game_t *g, lfb_t *lfb) {
 
             int right_x = LW / 2 + 6;
             if (g->difficulty_menu_selection == 0) {
-                l_draw_text(lfb, right_x, 16, "FOR FIRST TIME PLAYERS.", 1, 0xFFFFFFFF);
+                l_draw_text(lfb, right_x, 16, "FOR FIRST TIME PLAYERS.", 1, WHITE);
             } else if (g->difficulty_menu_selection == 1) {
-                l_draw_text(lfb, right_x, 16, "THE CLASSIC EXPERIENCE.", 1, 0xFFFFFFFF);
+                l_draw_text(lfb, right_x, 16, "THE CLASSIC EXPERIENCE.", 1, WHITE);
             } else if (g->difficulty_menu_selection == 2) {
-                l_draw_text(lfb, right_x, 16, "NO HEALING.", 1, 0xFFFFFFFF);
-                l_draw_text(lfb, right_x, 28, "ONE LIFE.", 1, 0xFFFFFFFF);
+                l_draw_text(lfb, right_x, 16, "NO HEALING.", 1, WHITE);
+                l_draw_text(lfb, right_x, 28, "ONE LIFE.", 1, WHITE);
             } else {
-                l_draw_text(lfb, right_x, 16, "RETURN TO MAIN MENU.", 1, 0xFFFFFFFF);
+                l_draw_text(lfb, right_x, 16, "RETURN TO MAIN MENU.", 1, WHITE);
             }
 
             const char *hint = "UP/DOWN DIFFICULTY  SPACE SELECT";
             int hint_w = text_width_5x5(hint, 1);
-            l_draw_text(lfb, (LW - hint_w) / 2, LH - 18, hint, 1, 0xFFBFBFBF);
+            l_draw_text(lfb, (LW - hint_w) / 2, LH - 18, hint, 1, GRAY);
         } else {
             const char *entries[PRACTICE_MENU_COUNT] = {
                 boss_menu_label(BOSS_TYPE_MAGICIAN),
@@ -5094,8 +5096,8 @@ void game_render(game_t *g, lfb_t *lfb) {
             int row_h = 13;
             for (int i = 0; i < PRACTICE_MENU_COUNT; i++) {
                 int is_selected = (i == g->practice_menu_selection);
-                uint32_t color = 0xFFAAAAAA;
-                uint32_t cursor_color = 0xFF00FF00;
+                uint32_t color = GRAY;
+                uint32_t cursor_color = GREEN;
 
                 if (i < BOSS_TYPE_COUNT) {
                     if (is_selected) {
@@ -5104,7 +5106,7 @@ void game_render(game_t *g, lfb_t *lfb) {
                         cursor_color = color;
                     }
                 } else {
-                    color = is_selected ? 0xFF00FF00 : 0xFFFFFFFF;
+                    color = is_selected ? GREEN : WHITE;
                 }
 
                 int entry_y = base_y + i * row_h;
@@ -5121,20 +5123,20 @@ void game_render(game_t *g, lfb_t *lfb) {
 
             const char *hint = "UP/DOWN BOSS  LEFT/RIGHT LEVEL  SPACE ENTER";
             int hint_w = text_width_5x5(hint, 1);
-            l_draw_text(lfb, (LW - hint_w) / 2, LH - 18, hint, 1, 0xFFBFBFBF);
+            l_draw_text(lfb, (LW - hint_w) / 2, LH - 18, hint, 1, GRAY);
         }
         return;
     }
 
     if (g->game_over) {
-        l_clear(lfb, 0xFF000000);
+        l_clear(lfb, BLACK);
 
         const char *title = "GAME OVER";
         int title_scale = 4;
         int title_w = text_width_5x5(title, title_scale);
         int title_x = (LW - title_w) / 2;
         int title_y = 10;
-        l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFFFF0000);
+        l_draw_text(lfb, title_x, title_y, title, title_scale, RED);
 
         int cx = LW / 2;
         int cy = LH / 2 - 10;
@@ -5146,8 +5148,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         const int game_over_ship_hold_frames = 30;
         int game_over_age = 90 - g->game_over_delay_timer;
         if (game_over_age < game_over_ship_hold_frames) {
-            uint32_t player_color = explosive_shot_active(g) ? 0xFFFF0000 :
-                                    (triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00);
+            uint32_t player_color = explosive_shot_active(g) ? RED :
+                                    (triple_shot_active(g) ? BLUE : GREEN);
             draw_sprite1r(lfb, &g->PLAYER, cx - g->PLAYER.w / 2, cy - g->PLAYER.h / 2, player_color);
         } else if (game_over_age < game_over_ship_hold_frames + PLAYER_DEATH_DELAY_FRAMES) {
             render_player_explosion_at(lfb, cx, cy, game_over_age - game_over_ship_hold_frames);
@@ -5157,7 +5159,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int hx[6] = { cx, cx + r, cx + r, cx, cx - r, cx - r };
         int hy[6] = { cy - r, cy - r/2, cy + r/2, cy + r, cy + r/2, cy - r/2 };
         for (int i = 0; i < 6; i++) {
-            draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
+            draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, WHITE);
         }
 
         const char *score_label = "FINAL SCORE:";
@@ -5165,8 +5167,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int label_w = text_width_5x5(score_label, label_scale);
         int label_x = (LW - label_w) / 2 - 12;
         int label_y = cy + r + 15;
-        l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
-        l_draw_score(lfb, label_x + label_w + 6, label_y, g->game_over_score, 0xFFFFFFFF);
+        l_draw_text(lfb, label_x, label_y, score_label, label_scale, WHITE);
+        l_draw_score(lfb, label_x + label_w + 6, label_y, g->game_over_score, WHITE);
 
         if (g->game_over_delay_timer == 0) {
             const char *prompt = "PRESS SPACE TO CONTINUE";
@@ -5174,20 +5176,20 @@ void game_render(game_t *g, lfb_t *lfb) {
             int prompt_w = text_width_5x5(prompt, prompt_scale);
             int prompt_x = (LW - prompt_w) / 2;
             int prompt_y = label_y + 25;
-            l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, 0xFFFFFFFF);
+            l_draw_text(lfb, prompt_x, prompt_y, prompt, prompt_scale, WHITE);
         }
         return;
     }
 
     if (g->win_screen) {
-        l_clear(lfb, 0xFF000000);
+        l_clear(lfb, BLACK);
 
         const char *title = "YOU WIN";
         int title_scale = 4;
         int title_w = text_width_5x5(title, title_scale);
         int title_x = (LW - title_w) / 2;
         int title_y = 10;
-        l_draw_text(lfb, title_x, title_y, title, title_scale, 0xFF00FF00);
+        l_draw_text(lfb, title_x, title_y, title, title_scale, GREEN);
 
         int cx = LW / 2;
         int cy = LH / 2 - 10;
@@ -5198,8 +5200,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int p_w = g->PLAYER.w;
         int p_h = g->PLAYER.h;
 
-        uint32_t player_color = explosive_shot_active(g) ? 0xFFFF0000 :
-                    (triple_shot_active(g) ? 0xFF0000FF : 0xFF00FF00);
+        uint32_t player_color = explosive_shot_active(g) ? RED :
+                    (triple_shot_active(g) ? BLUE : GREEN);
         draw_sprite1r(lfb, &g->PLAYER, cx - p_w / 2, cy - p_h / 2, player_color);
 
         int r = 22;
@@ -5209,7 +5211,7 @@ void game_render(game_t *g, lfb_t *lfb) {
             if (g->win_alien_explode_timer[i] > 0) {
                 render_alien_explosion(lfb, hx[i], hy[i], g->win_alien_explode_timer[i], 0, 0);
             } else if (i >= g->win_explosion_index) {
-                draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, 0xFFFFFFFF);
+                draw_sprite1r(lfb, AS, hx[i] - a_w / 2, hy[i] - a_h / 2, WHITE);
             }
         }
 
@@ -5218,8 +5220,8 @@ void game_render(game_t *g, lfb_t *lfb) {
         int label_w = text_width_5x5(score_label, label_scale);
         int label_x = (LW - label_w) / 2 - 12;
         int label_y = cy + r + 15;
-        l_draw_text(lfb, label_x, label_y, score_label, label_scale, 0xFFFFFFFF);
-        l_draw_score(lfb, label_x + label_w + 6, label_y, g->score, 0xFFFFFFFF);
+        l_draw_text(lfb, label_x, label_y, score_label, label_scale, WHITE);
+        l_draw_score(lfb, label_x + label_w + 6, label_y, g->score, WHITE);
 
         return;
     }
@@ -5235,7 +5237,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     }
 
     if (g->boss_intro_active) {
-        l_clear(lfb, 0xFF000000);
+        l_clear(lfb, BLACK);
 
         const char *type_prefix = "ALIEN TYPE:";
         const char *type_value = boss_intro_type_text(g);
@@ -5249,31 +5251,31 @@ void game_render(game_t *g, lfb_t *lfb) {
         int scale = 1;
         int y = 18;
 
-        uint32_t type_color = 0xFFFF55AA;
+        uint32_t type_color = WHITE;
         if (g->boss_type == BOSS_TYPE_BLUE) {
-            uint32_t blue_flicker_palette[4] = {0xFF1E6AD6, 0xFF3399FF, 0xFF66CCFF, 0xFF3399FF};
+            uint32_t blue_flicker_palette[2] = {BLUE, WHITE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = blue_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_YELLOW) {
-            uint32_t yellow_flicker_palette[4] = {0xFFFFFF66, 0xFFFFFF00, 0xFFFFD700, 0xFFFFFF00};
+            uint32_t yellow_flicker_palette[2] = {YELLOW, WHITE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = yellow_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
-            uint32_t tower_flicker_palette[4] = {0xFF6A4421, 0xFF8B5A2B, 0xFFC08A4B, 0xFF8B5A2B};
+            uint32_t tower_flicker_palette[2] = {BROWN, WHITE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = tower_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
-            uint32_t hermit_flicker_palette[4] = {0xFF8000FF, 0xFFB266FF, 0xFFD9B3FF, 0xFFB266FF};
+            uint32_t hermit_flicker_palette[2] = {PURPLE, WHITE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = hermit_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
-            uint32_t chariot_flicker_palette[4] = {0xFFFF6A00, 0xFFFF8C00, 0xFFFFB347, 0xFFFF8C00};
+            uint32_t chariot_flicker_palette[2] = {ORANGE, WHITE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = chariot_flicker_palette[flicker_idx];
         } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
-            type_color = 0xFF00E5FF;
+            type_color = GRAY;
         } else {
-            uint32_t flicker_palette[4] = {0xFF00FF00, 0xFFFFFF00, 0xFFFF0000, 0xFF8000FF};
+            uint32_t flicker_palette[4] = {GREEN, YELLOW, RED, PURPLE};
             int flicker_idx = ((BOSS_INTRO_FRAMES - g->boss_intro_timer) / 8) & 3;
             type_color = flicker_palette[flicker_idx];
         }
@@ -5281,20 +5283,20 @@ void game_render(game_t *g, lfb_t *lfb) {
         int type_prefix_w = text_width_5x5(type_prefix, scale);
         int type_value_w = text_width_5x5(type_value, scale);
         int type_x = (LW - (type_prefix_w + 6 + type_value_w)) / 2;
-        l_draw_text(lfb, type_x, y, type_prefix, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, type_x, y, type_prefix, scale, WHITE);
         l_draw_text(lfb, type_x + type_prefix_w + 6, y, type_value, scale, type_color);
 
         y += 14;
         int main_prefix_w = text_width_5x5(main_prefix, scale);
         int main_value_w = text_width_5x5(main_value, scale);
         int main_x = (LW - (main_prefix_w + 6 + main_value_w)) / 2;
-        uint32_t main_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                      (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                      (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                      (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF :
-                      (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                      (g->boss_type == BOSS_TYPE_MAGICIAN) ? 0xFFA8A8A8 : 0xFFFF0000;
-        l_draw_text(lfb, main_x, y, main_prefix, scale, 0xFFFFFFFF);
+        uint32_t main_color = (g->boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                      (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW :
+                      (g->boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                      (g->boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                      (g->boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                      (g->boss_type == BOSS_TYPE_MAGICIAN) ? GRAY : RED;
+        l_draw_text(lfb, main_x, y, main_prefix, scale, WHITE);
         l_draw_text(lfb, main_x + main_prefix_w + 6, y, main_value, scale, main_color);
 
         y += 14;
@@ -5305,38 +5307,38 @@ void game_render(game_t *g, lfb_t *lfb) {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF3399FF);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, BLUE);
         } else if (g->boss_type == BOSS_TYPE_YELLOW) {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFFFFF00);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, YELLOW);
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF4A2E12);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, BROWN);
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFB266FF);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, PURPLE);
         } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFFFF8C00);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, ORANGE);
         } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF00E5FF);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, GRAY);
         } else if (g->level >= 3) {
             const char *spec1 = "PLASMA";
             const char *spec2 = "HEAL";
@@ -5347,28 +5349,28 @@ void game_render(game_t *g, lfb_t *lfb) {
 
             special_x = (LW - (special_prefix_w + 6 + value_total_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, spec1, scale, 0xFF8000FF);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, spec1, scale, BLUE);
 
-            l_draw_text(lfb, special_text_x + spec1_w + gap_w, y, spec2, scale, 0xFF00FF00);
+            l_draw_text(lfb, special_text_x + spec1_w + gap_w, y, spec2, scale, GREEN);
         } else {
             int special_value_w = text_width_5x5(special_value, scale);
             special_x = (LW - (special_prefix_w + 6 + special_value_w)) / 2;
             special_text_x = special_x + special_prefix_w + 6;
-            l_draw_text(lfb, special_x, y, special_prefix, scale, 0xFFFFFFFF);
-            l_draw_text(lfb, special_text_x, y, special_value, scale, 0xFF8000FF);
+            l_draw_text(lfb, special_x, y, special_prefix, scale, WHITE);
+            l_draw_text(lfb, special_text_x, y, special_value, scale, RED);
         }
 
         const sprite1r_t *BS = active_boss_sprite(g);
         int boss_x = (LW - BS->w) / 2;
         int boss_y = 68;
-        uint32_t intro_boss_color = 0xFF00FF00;
+        uint32_t intro_boss_color = GREEN;
         if (g->boss_type != BOSS_TYPE_YELLOW) {
-            intro_boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                               (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                               (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
-                               (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                               (g->boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(magician_intro_special_anim_active(g)) : 0xFF00FF00;
+            intro_boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                               (g->boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                               (g->boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                               (g->boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                               (g->boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(magician_intro_special_anim_active(g)) : GREEN;
             if (g->boss_type == BOSS_TYPE_CLASSIC) {
                 intro_boss_color = type_color;
             }
@@ -5376,15 +5378,15 @@ void game_render(game_t *g, lfb_t *lfb) {
                 draw_sprite1r(lfb, BS, boss_x, boss_y, intro_boss_color);
             }
         } else {
-            intro_boss_color = 0xFFFFFF00;
+            intro_boss_color = YELLOW;
         }
         render_intro_boss_attack_preview(g, lfb, boss_x, boss_y, BS, 1);
 
         uint32_t desc_color = intro_boss_color;
         if (g->boss_type == BOSS_TYPE_CLASSIC) {
-            desc_color = 0xFF00FF00;
+            desc_color = GREEN;
         } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
-            desc_color = 0xFF00E5FF;
+            desc_color = CYAN;
         }
         int desc1_w = text_width_5x5(desc_line1, 1);
         int desc2_w = text_width_5x5(desc_line2, 1);
@@ -5399,12 +5401,12 @@ void game_render(game_t *g, lfb_t *lfb) {
             const char *paused_text = "PAUSED";
             int paused_w = text_width_5x5(paused_text, 1);
             int paused_x = LW - paused_w - 5;
-            l_draw_text(lfb, paused_x, 5, paused_text, 1, 0xFFFFFFFF);
+            l_draw_text(lfb, paused_x, 5, paused_text, 1, WHITE);
         }
         return;
     }
 
-    l_clear(lfb, 0xFF000000);
+    l_clear(lfb, BLACK);
 
     // Starfield background (static tiling pattern)
     {
@@ -5414,7 +5416,7 @@ void game_render(game_t *g, lfb_t *lfb) {
                 // Pseudo-random star pattern based on position
                 int seed = (x ^ y) * 73856093 + (g->powerup_spawn_timer / 10);
                 if ((seed % 7) == 0) {  // ~14% of positions have stars
-                    uint32_t star_color = 0xFF333333;  // Dark gray
+                    uint32_t star_color = DARK_GRAY;  // Dark gray
                     l_putpix(lfb, x, y, star_color);
                     if ((seed % 13) == 0 && x + 1 < LW) {  // Some stars are 2x2
                         l_putpix(lfb, x + 1, y, star_color);
@@ -5430,34 +5432,29 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // Boss health bar on the left side of screen
     if (g->boss_alive) {
-        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                              (g->boss_type == BOSS_TYPE_YELLOW) ? 0xFFFFFF00 :
-                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
-                              (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                              (g->boss_type == BOSS_TYPE_MAGICIAN) ? 0xFF00E5FF : 0xFF00FF00;
+        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                              (g->boss_type == BOSS_TYPE_YELLOW) ? YELLOW :
+                              (g->boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                              (g->boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                              (g->boss_type == BOSS_TYPE_MAGICIAN) ? CYAN : GREEN;
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
         if (g->boss_type == BOSS_TYPE_BLUE) {
-            if (health_pct <= 33) boss_color = 0xFF114488;
-            else if (health_pct <= 67) boss_color = 0xFF1E6AD6;
+            boss_color = BLUE;
         } else if (g->boss_type == BOSS_TYPE_YELLOW) {
-            if (health_pct <= 33) boss_color = 0xFFFFC000;
-            else if (health_pct <= 67) boss_color = 0xFFFFD84D;
+            boss_color = YELLOW;
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
-            if (health_pct <= 33) boss_color = 0xFF4A2E12;
-            else if (health_pct <= 67) boss_color = 0xFF6A4421;
+            boss_color = BROWN;
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
-            if (health_pct <= 33) boss_color = 0xFF6A2AA9;
-            else if (health_pct <= 67) boss_color = 0xFF9A4DDA;
+            boss_color = PURPLE;
         } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
-            if (health_pct <= 33) boss_color = 0xFFCC5C00;
-            else if (health_pct <= 67) boss_color = 0xFFE67700;
+            boss_color = ORANGE;
         } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
-            if (health_pct <= 33) boss_color = 0xFF0090AA;
-            else if (health_pct <= 67) boss_color = 0xFF00B8D1;
+            boss_color = GRAY;
         } else {
-            if (health_pct <= 33) boss_color = 0xFFFF0000;
-            else if (health_pct <= 67) boss_color = 0xFFFFFF00;
+            if (health_pct > 66) boss_color = GREEN;
+            else if (health_pct > 33) boss_color = YELLOW;
+            else boss_color = RED;
         }
 
         if (g->boss_type == BOSS_TYPE_MAGICIAN) {
@@ -5469,7 +5466,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int bx = 5;
         int by = 5;
 
-        l_draw_text(lfb, bx, by, boss_label, 1, 0xFFFFFFFF);
+        l_draw_text(lfb, bx, by, boss_label, 1, WHITE);
 
         int bar_x = bx + boss_label_w + 6;
         int bar_y = by - 1;
@@ -5484,7 +5481,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int power_label_w = text_width_5x5(power_label, 1);
         int power_bar_y = by;
         int power_bar_x_start = bar_x + bar_w + 15;  // 15 pixels to the right of health bar
-        l_draw_text(lfb, power_bar_x_start, power_bar_y, power_label, 1, 0xFFFFFFFF);
+        l_draw_text(lfb, power_bar_x_start, power_bar_y, power_label, 1, WHITE);
 
         int power_bar_x = power_bar_x_start + power_label_w + 6;
         int power_bar_h = 6;
@@ -5492,15 +5489,15 @@ void game_render(game_t *g, lfb_t *lfb) {
         
         // Determine power color based on what attack will be used (shows next attack)
         uint32_t power_color;  // Purple (default for purple laser)
-        if (g->next_boss_attack_type == 0) power_color = 0xFF8000FF;  // Purple
-        else if (g->next_boss_attack_type == 1) power_color = 0xFF00FF00;  // Green (for green laser heal)
-        else if (g->next_boss_attack_type == 2) power_color = 0xFF3399FF;  // Blue bomb
-        else if (g->next_boss_attack_type == YELLOW_BOSS_ATTACK_SHUFFLE) power_color = 0xFFFFFF00;  // Yellow shuffle
-        else if (g->next_boss_attack_type == TOWER_WALL_ATTACK) power_color = 0xFF8B5A2B;  // Tower walls
-        else if (g->next_boss_attack_type == HERMIT_DODGE_ATTACK) power_color = 0xFFB266FF;  // Hermit dodge
-        else if (g->next_boss_attack_type == CHARIOT_CHARGE_ATTACK) power_color = 0xFFFF8C00;  // Chariot charge
-        else if (g->next_boss_attack_type == MAGICIAN_MIRROR_ATTACK) power_color = 0xFF00E5FF;  // Magician mirrors
-        else power_color = 0xFF808080;  // Gray (unknown)
+        if (g->next_boss_attack_type == 0) power_color = PURPLE;  // Purple
+        else if (g->next_boss_attack_type == 1) power_color = GREEN;  // Green (for green laser heal)
+        else if (g->next_boss_attack_type == 2) power_color = BLUE;  // Blue bomb
+        else if (g->next_boss_attack_type == YELLOW_BOSS_ATTACK_SHUFFLE) power_color = YELLOW;  // Yellow shuffle
+        else if (g->next_boss_attack_type == TOWER_WALL_ATTACK) power_color = BROWN;  // Tower walls
+        else if (g->next_boss_attack_type == HERMIT_DODGE_ATTACK) power_color = PURPLE;  // Hermit dodge
+        else if (g->next_boss_attack_type == CHARIOT_CHARGE_ATTACK) power_color = ORANGE;  // Chariot charge
+        else if (g->next_boss_attack_type == MAGICIAN_MIRROR_ATTACK) power_color = CYAN;  // Magician mirrors
+        else power_color = GRAY;  // Gray (unknown)
 
         int power_fill_w = (g->boss_power_max > 0) ? (g->boss_power_timer * power_bar_w) / g->boss_power_max : 0;
         draw_bar(lfb, power_bar_x, power_bar_y, power_bar_w, power_bar_h, power_fill_w, power_color);
@@ -5509,7 +5506,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     // Draw a separator line below the top HUD (boss/level info) to frame gameplay area.
     {
         for (int x = 0; x < LW; x++) {
-            l_putpix(lfb, x, TOP_HUD_SEPARATOR_Y, 0xFFFFFFFF);
+            l_putpix(lfb, x, TOP_HUD_SEPARATOR_Y, WHITE);
         }
     }
 
@@ -5543,16 +5540,16 @@ void game_render(game_t *g, lfb_t *lfb) {
         snprintf(fps_text, sizeof(fps_text), "FPS:%d", fps_value);
         int fps_w = text_width_5x5(fps_text, 1);
         int fps_x = x - fps_w - 8;
-        l_draw_text(lfb, fps_x, 5, fps_text, 1, 0xFFFFFFFF);
+        l_draw_text(lfb, fps_x, 5, fps_text, 1, WHITE);
 
-        l_draw_text(lfb, x, 5, label, label_scale, 0xFFFFFFFF);
-        l_draw_score(lfb, x + label_w + 6, 5, g->level, 0xFFFFFFFF);
+        l_draw_text(lfb, x, 5, label, label_scale, WHITE);
+        l_draw_score(lfb, x + label_w + 6, 5, g->level, WHITE);
     }
 
     // Draw a separator line above the bottom HUD (player/powerup info) with a small gap.
     {
         for (int x = 0; x < LW; x++) {
-            l_putpix(lfb, x, BOTTOM_HUD_SEPARATOR_Y, 0xFFFFFFFF);
+            l_putpix(lfb, x, BOTTOM_HUD_SEPARATOR_Y, WHITE);
         }
     }
 
@@ -5564,36 +5561,31 @@ void game_render(game_t *g, lfb_t *lfb) {
             // blit sprite bits onto lfb
             sprite1r_t *b = g->bunkers[i];
             int x0 = g->bunker_x[i], y0 = g->bunker_y;
-            draw_sprite1r(lfb, b, x0, y0, 0xFF00FF00);
+            draw_sprite1r(lfb, b, x0, y0, GREEN);
         }
     }
 
     // boss (drawn behind regular aliens)
     if (g->boss_alive && !g->boss_dying && g->boss_type != BOSS_TYPE_YELLOW) {
         int health_pct = (g->boss_max_health > 0) ? (g->boss_health * 100) / g->boss_max_health : 0;
-        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? 0xFF3399FF :
-                              (g->boss_type == BOSS_TYPE_TOWER) ? 0xFF8B5A2B :
-                              (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFFB266FF :
-                                  (g->boss_type == BOSS_TYPE_CHARIOT) ? 0xFFFF8C00 :
-                                  (g->boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(0) : 0xFF00FF00;
+        uint32_t boss_color = (g->boss_type == BOSS_TYPE_BLUE) ? BLUE :
+                              (g->boss_type == BOSS_TYPE_TOWER) ? BROWN :
+                              (g->boss_type == BOSS_TYPE_HERMIT) ? PURPLE :
+                                  (g->boss_type == BOSS_TYPE_CHARIOT) ? ORANGE :
+                                  (g->boss_type == BOSS_TYPE_MAGICIAN) ? magician_color_for_special_state(0) : GREEN;
         if (g->boss_type == BOSS_TYPE_BLUE) {
-            if (health_pct <= 33) boss_color = 0xFF114488;
-            else if (health_pct <= 67) boss_color = 0xFF1E6AD6;
+            boss_color = BLUE;
         } else if (g->boss_type == BOSS_TYPE_TOWER) {
-            if (health_pct <= 33) boss_color = 0xFF4A2E12;
-            else if (health_pct <= 67) boss_color = 0xFF6A4421;
+            boss_color = BROWN;
         } else if (g->boss_type == BOSS_TYPE_HERMIT) {
-            if (health_pct <= 33) boss_color = 0xFF6A2AA9;
-            else if (health_pct <= 67) boss_color = 0xFF9A4DDA;
+            boss_color = PURPLE;
         } else if (g->boss_type == BOSS_TYPE_CHARIOT) {
-            if (health_pct <= 33) boss_color = 0xFFCC5C00;
-            else if (health_pct <= 67) boss_color = 0xFFE67700;
+            boss_color = ORANGE;
         } else if (g->boss_type == BOSS_TYPE_MAGICIAN) {
-            if (health_pct <= 33) boss_color = 0xFF0090AA;
-            else if (health_pct <= 67) boss_color = 0xFF00B8D1;
+            boss_color = GRAY;
         } else {
-            if (health_pct <= 33) boss_color = 0xFFFF0000;
-            else if (health_pct <= 67) boss_color = 0xFFFFFF00;
+            if (health_pct <= 33) boss_color = RED;
+            else if (health_pct <= 67) boss_color = YELLOW;
         }
 
         if (g->boss_type == BOSS_TYPE_MAGICIAN) {
@@ -5601,11 +5593,11 @@ void game_render(game_t *g, lfb_t *lfb) {
         }
 
         // Turn purple when stunned/using purple laser attack
-        if (g->boss_power_cooldown > 0) {
+        if (g->boss_power_cooldown > 0 && g-> boss_type == BOSS_TYPE_CLASSIC) {
             if (g->boss_attack_type == 0) {
-                boss_color = 0xFF8000FF;  // Purple for purple laser
+                boss_color = PURPLE;  // Purple for purple laser
             } else if (g->boss_attack_type == 2) {
-                boss_color = 0xFF66B2FF;
+                boss_color = GREEN;
             }
         }
 
@@ -5623,13 +5615,13 @@ void game_render(game_t *g, lfb_t *lfb) {
                 int age = CHARIOT_CHARGE_EXPLOSION_FRAMES - g->boss_special_timer;
                 int r = 8 + age / 2;
                 if (r > CHARIOT_CHARGE_EXPLOSION_RADIUS) r = CHARIOT_CHARGE_EXPLOSION_RADIUS;
-                draw_filled_circle_clipped_y(lfb, cx, cy, r, 0xFFFF4500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-                draw_filled_circle_clipped_y(lfb, cx, cy, r - 3, 0xFFFFA500, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+                draw_filled_circle_clipped_y(lfb, cx, cy, r, ORANGE, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+                draw_filled_circle_clipped_y(lfb, cx, cy, r - 3, YELLOW, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             }
         }
 
         if (g->boss_shield_active) {
-            uint32_t shield_color = (g->boss_type == BOSS_TYPE_HERMIT) ? 0xFF8000FF : 0xFF00FF00;
+            uint32_t shield_color = (g->boss_type == BOSS_TYPE_HERMIT) ? PURPLE : GREEN;
             draw_sprite1r(lfb, &g->BOSS_SHIELD, boss_shield_x(g), boss_shield_y(g), shield_color);
         }
     } else if (g->boss_dying) {
@@ -5648,13 +5640,13 @@ void game_render(game_t *g, lfb_t *lfb) {
             // Red if 3+, Green if 2, white if 1
             uint32_t alien_color;
             if (g->level == 0 && tutorial_is_leave_alien(r, c)) {
-                alien_color = 0xFFB266FF;
+                alien_color = PURPLE;
             } else if (g->yellow_boss_marked[r][c]) {
-                alien_color = 0xFFFFFF00;
+                alien_color = YELLOW;
             } else if (g->alien_hermit_regen[r][c]) {
-                alien_color = 0xFFB266FF;
+                alien_color = PURPLE;
             } else {
-                alien_color = (g->alien_health[r][c] >= 3) ? 0xFFFF0000 : (g->alien_health[r][c] == 2) ? 0xFF00FF00 : 0xFFFFFFFF;
+                alien_color = (g->alien_health[r][c] >= 3) ? RED : (g->alien_health[r][c] == 2) ? GREEN : WHITE;
             }
             draw_sprite1r(lfb, AS, ax, ay, alien_color);
         }
@@ -5668,7 +5660,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int label_w = text_width_5x5("LEAVE", 1);
         int label_x = leave_x + (TS->w / 2) - (label_w / 2);
         int label_y = leave_y - 9;
-        l_draw_text(lfb, label_x, label_y, "LEAVE", 1, 0xFFB266FF);
+        l_draw_text(lfb, label_x, label_y, "LEAVE", 1, PURPLE);
     }
 
     for (int r = 0; r < AROWS; r++) {
@@ -5709,9 +5701,9 @@ void game_render(game_t *g, lfb_t *lfb) {
 
     // bullets
     render_player_shots(g, lfb);
-    if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
+    if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, RED);
     if (g->boss_shot.alive) {
-        for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
+        for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, RED);
     }
     for (int s = 0; s < 3; s++) {
         if (!g->boss_triple_shot[s].alive) continue;
@@ -5719,7 +5711,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         for (int i = 0; i < 5; i++) {
             int x = g->boss_triple_shot[s].x + ((x_dir * i) / 2);
             int y = g->boss_triple_shot[s].y + i;
-            l_putpix(lfb, x, y, 0xFF3399FF);
+            l_putpix(lfb, x, y, BLUE);
         }
     }
     for (int s = 0; s < CHARIOT_ARC_SHOT_COUNT; s++) {
@@ -5728,14 +5720,14 @@ void game_render(game_t *g, lfb_t *lfb) {
         for (int i = 0; i < 5; i++) {
             int x = g->boss_arc_shot[s].x + ((x_dir * i) / 2);
             int y = g->boss_arc_shot[s].y + i;
-            l_putpix(lfb, x, y, 0xFFFF8C00);
+            l_putpix(lfb, x, y, ORANGE);
         }
     }
     render_magician_wave(g, lfb);
     for (int s = 0; s < YELLOW_BOSS_ALIENS; s++) {
         if (!g->yellow_beam_shot[s].alive) continue;
         for (int i = 0; i < 5; i++) {
-            l_putpix(lfb, g->yellow_beam_shot[s].x, g->yellow_beam_shot[s].y + i, 0xFFFFFF00);
+            l_putpix(lfb, g->yellow_beam_shot[s].x, g->yellow_beam_shot[s].y + i, YELLOW);
         }
     }
     for (int ai = 0; ai < MAX_TOWER_ASTEROIDS; ai++) {
@@ -5743,14 +5735,14 @@ void game_render(game_t *g, lfb_t *lfb) {
             render_tower_asteroid(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, g->tower_asteroid_spin[ai]);
         } else if (g->tower_asteroid_exploding[ai]) {
             int r = tower_asteroid_explosion_radius(g, ai);
-            draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r, 0xFFFF4500,
+            draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r, ORANGE,
                                          GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-            draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r - 2, 0xFFFF8C00,
+            draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, r - 2, YELLOW,
                                          GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             if ((g->tower_asteroid_explode_timer[ai] & 1) == 0) {
                 int core_r = r - 4;
                 if (core_r < 1) core_r = 1;
-                draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, core_r, 0xFFFFFF00,
+                draw_filled_circle_clipped_y(lfb, g->tower_asteroid[ai].x, g->tower_asteroid[ai].y, core_r, YELLOW,
                                              GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             }
         }
@@ -5762,7 +5754,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         const sprite1r_t *BS = active_boss_sprite(g);
         int laser_w = BS->w;
         int laser_center_x = g->boss_laser.x;
-        uint32_t laser_color = (g->boss_attack_type == 1) ? 0xFF00FF00 : 0xFF8000FF;
+        uint32_t laser_color = (g->boss_attack_type == 1) ? GREEN : PURPLE;
 
         const int seg_count = 5;
         const int seg_offset_y[5] = {0, 3, 7, 12, 18};
@@ -5810,21 +5802,21 @@ void game_render(game_t *g, lfb_t *lfb) {
     // Blue boss charged bomb and explosion visual.
     if (g->boss_bomb.alive) {
         if (!g->boss_bomb.exploding) {
-            draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, 4, 0xFF66CCFF);
-            draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, 2, 0xFFB8ECFF);
+            draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, 4, BLUE);
+            draw_filled_circle(lfb, g->boss_bomb.x, g->boss_bomb.y, 2, CYAN);
         } else {
             int r = boss_bomb_explosion_radius(g);
             if (blue_black_hole_enabled(g)) {
                 render_black_hole_explosion_clipped(lfb, g->boss_bomb.x, g->boss_bomb.y, r);
             } else {
-                draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, r, 0xFF0B3A8F,
+                draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, r, BLUE,
                                              GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
-                draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, r - 3, 0xFF1E6AD6,
+                draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, r - 3, CYAN,
                                              GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
                 if ((g->boss_bomb.explode_timer & 1) == 0) {
                     int core_r = r - 7;
                     if (core_r < 1) core_r = 1;
-                    draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, core_r, 0xFF66CCFF,
+                    draw_filled_circle_clipped_y(lfb, g->boss_bomb.x, g->boss_bomb.y, core_r, BLUE,
                                                  GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
                 }
             }
@@ -5834,7 +5826,7 @@ void game_render(game_t *g, lfb_t *lfb) {
     for (int i = 0; i < HERMIT_MAX_LIGHTNINGS; i++) {
         const hermit_lightning_t *l = &g->hermit_lightning[i];
         if (!l->active) continue;
-        uint32_t bolt_color = (l->flash_timer > 0) ? 0xFFFFFF00 : 0xFF8000FF;
+        uint32_t bolt_color = (l->flash_timer > 0) ? YELLOW : PURPLE;
         draw_zigzag_segment(lfb, (int)l->start_x, (int)l->start_y, (int)l->tip_x, (int)l->tip_y, 3, 7, bolt_color);
     }
 
@@ -5842,9 +5834,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         int half_w = g->magician_mirror.width / 2;
         for (int x = g->magician_mirror.x - half_w; x <= g->magician_mirror.x + half_w; x++) {
             if (!magician_mirror_has_segment_at_x(&g->magician_mirror, x)) continue;
-            putpix_clipped_y(lfb, x, g->magician_mirror.y, 0xFFB0B0B0, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+            putpix_clipped_y(lfb, x, g->magician_mirror.y, GRAY, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             if ((x & 3) == 0) {
-                putpix_clipped_y(lfb, x, g->magician_mirror.y + 1, 0xFFE0E0E0, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+                putpix_clipped_y(lfb, x, g->magician_mirror.y + 1, GRAY, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             }
         }
     }
@@ -5853,9 +5845,9 @@ void game_render(game_t *g, lfb_t *lfb) {
         int half_w = g->magician_mirror_alt.width / 2;
         for (int x = g->magician_mirror_alt.x - half_w; x <= g->magician_mirror_alt.x + half_w; x++) {
             if (!magician_mirror_has_segment_at_x(&g->magician_mirror_alt, x)) continue;
-            putpix_clipped_y(lfb, x, g->magician_mirror_alt.y, 0xFFB0B0B0, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+            putpix_clipped_y(lfb, x, g->magician_mirror_alt.y, GRAY, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             if ((x & 3) == 0) {
-                putpix_clipped_y(lfb, x, g->magician_mirror_alt.y + 1, 0xFFE0E0E0, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
+                putpix_clipped_y(lfb, x, g->magician_mirror_alt.y + 1, GRAY, GAMEPLAY_CLIP_Y_MIN, GAMEPLAY_CLIP_Y_MAX);
             }
         }
     }
@@ -5872,7 +5864,7 @@ void game_render(game_t *g, lfb_t *lfb) {
         int perfect_w = text_width_5x5(perfect_text, perfect_scale);
         int perfect_x = (LW - perfect_w) / 2;
         int perfect_y = (LH - (perfect_scale * 5)) / 2;
-        l_draw_text(lfb, perfect_x, perfect_y, perfect_text, perfect_scale, 0xFF00FF00);
+        l_draw_text(lfb, perfect_x, perfect_y, perfect_text, perfect_scale, GREEN);
     }
 
     if (g->paused) {
@@ -5884,23 +5876,23 @@ void game_render(game_t *g, lfb_t *lfb) {
 
         for (int y = panel_y; y < panel_y + panel_h; y++) {
             for (int x = panel_x; x < panel_x + panel_w; x++) {
-                l_putpix(lfb, x, y, 0xFF000000);
+                l_putpix(lfb, x, y, BLACK);
             }
         }
 
         for (int x = panel_x; x < panel_x + panel_w; x++) {
-            l_putpix(lfb, x, panel_y, 0xFFFFFFFF);
-            l_putpix(lfb, x, panel_y + panel_h - 1, 0xFFFFFFFF);
+            l_putpix(lfb, x, panel_y, WHITE);
+            l_putpix(lfb, x, panel_y + panel_h - 1, WHITE);
         }
         for (int y = panel_y; y < panel_y + panel_h; y++) {
-            l_putpix(lfb, panel_x, y, 0xFFFFFFFF);
-            l_putpix(lfb, panel_x + panel_w - 1, y, 0xFFFFFFFF);
+            l_putpix(lfb, panel_x, y, WHITE);
+            l_putpix(lfb, panel_x + panel_w - 1, y, WHITE);
         }
 
         int scale = 3;
         int text_w = text_width_5x5(paused_text, scale);
         int text_x = panel_x + (panel_w - text_w) / 2;
         int text_y = panel_y + (panel_h - (scale * 5)) / 2;
-        l_draw_text(lfb, text_x, text_y, paused_text, scale, 0xFFFFFFFF);
+        l_draw_text(lfb, text_x, text_y, paused_text, scale, WHITE);
     }
 }
