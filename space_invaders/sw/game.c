@@ -2098,8 +2098,8 @@ static int player_shield_radius(const game_t *g) {
 	}
 
 	int pulse = (active_timer / 5) & 3;
-	int extra = (pulse == 1 || pulse == 2) ? 1 : 0;
-	return PLAYER_SHIELD_RADIUS + extra;
+	// int extra = (pulse == 1 || pulse == 2) ? 1 : 0;
+	return PLAYER_SHIELD_RADIUS ;//+ extra;
 }
 
 static int projectile_hits_player_shield(const game_t *g, int px, int py) {
@@ -2117,9 +2117,25 @@ static void render_player_shield_ring(const game_t *g, lfb_t *lfb) {
 	if (!shield_power_active(g) || g->player_dying) return;
 
 	int cx = g->player_x + g->PLAYER.w / 2;
+	int cxx = g->player_prev_x + g->PLAYER.w / 2;
 	int cy = g->player_y + g->PLAYER.h / 2;
+	int cyy = g->player_prev_y + g->PLAYER.h / 2;
+
 	int r = player_shield_radius(g);
 	uint32_t ring_color = ((g->powerup_spawn_timer / 4) & 1) ? 0xFF66CCFF : 0xFF3399FF;
+
+	// int k = (r == PLAYER_SHIELD_RADIUS) ? PLAYER_SHIELD_RADIUS + 1 : PLAYER_SHIELD_RADIUS;
+	int k = r;
+
+	for (int y = -k; y <= k; y++) {
+		for (int x = -k; x <= k; x++) {
+			int d = x * x + y * y;
+			if (d <= (k * k) && d >= ((k - 1) * (k - 1))) {
+				l_putpix(lfb, cxx + x, cyy + y, 0xFF000000);
+			}
+		}
+	}
+
 
 	for (int y = -r; y <= r; y++) {
 		for (int x = -r; x <= r; x++) {
@@ -5798,10 +5814,23 @@ void game_render(game_t *g, lfb_t *lfb) {
 
 	// bullets
 	render_player_shots(g, lfb);
+
+	if (g->ashot.prev_x != g->ashot.x || g->ashot.prev_y != g->ashot.y) {
+		if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.prev_x, g->ashot.prev_y + i, 0xFF000000);
+		g->ashot.prev_x = g->ashot.x; g->ashot.prev_y = g->ashot.y;
+	}
+
 	if (g->ashot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->ashot.x, g->ashot.y + i, 0xFFFF0000);
+
+	if (g->boss_shot.prev_x != g->boss_shot.x || g->boss_shot.prev_y != g->boss_shot.y) {
+		if (g->boss_shot.alive) for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.prev_x, g->boss_shot.prev_y + i, 0xFF000000);
+		g->boss_shot.prev_x = g->boss_shot.x; g->boss_shot.prev_y = g->boss_shot.y;
+	}
+
 	if (g->boss_shot.alive) {
 		for (int i = 0; i < 5; i++) l_putpix(lfb, g->boss_shot.x, g->boss_shot.y + i, 0xFFFF0000);
 	}
+
 	for (int s = 0; s < 3; s++) {
 		if (!g->boss_triple_shot[s].alive) continue;
 		int x_dir = g->boss_triple_shot_dx[s];
