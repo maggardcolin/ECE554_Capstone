@@ -74,13 +74,13 @@ int sw_sim_main(void) {
         while (shm.regs->swap_ack == last_ack) { /* spin */ }
         last_ack = shm.regs->swap_ack;
 
-        toggle_music(0x000000);
+        clear_music();
     }
 
     // if (music_ok) {
     //     music_shutdown();
     // }
-    toggle_music(0x000000);
+    clear_music();
     lfb_free(&lfb);
     shm_close_unmap(&shm);
     return 0;

@@ -3458,7 +3458,7 @@ void game_reset(game_t *g) {
 	g->overworld_current_node = -1;
 
 	setup_level(g, g->tutorial_mode ? 0 : START_LEVEL, 1);
-    toggle_music(0x000000);
+    clear_music();
 }
 
 void game_update(game_t *g, uint32_t buttons, uint32_t vsync_counter) {

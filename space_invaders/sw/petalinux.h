@@ -1,4 +1,4 @@
-
+void clear_music_gpio(void *mmio);
 
 void set_music_gpio(void *mmio, uint32_t music_mask);
 

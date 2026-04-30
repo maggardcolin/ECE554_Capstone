@@ -258,4 +258,10 @@ void toggle_music(uint32_t music_mask) {
 	set_music_gpio(MMIO_MAP, music_mask);
 }
 
+void clear_music() {
+	if (!initialized) init();
+
+	clear_music_gpio(MMIO_MAP);
+}
+
 #endif
