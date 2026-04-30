@@ -28,10 +28,10 @@ int sw_sim_main(void) {
     game_t game;
     game_init(&game);
 
-    int music_ok = (music_init() == 0);
-    if (!music_ok) {
-        fprintf(stderr, "music: disabled (ALSA init failed)\n");
-    }
+    // int music_ok = (music_init() == 0);
+    // if (!music_ok) {
+    //     fprintf(stderr, "music: disabled (ALSA init failed)\n");
+    // }
 
     uint32_t last_ack = shm.regs->swap_ack;
 
@@ -41,7 +41,7 @@ int sw_sim_main(void) {
 
         game_update(&game, buttons, shm.regs->vsync_counter);
 
-        if (music_ok) {
+        // if (music_ok) {
             music_mode_t mode = MUSIC_MODE_GAMEPLAY;
             if (game.start_screen) mode = MUSIC_MODE_MENU;
             else if (game.game_over) mode = MUSIC_MODE_GAME_OVER;
@@ -63,7 +63,7 @@ int sw_sim_main(void) {
             }
             // music_set_mode(mode);
             toggle_music(1 << mode);
-        }
+        // }
 
         game_render(&game, &lfb);
 
@@ -77,10 +77,10 @@ int sw_sim_main(void) {
         toggle_music(0x000000);
     }
 
-    if (music_ok) {
-        toggle_music(0x000000);
-        music_shutdown();
-    }
+    // if (music_ok) {
+    //     music_shutdown();
+    // }
+    toggle_music(0x000000);
     lfb_free(&lfb);
     shm_close_unmap(&shm);
     return 0;
