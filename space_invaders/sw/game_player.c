@@ -3,6 +3,7 @@
 #include "../hw_contract.h"
 #include "font.h"
 #include "game_helpers.h"
+#include "color.h"
 
 #define MAGICIAN_SIDE_WALL_THICKNESS 4
 #define MAGICIAN_SIDE_DEFLECT_DY -2
@@ -194,7 +195,7 @@ void render_player(game_t *g, lfb_t *lfb) {
 	uint32_t player_color = get_player_color(g);
 
 	if (g->player_prev_x != g->player_x || g->player_prev_y != g->player_y) {
-		draw_sprite1r(lfb, &g->PLAYER, g->player_prev_x, g->player_prev_y, 0);
+		draw_sprite1r(lfb, &g->PLAYER, g->player_prev_x, g->player_prev_y, BLACK);
 		g->player_prev_x = g->player_x; g->player_prev_y = g->player_y;
 	}
 
