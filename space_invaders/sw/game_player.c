@@ -176,19 +176,19 @@ void update_player_firing(game_t *g, uint32_t buttons) {
 }
 
 static uint32_t get_player_color(game_t *g) {
-	if (explosive_shot_active(g)) return 0xFFFF0000;
-	if (rapid_fire_active(g)) return 0xFFFFA500;
-	if (triple_shot_active(g)) return 0xFF0000FF;
-	return 0xFF00FF00;
+	if (explosive_shot_active(g)) return RED;
+	if (rapid_fire_active(g)) return ORANGE;
+	if (triple_shot_active(g)) return BLUE;
+	return GREEN;
 }
 
 static uint32_t powerup_type_color(powerup_type_t type) {
-	if (type == POWERUP_DOUBLE_SHOT) return 0xFFFFFF00;
-	if (type == POWERUP_TRIPLE_SHOT) return 0xFF0000FF;
-	if (type == POWERUP_RAPID_FIRE) return 0xFFFFA500;
-	if (type == POWERUP_EXPLOSIVE) return 0xFFFF0000;
-	if (type == POWERUP_SHIELD) return 0xFF66CCFF;
-	return 0xFFFFFFFF;
+	if (type == POWERUP_DOUBLE_SHOT) return YELLOW;
+	if (type == POWERUP_TRIPLE_SHOT) return BLUE;
+	if (type == POWERUP_RAPID_FIRE) return ORANGE;
+	if (type == POWERUP_EXPLOSIVE) return RED;
+	if (type == POWERUP_SHIELD) return CYAN;
+	return WHITE;
 }
 
 void render_player(game_t *g, lfb_t *lfb) {
@@ -216,7 +216,7 @@ void render_score_display(game_t *g, lfb_t *lfb) {
 	int score_x = right_edge - score_w;
 	int score_label_x = right_edge - score_label_w - 30;
 
-	uint32_t score_color = double_shot_active(g) ? 0xFFFFFF00 : 0xFFFFFFFF;
+	uint32_t score_color = double_shot_active(g) ? YELLOW : WHITE;
 	l_draw_text(lfb, score_label_x, y, score_label, label_scale, score_color);
 	l_draw_score(lfb, score_x, y, g->score, score_color);
 
@@ -228,7 +228,7 @@ void render_score_display(game_t *g, lfb_t *lfb) {
 			best_type = (powerup_type_t)g->powerup_type_slot[i];
 		}
 	}
-	uint32_t power_countdown_color = (best_timer > 0) ? powerup_type_color(best_type) : 0xFFFFFFFF;
+	uint32_t power_countdown_color = (best_timer > 0) ? powerup_type_color(best_type) : WHITE;
 	int power_gap = 4;
 
 	int power_label_w = text_width_5x5(power_label, label_scale);
@@ -237,11 +237,11 @@ void render_score_display(game_t *g, lfb_t *lfb) {
 	int power_total_w = power_label_w + power_gap + power_value_w;
 	int power_x = score_label_x - 6 - power_total_w;
 
-	l_draw_text(lfb, power_x, y, power_label, label_scale, 0xFFFFFFFF);
+	l_draw_text(lfb, power_x, y, power_label, label_scale, WHITE);
 	int value_x = power_x + power_label_w + power_gap;
 
 	if (best_timer <= 0) {
-		l_draw_text(lfb, value_x, y, "NONE", label_scale, 0xFFFFFFFF);
+		l_draw_text(lfb, value_x, y, "NONE", label_scale, WHITE);
 		return;
 	}
 
@@ -256,7 +256,7 @@ void render_score_display(game_t *g, lfb_t *lfb) {
 	int ones = seconds % 10;
 
 	if (tens > 0) {
-		l_draw_digit(lfb, value_x, y, tens, 0xFFFFFFFF);
+		l_draw_digit(lfb, value_x, y, tens, WHITE);
 	}
 	int ones_x = value_x + digit_w;
 	int dot_x = ones_x + digit_w - 1;
@@ -274,12 +274,12 @@ void render_player_health_bar(game_t *g, lfb_t *lfb) {
 
 	int x_text_x = icon_x + g->PLAYER.w + 4;
 	int text_y = LH - 12;
-	l_draw_text(lfb, x_text_x, text_y, "x", 1, 0xFFFFFFFF);
+	l_draw_text(lfb, x_text_x, text_y, "x", 1, WHITE);
 
 	int lives_x = x_text_x + text_width_5x5("x", 1) + 4;
 	int lives = g->lives;
 	if (lives < 0) lives = 0;
-	uint32_t lives_color = g->hard_mode ? 0xFFFF0000 : 0xFFFFFFFF;
+	uint32_t lives_color = g->hard_mode ? RED : WHITE;
 	l_draw_score(lfb, lives_x, text_y, lives, lives_color);
 
 	int status_x = lives_x + digit_count(lives) * 4 + 8;
@@ -297,7 +297,7 @@ void render_player_health_bar(game_t *g, lfb_t *lfb) {
 
 	for (int i = 0; i < 3; i++) {
 		int x0 = box_x + i * (box_w + box_gap);
-		uint32_t border = 0xFFFFFFFF;
+		uint32_t border = WHITE;
 
 		for (int x = 0; x < box_w; x++) {
 			l_putpix(lfb, x0 + x, box_y, border);
@@ -312,7 +312,7 @@ void render_player_health_bar(game_t *g, lfb_t *lfb) {
 			if (unlocked_icon_type[i] == SHOP_ITEM_PIERCE) {
 				int px = x0 + (box_w - g->SHOP_PIERCE.w) / 2;
 				int py = box_y + (box_h - g->SHOP_PIERCE.h) / 2;
-				draw_sprite1r(lfb, &g->SHOP_PIERCE, px, py, 0xFF66CCFF);
+				draw_sprite1r(lfb, &g->SHOP_PIERCE, px, py, CYAN);
 			} else if (unlocked_icon_type[i] == SHOP_ITEM_POINTS) {
 				int cx = x0 + box_w / 2;
 				int cy = box_y + box_h / 2;
@@ -328,29 +328,29 @@ void render_player_health_bar(game_t *g, lfb_t *lfb) {
 }
 
 void render_player_shots(game_t *g, lfb_t *lfb) {
-	uint32_t side_bullet_color = 0xFFFFFFFF;
+	uint32_t side_bullet_color = WHITE;
 	if (rapid_fire_active(g)) {
-		side_bullet_color = 0xFFFFA500;
+		side_bullet_color = ORANGE;
 	} else if (triple_shot_active(g)) {
-		side_bullet_color = 0xFF0000FF;
+		side_bullet_color = BLUE;
 	}
 
 	for (int s = 0; s < MAX_PSHOTS; s++) {
 		if (g->pshot[s].alive) {
 			if (g->pshot[s].reflected == 1) {
-				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y + i, 0xFF00E5FF);
+				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot[s].x, g->pshot[s].y + i, CYAN);
 				continue;
 			}
-			uint32_t bullet_color = g->pshot[s].critical ? 0xFF00FF00 : (rapid_fire_active(g) ? 0xFFFFA500 : 0xFFFFFFFF);
+			uint32_t bullet_color = g->pshot[s].critical ? GREEN : (rapid_fire_active(g) ? ORANGE : WHITE);
 			if (g->pshot[s].pierce_active) {
 				for (int i = 0; i < 5; i++) {
 					int py = g->pshot[s].y - i;
 					int pyy = g->pshot[s].prev_y - i;
 
 					if (g->pshot[s].prev_x != g->pshot[s].x || g->pshot[s].prev_y != g->pshot[s].y) {
-						l_putpix(lfb, g->pshot[s].prev_x, pyy, 0xFF000000);
-						l_putpix(lfb, g->pshot[s].prev_x - 1, pyy, 0xFF000000);
-						l_putpix(lfb, g->pshot[s].prev_x + 1, pyy, 0xFF000000);
+						l_putpix(lfb, g->pshot[s].prev_x, pyy, BLACK);
+						l_putpix(lfb, g->pshot[s].prev_x - 1, pyy, BLACK);
+						l_putpix(lfb, g->pshot[s].prev_x + 1, pyy, BLACK);
 					}
 
 					l_putpix(lfb, g->pshot[s].x, py, bullet_color);
@@ -363,10 +363,10 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 					int pyy = g->pshot[s].prev_y - i;
 
 					if (g->pshot[s].prev_x != g->pshot[s].x || g->pshot[s].prev_y != g->pshot[s].y) {
-						l_putpix(lfb, g->pshot[s].prev_x, pyy, 0xFF000000);
+						l_putpix(lfb, g->pshot[s].prev_x, pyy, BLACK);
 						if (g->pshot[s].critical) {
-							l_putpix(lfb, g->pshot[s].prev_x - 1, pyy, 0xFF000000);
-							l_putpix(lfb, g->pshot[s].prev_x + 1, pyy, 0xFF000000);
+							l_putpix(lfb, g->pshot[s].prev_x - 1, pyy, BLACK);
+							l_putpix(lfb, g->pshot[s].prev_x + 1, pyy, BLACK);
 						}
 					}
 
@@ -384,10 +384,10 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 		if (g->pshot_left[s].alive) {
 			if (g->pshot_left[s].reflected == 1) {
 				if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
-					for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].prev_x, g->pshot_left[s].prev_y + i, 0xFF000000);
+					for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].prev_x, g->pshot_left[s].prev_y + i, BLACK);
 				}
 
-				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x, g->pshot_left[s].y + i, 0xFF00E5FF);
+				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x, g->pshot_left[s].y + i, CYAN);
 
 				g->pshot_left[s].prev_x = g->pshot_left[s].x;
 				g->pshot_left[s].prev_y = g->pshot_left[s].y;
@@ -399,14 +399,14 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 					int py = g->pshot_left[s].y - i;
 					int pyy = g->pshot_left[s].prev_y - i;
 					if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
-						l_putpix(lfb, g->pshot_left[s].prev_x, pyy, 0xFF000000);
-						l_putpix(lfb, g->pshot_left[s].prev_x - 1, pyy, 0xFF000000);
-						l_putpix(lfb, g->pshot_left[s].prev_x + 1, pyy, 0xFF000000);
+						l_putpix(lfb, g->pshot_left[s].prev_x, pyy, BLACK);
+						l_putpix(lfb, g->pshot_left[s].prev_x - 1, pyy, BLACK);
+						l_putpix(lfb, g->pshot_left[s].prev_x + 1, pyy, BLACK);
 					}
 
-					l_putpix(lfb, g->pshot_left[s].x, py, 0xFF66CCFF);
-					l_putpix(lfb, g->pshot_left[s].x - 1, py, 0xFF66CCFF);
-					l_putpix(lfb, g->pshot_left[s].x + 1, py, 0xFF66CCFF);
+					l_putpix(lfb, g->pshot_left[s].x, py, BLUE);
+					l_putpix(lfb, g->pshot_left[s].x - 1, py, BLUE);
+					l_putpix(lfb, g->pshot_left[s].x + 1, py, BLUE);
 				}
 
 				g->pshot_left[s].prev_x = g->pshot_left[s].x;
@@ -422,7 +422,7 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 					int yy = g->pshot_left[s].y - i;
 
 					if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
-						l_putpix(lfb, xx, yy, 0xFF000000);
+						l_putpix(lfb, xx, yy, BLACK);
 					}
 					l_putpix(lfb, x, y, side_bullet_color);
 				}
@@ -435,7 +435,7 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 
 			if (g->pshot_left[s].prev_x != g->pshot_left[s].x || g->pshot_left[s].prev_y != g->pshot_left[s].y) {
 				for (int i = 0; i < 5; i++)
-					l_putpix(lfb, g->pshot_left[s].prev_x - (i / 4), g->pshot_left[s].prev_y - i, 0xFF000000);
+					l_putpix(lfb, g->pshot_left[s].prev_x - (i / 4), g->pshot_left[s].prev_y - i, BLACK);
 			}
 
 			for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_left[s].x - (i / 4), g->pshot_left[s].y - i, side_bullet_color);
@@ -448,13 +448,13 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 			if (g->pshot_right[s].reflected == 1) {
 				if (g->pshot_right[s].prev_x != g->pshot_right[s].x || g->pshot_right[s].prev_y != g->pshot_right[s].y) {
 					for (int i = 0; i < 5; i++)
-						l_putpix(lfb, g->pshot_right[s].prev_x, g->pshot_right[s].prev_y + i, 0xFF000000);
+						l_putpix(lfb, g->pshot_right[s].prev_x, g->pshot_right[s].prev_y + i, BLACK);
 
 					g->pshot_right[s].prev_x = g->pshot_right[s].x;
 					g->pshot_right[s].prev_y = g->pshot_right[s].y;
 				}
 
-				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x, g->pshot_right[s].y + i, 0xFF00E5FF);
+				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].x, g->pshot_right[s].y + i, CYAN);
 				continue;
 			}
 			if (g->pshot_right[s].pierce_active) {
@@ -463,14 +463,14 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 					int pyy = g->pshot_right[s].prev_y - i;
 
 					if (g->pshot_right[s].prev_x != g->pshot_right[s].x || g->pshot_right[s].prev_y != g->pshot_right[s].y) {
-						l_putpix(lfb, g->pshot_right[s].prev_x, pyy, 0xFF000000);
-						l_putpix(lfb, g->pshot_right[s].prev_x - 1, pyy, 0xFF000000);
-						l_putpix(lfb, g->pshot_right[s].prev_x + 1, pyy, 0xFF000000);
+						l_putpix(lfb, g->pshot_right[s].prev_x, pyy, BLACK);
+						l_putpix(lfb, g->pshot_right[s].prev_x - 1, pyy, BLACK);
+						l_putpix(lfb, g->pshot_right[s].prev_x + 1, pyy, BLACK);
 					}
 
-					l_putpix(lfb, g->pshot_right[s].x, py, 0xFF66CCFF);
-					l_putpix(lfb, g->pshot_right[s].x - 1, py, 0xFF66CCFF);
-					l_putpix(lfb, g->pshot_right[s].x + 1, py, 0xFF66CCFF);
+					l_putpix(lfb, g->pshot_right[s].x, py, BLUE);
+					l_putpix(lfb, g->pshot_right[s].x - 1, py, BLUE);
+					l_putpix(lfb, g->pshot_right[s].x + 1, py, BLUE);
 				}
 
 				g->pshot_right[s].prev_x = g->pshot_right[s].x;
@@ -486,7 +486,7 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 					int yy = g->pshot_right[s].prev_y - i;
 
 					if (g->pshot_right[s].prev_x != g->pshot_right[s].x || g->pshot_right[s].prev_y != g->pshot_right[s].y) {
-						l_putpix(lfb, xx, yy, 0xFF000000);
+						l_putpix(lfb, xx, yy, BLACK);
 					}
 
 					l_putpix(lfb, x, y, side_bullet_color);
@@ -499,7 +499,7 @@ void render_player_shots(game_t *g, lfb_t *lfb) {
 			}
 
 			if (g->pshot_right[s].prev_x != g->pshot_right[s].x || g->pshot_right[s].prev_y != g->pshot_right[s].y) {
-				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].prev_x + (i / 4), g->pshot_right[s].prev_y - i, 0xFF000000);
+				for (int i = 0; i < 5; i++) l_putpix(lfb, g->pshot_right[s].prev_x + (i / 4), g->pshot_right[s].prev_y - i, BLACK);
 
 				g->pshot_right[s].prev_x = g->pshot_right[s].x;
 				g->pshot_right[s].prev_y = g->pshot_right[s].y;
