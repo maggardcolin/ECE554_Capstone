@@ -256,7 +256,7 @@ void l_putrect(int x, int y, int w, int h, uint32_t argb) {
 
         uint8_t color = map_color(argb);
 
-	cache_ins(0x5ULL, x, y, w, h, color);
+	// cache_ins(0x5ULL, x, y, w, h, color);
 }
 
 void toggle_music(uint32_t music_mask) {
