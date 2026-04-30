@@ -51,6 +51,8 @@ void l_putrect(int x, int y, int w, int h, uint32_t argb);
 
 void toggle_music(uint32_t music_mask);
 
+void clear_music();
+
 #endif
 
 

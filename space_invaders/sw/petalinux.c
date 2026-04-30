@@ -56,7 +56,12 @@ long get_size(char *path) {
 }
 
 void set_music_gpio(void *mmio, uint32_t music_mask) {
-	*((uint32_t *)(mmio + REG_MUSIC)) = music_mask;
+	volatile uint32_t music_reg = *((uint32_t *)(mmio + REG_MUSIC));
+	*((uint32_t *)(mmio + REG_MUSIC)) = music_reg | music_mask;
+}
+
+void clear_music_gpio(void *mmio) {
+	*((uint32_t *)(mmio + REG_MUSIC)) = 0x00000000u;
 }
 
 void send_instruction_2(void *mmio, uint64_t ins) {
