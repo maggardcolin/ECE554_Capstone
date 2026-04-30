@@ -7,6 +7,14 @@
 #define SCALE 4
 #endif
 
+#ifndef W
+#define W 1280
+#endif
+
+#ifndef H
+#define H 720
+#endif
+
 #define LW (W / SCALE)
 #define LH (H / SCALE)
 
@@ -20,6 +28,7 @@ typedef struct {
 
 int  lfb_init(lfb_t *lfb);
 void lfb_free(lfb_t *lfb);
+void l_clear_2();
 
 #ifndef FB
 
@@ -36,6 +45,10 @@ void commit_ins(void);
 void commit_ins(void);
 
 void l_putpix(lfb_t *lfb, int x, int y, uint32_t argb);
+
+void l_putrect(int x, int y, int w, int h, uint32_t argb);
+
+void toggle_music(uint32_t music_mask);
 
 #endif
 
