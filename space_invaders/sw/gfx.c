@@ -212,7 +212,7 @@ void cache_ins(uint64_t inst, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 }
 
 uint8_t map_color(uint32_t argb) {
-	switch (argb & 0x00FFFFFF) {
+	switch (argb) {
 		case BLACK: return 0;
 		case BLUE:   return 1;
 		case YELLOW: return 2;
