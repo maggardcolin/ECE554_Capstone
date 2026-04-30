@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "color.h"
 
 #ifndef FB
 
@@ -211,12 +212,23 @@ void cache_ins(uint64_t inst, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 }
 
 uint8_t map_color(uint32_t argb) {
-	if ((argb & 0x00FFFFFF) != 0x000000) {
-                return 15;
-        } else {
-                return 0;
-        }
-
+	switch (argb) {
+		case BLACK: return 0;
+		case BLUE:   return 1;
+		case YELLOW: return 2;
+		case BROWN:  return 3;
+		case BROWN_DARK: return 4;
+		case PURPLE: return 5;
+		case ORANGE: return 6;
+		case CYAN:   return 7;
+		case GRAY:   return 8;
+		case GREEN:  return 9;
+		case DARK_GRAY: return 10;
+		case RED_ORANGE: return 11;
+		case RED:    return 12;
+		case WHITE:  return 15;
+		default:    return 15; // treat unknown colors as white
+	}
 }
 
 void l_putpix(lfb_t *lfb, int x, int y, uint32_t argb) {
