@@ -3376,6 +3376,7 @@ static void bunkers_rebuild(game_t *g) {
 }
 
 void game_init(game_t *g) {
+	srand(time(NULL));
 	memset(g, 0, sizeof(*g));
 	g->scene = 0;
 	g->prev_scene = 0;
