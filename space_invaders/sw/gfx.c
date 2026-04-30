@@ -148,10 +148,10 @@ void commit_ins(void) {
 	// if (instruction[0] == 0) return;
 
 	volatile int index = 0;
-	if (clr_screen) {
-		send_instruction(MMIO_MAP, 0x2ULL, 0, 0, 0, 0, 0, 0xFFFFFFFFu);
-		clr_screen = false;
-	}
+	// if (clr_screen) {
+	// 	send_instruction(MMIO_MAP, 0x2ULL, 0, 0, 0, 0, 0, 0xFFFFFFFFu);
+	// 	clr_screen = false;
+	// }
 	// usleep(50);
 	
 //	while (instruction[index] != 0) {
@@ -171,7 +171,7 @@ void commit_ins(void) {
 		for (int y = 0; y < 180; y++) {
 			if (put_pixel[x][y] != pixel_buf[x][y]) {
 				if (put_pixel[x][y] == 0)
-					send_instruction(MMIO_MAP, x, y, 0, 0, 0, 0xFFFFFFFFu);
+					send_instruction(MMIO_MAP, 0x3ULL, x, y, 0, 0, 0, 0xFFFFFFFFu);
 				else
 					send_instruction_2(MMIO_MAP, put_pixel[x][y]);
 				// ins_changed[x][y] = false;
