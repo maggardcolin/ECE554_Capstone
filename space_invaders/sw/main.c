@@ -61,7 +61,8 @@ int sw_sim_main(void) {
                 else if (game.boss_type == BOSS_TYPE_MAGICIAN) mode = MUSIC_MODE_BOSS_MAGICIAN;
                 else mode = MUSIC_MODE_BOSS;
             }
-            music_set_mode(mode);
+            // music_set_mode(mode);
+            toggle_music(1 << mode);
         }
 
         game_render(&game, &lfb);
@@ -72,9 +73,12 @@ int sw_sim_main(void) {
         shm.regs->swap_request = 1;
         while (shm.regs->swap_ack == last_ack) { /* spin */ }
         last_ack = shm.regs->swap_ack;
+
+        toggle_music(0x000000);
     }
 
     if (music_ok) {
+        toggle_music(0x000000);
         music_shutdown();
     }
     lfb_free(&lfb);

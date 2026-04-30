@@ -604,7 +604,7 @@ static void *audio_thread(void *arg) {
     (void)arg;
 
     int16_t buffer[AUDIO_FRAMES];
-    mode_state_t mode_states[26];  // State for each possible music mode (up to 26 tracks)
+    mode_state_t mode_states[23];  // State for each possible music mode (up to 23 tracks)
     memset(mode_states, 0, sizeof(mode_states));
     uint32_t prev_active_tracks = 0;  // Track state transitions
     
@@ -633,16 +633,16 @@ static void *audio_thread(void *arg) {
 
         // Reset state for tracks that are being activated (transition from inactive to active)
         uint32_t transitions = active_tracks & ~prev_active_tracks;
-        for (int track = 0; track < 26; track++) {
+        for (int track = 0; track < 23; track++) {
             if (transitions & (1 << track)) {
                 memset(&mode_states[track], 0, sizeof(mode_states[track]));
                 music_mode_t mode = (music_mode_t)track;
-                if (mode == MUSIC_MODE_DING) g_music.ding_pending += 1;
-                else if (mode == MUSIC_MODE_BOOM) g_music.boom_pending += 1;
-                else if (mode == MUSIC_MODE_BOOM_LONG) g_music.boom_long_pending += 1;
-                else if (mode == MUSIC_MODE_TOWER_ASTEROID_BOOM) g_music.tower_asteroid_boom_pending += 1;
-                else if (mode == MUSIC_MODE_LASER) g_music.laser_pending += 1;
-                else if (mode == MUSIC_MODE_POWERUP) g_music.powerup_pending += 1;
+                if (mode == MUSIC_MODE_DING) g_music.ding_pending = 1;
+                else if (mode == MUSIC_MODE_BOOM) g_music.boom_pending = 1;
+                else if (mode == MUSIC_MODE_BOOM_LONG) g_music.boom_long_pending = 1;
+                else if (mode == MUSIC_MODE_TOWER_ASTEROID_BOOM) g_music.tower_asteroid_boom_pending = 1;
+                else if (mode == MUSIC_MODE_LASER) g_music.laser_pending = 1;
+                else if (mode == MUSIC_MODE_POWERUP) g_music.powerup_pending = 1;
             }
         }
         prev_active_tracks = active_tracks;
@@ -687,7 +687,7 @@ static void *audio_thread(void *arg) {
             float music_mix = 0.0f;
             
             // Process all active tracks
-            for (int track = 0; track < 26; track++) {
+            for (int track = 0; track < 23; track++) {
                 if (!(active_tracks & (1 << track))) {
                     continue;  // Skip inactive tracks
                 }
@@ -867,7 +867,7 @@ void music_set_mode(music_mode_t mode) {
 
 void music_set_track_active(int track_index, int active) {
     pthread_mutex_lock(&g_music.lock);
-    if (g_music.running && track_index >= 0 && track_index < 26) {
+    if (g_music.running && track_index >= 0 && track_index < 23) {
         if (active) {
             g_music.active_tracks |= (1 << track_index);
         } else {
