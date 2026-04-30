@@ -78,7 +78,8 @@ void* DMA_MAP = NULL;
 // volatile uint64_t *instruction;
 volatile uint64_t *put_rect = NULL;
 volatile uint64_t put_pixel[320][180] = {0};
-volatile bool     ins_changed[320][180] = {false};
+volatile uint64_t pixel_buf[320][180] = {0};
+// volatile bool     ins_changed[320][180] = {false};
 
 int lfb_init(lfb_t *lfb) {
     lfb->px = (uint32_t*)malloc((size_t)LW * (size_t)LH * sizeof(uint32_t));
@@ -131,12 +132,12 @@ void l_clear_2() {
 
 	clr_screen = true;
 
-	for (int x = 0; x < 320; x++) {
-		for (int y = 0; y < 180; y++) {
-			ins_changed[x][y] = false;
-			put_pixel[x][y] = 0;
-		}
-	}
+	//for (int x = 0; x < 320; x++) {
+	//	for (int y = 0; y < 180; y++) {
+	//		ins_changed[x][y] = false;
+	//		put_pixel[x][y] = 0;
+	//	}
+	//}
 }
 
 // int cached_ins = 0;
@@ -168,10 +169,15 @@ void commit_ins(void) {
 	
 	for (int x = 0; x < 320; x++) {
 		for (int y = 0; y < 180; y++) {
-			if (ins_changed[x][y]) {
-				send_instruction_2(MMIO_MAP, put_pixel[x][y]);
-				ins_changed[x][y] = false;
+			if (put_pixel[x][y] != pixel_buf[x][y]) {
+				if (put_pixel[x][y] == 0)
+					send_instruction(MMIO_MAP, x, y, 0, 0, 0, 0xFFFFFFFFu);
+				else
+					send_instruction_2(MMIO_MAP, put_pixel[x][y]);
+				// ins_changed[x][y] = false;
 			}
+			pixel_buf[x][y] = put_pixel[x][y];
+			put_pixel[x][y] = 0;
 		}
 	}
 
@@ -199,8 +205,9 @@ void cache_ins(uint64_t inst, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 	// cached_ins++;
 	if (inst == 0x3ULL) {
 		if (put_pixel[(int) a1][(int) a2] != word) {
+			if (a3 == 0) return;
 			put_pixel[(int) a1][(int) a2] = word;
-			ins_changed[(int) a1][(int) a2] = true;
+			// ins_changed[(int) a1][(int) a2] = true;
 		} // else cached_ins--;
 	} else {
 		int fifo_index = 0;
