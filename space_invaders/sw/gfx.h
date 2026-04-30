@@ -7,6 +7,14 @@
 #define SCALE 4
 #endif
 
+#ifndef W
+#define W 1280
+#endif
+
+#ifndef H
+#define H 720
+#endif
+
 #define LW (W / SCALE)
 #define LH (H / SCALE)
 
@@ -25,6 +33,7 @@ void l_clear_2();
 #ifndef FB
 
 static inline void l_putpix(lfb_t *lfb, int x, int y, uint32_t argb) {
+    if (lfb == NULL) return;
     if ((unsigned)x < (unsigned)LW && (unsigned)y < (unsigned)LH) lfb->px[y * LW + x] = argb;
 }
 
