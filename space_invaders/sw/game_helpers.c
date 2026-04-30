@@ -3,6 +3,7 @@
 #include "font.h"
 #include <stdio.h>
 #include <time.h>
+#include "color.h"
 
 int digit_count(uint32_t v)
 {
@@ -44,15 +45,15 @@ void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_
     if (fill_w > w) fill_w = w;
 
     for (int i = 0; i <= w; i++) {
-        l_putpix(lfb, x + i, y - 1, 0xFFFFFFFF);
-        l_putpix(lfb, x + i, y + h, 0xFFFFFFFF);
+        l_putpix(lfb, x + i, y - 1, WHITE);
+        l_putpix(lfb, x + i, y + h, WHITE);
     }
     for (int j = 0; j <= h; j++) {
-        l_putpix(lfb, x - 1, y + j, 0xFFFFFFFF);
-        l_putpix(lfb, x + w, y + j, 0xFFFFFFFF);
+        l_putpix(lfb, x - 1, y + j, WHITE);
+        l_putpix(lfb, x + w, y + j, WHITE);
     }
 
-    l_putpix(lfb, x - 1, y - 1, 0xFFFFFFFF);
+    l_putpix(lfb, x - 1, y - 1, WHITE);
 
     for (int i = 0; i < fill_w; i++) {
         for (int j = 0; j < h; j++) {
@@ -68,7 +69,7 @@ void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_
     if (fill_w < 0) fill_w = 0;
     if (fill_w > w) fill_w = w;
 
-    uint32_t border = 0xFFFFFFFF;
+    uint32_t border = WHITE;
 
     // Top border
     l_putrect(x - 1, y - 1, w + 2, 1, border);
@@ -140,40 +141,40 @@ void render_fps_counter(lfb_t *lfb) {
     int x = LW - text_width_5x5(fps_text, 1) - 80;
     int y = LH - 12;
     // Keep FPS tracking live but suppress on-screen rendering.
-    if (0) l_draw_text(lfb, x, y, fps_text, 1, 0xFFFFFFFF);
+    if (0) l_draw_text(lfb, x, y, fps_text, 1, WHITE);
 }
 
 void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
     if (type == POWERUP_DOUBLE_SHOT) {
         int r = 6;
-        draw_filled_circle(lfb, x0, y0, r, 0xFFFFFF00);
+        draw_filled_circle(lfb, x0, y0, r, YELLOW);
         l_draw_text(lfb, x0 - 4, y0 - 3, "2X", 1, 0xFF000000);
     } else if (type == POWERUP_SHIELD) {
         int r = 6;
-        draw_filled_circle(lfb, x0, y0, r, 0xFF1E6AD6);
+        draw_filled_circle(lfb, x0, y0, r, BLUE);
         for (int y = -r; y <= r; y++) {
             for (int x = -r; x <= r; x++) {
                 int d = x * x + y * y;
                 if (d <= (r * r) && d >= ((r - 1) * (r - 1))) {
-                    l_putpix(lfb, x0 + x, y0 + y, 0xFF66CCFF);
+                    l_putpix(lfb, x0 + x, y0 + y, CYAN);
                 }
             }
         }
     } else if (type == POWERUP_TRIPLE_SHOT) {
         int r = 6;
-        draw_filled_circle(lfb, x0, y0, r, 0xFF0000FF);
-        for (int i = -4; i <= 4; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
+        draw_filled_circle(lfb, x0, y0, r, BLUE);
+        for (int i = -4; i <= 4; i++) l_putpix(lfb, x0, y0 + i, WHITE);
     } else if (type == POWERUP_EXPLOSIVE) {
         int r = 6;
-        draw_filled_circle(lfb, x0, y0, r, 0xFFFF0000);
-        l_putpix(lfb, x0, y0, 0xFFFFFF00);
-        l_putpix(lfb, x0 - 2, y0, 0xFFFFFF00);
-        l_putpix(lfb, x0 + 2, y0, 0xFFFFFF00);
-        l_putpix(lfb, x0, y0 - 2, 0xFFFFFF00);
-        l_putpix(lfb, x0, y0 + 2, 0xFFFFFF00);
+        draw_filled_circle(lfb, x0, y0, r, RED);
+        l_putpix(lfb, x0, y0, YELLOW);
+        l_putpix(lfb, x0 - 2, y0, YELLOW);
+        l_putpix(lfb, x0 + 2, y0, YELLOW);
+        l_putpix(lfb, x0, y0 - 2, YELLOW);
+        l_putpix(lfb, x0, y0 + 2, YELLOW);
     } else {
         int r = 6;
-        draw_filled_circle(lfb, x0, y0, r, 0xFFFA500);
+        draw_filled_circle(lfb, x0, y0, r, ORANGE);
         for (int i = -3; i <= 3; i++) l_putpix(lfb, x0, y0 + i, 0xFFFFFFFF);
         l_putpix(lfb, x0, y0 - 4, 0xFFFFFFFF);
     }
@@ -181,15 +182,15 @@ void draw_powerup_icon(lfb_t *lfb, int x0, int y0, powerup_type_t type) {
 
 void draw_points_upgrade_icon(lfb_t *lfb, int x0, int y0) {
     // Compact single-digit glyph without the circular backdrop.
-    l_draw_text(lfb, x0 - 1, y0 - 2, "2", 1, 0xFFFFFF00);
+    l_draw_text(lfb, x0 - 1, y0 - 2, "2", 1, YELLOW);
 }
 
 void draw_crit_upgrade_icon(lfb_t *lfb, int x0, int y0) {
     // Match the critical center-shot bullet: 5px tall and 3px wide, solid green.
     for (int i = -2; i <= 2; i++) {
-        l_putpix(lfb, x0 - 1, y0 + i, 0xFF00FF00);
-        l_putpix(lfb, x0, y0 + i, 0xFF00FF00);
-        l_putpix(lfb, x0 + 1, y0 + i, 0xFF00FF00);
+        l_putpix(lfb, x0 - 1, y0 + i, GREEN);
+        l_putpix(lfb, x0, y0 + i, GREEN);
+        l_putpix(lfb, x0 + 1, y0 + i, GREEN);
     }
 }
 
