@@ -1224,7 +1224,7 @@ static int circle_hits_sprite(const sprite1r_t *s, int sx, int sy, int cx, int c
 	return (dx * dx + dy * dy) <= (r * r);
 }
 
-#ifndef FB
+// #ifndef FB
 
 static void render_tower_walls(lfb_t *lfb, const game_t *g) {
 	if (!g->tower_wall_active) return;
@@ -1242,27 +1242,27 @@ static void render_tower_walls(lfb_t *lfb, const game_t *g) {
 	}
 }
 
-#else
-
-static void render_tower_walls(lfb_t *lfb, const game_t *g) {
-	if (!g->tower_wall_active) return;
-	int top = TOP_HUD_SEPARATOR_Y + 1;
-	int bottom = BOTTOM_HUD_SEPARATOR_Y - 1;
-	if (bottom < top) return;
-
-	int height = bottom - top + 1;
-	uint32_t color = BROWN; // FIXME 0xFF4A2E12
-
-	// Left wall
-	if (g->tower_wall_left > 0)
-		l_putrect(0, top, g->tower_wall_left, height, color);
-
-	// Right wall
-	if (g->tower_wall_right < LW)
-		l_putrect(g->tower_wall_right, top, LW - g->tower_wall_right, height, color);
-}
-
-#endif
+// #else
+// 
+// static void render_tower_walls(lfb_t *lfb, const game_t *g) {
+// 	if (!g->tower_wall_active) return;
+// 	int top = TOP_HUD_SEPARATOR_Y + 1;
+// 	int bottom = BOTTOM_HUD_SEPARATOR_Y - 1;
+// 	if (bottom < top) return;
+// 
+// 	int height = bottom - top + 1;
+// 	uint32_t color = BROWN; // FIXME 0xFF4A2E12
+// 
+// 	// Left wall
+// 	if (g->tower_wall_left > 0)
+// 		l_putrect(0, top, g->tower_wall_left, height, color);
+// 
+// 	// Right wall
+// 	if (g->tower_wall_right < LW)
+// 		l_putrect(g->tower_wall_right, top, LW - g->tower_wall_right, height, color);
+// }
+// 
+// #endif
 
 static void render_magician_side_walls(lfb_t *lfb, const game_t *g) {
 	int wall = magician_side_wall_thickness(g);

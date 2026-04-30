@@ -256,6 +256,12 @@ void l_putrect(int x, int y, int w, int h, uint32_t argb) {
 
         uint8_t color = map_color(argb);
 
+	for (int i = x; i < x + w; i++) {
+		for (int j = y; j < y + h; y++) {
+			cache_ins(0x3ULL, i, j, color, 0, 0);
+		}
+	}
+
 	// cache_ins(0x5ULL, x, y, w, h, color);
 }
 

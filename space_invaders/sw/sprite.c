@@ -186,16 +186,16 @@ void draw_sprite1r_scaled(lfb_t *lfb, const sprite1r_t *s, int x0, int y0, uint3
 			if (!((row[x >> 3] >> (7 - (x & 7))) & 1)) continue;
 			int xx = x0 + x * scale;
 			if ((unsigned)xx >= (unsigned)LW) continue;
-			l_putrect(xx, yy, scale, scale, color);
-			/*for (int dy = 0; dy < scale; dy++) {
-			  int yyy = yy + dy;
-			  if ((unsigned)yyy >= (unsigned)LH) continue;
-			  for (int dx = 0; dx < scale; dx++) {
-			  int xxx = xx + dx;
-			  if ((unsigned)xxx >= (unsigned)LW) continue;
-			  l_putpix(lfb, xxx, yyy, color);
-			  }
-			  }*/
+			// l_putrect(xx, yy, scale, scale, color);
+			for (int dy = 0; dy < scale; dy++) {
+				int yyy = yy + dy;
+				if ((unsigned)yyy >= (unsigned)LH) continue;
+				for (int dx = 0; dx < scale; dx++) {
+					int xxx = xx + dx;
+					if ((unsigned)xxx >= (unsigned)LW) continue;
+					l_putpix(lfb, xxx, yyy, color);
+				}
+			}
 		}
 	}
 }

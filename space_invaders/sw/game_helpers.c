@@ -38,7 +38,7 @@ void putpix_clipped_y(lfb_t *lfb, int x, int y, uint32_t color, int y_min, int y
     l_putpix(lfb, x, y, color);
 }
 
-#ifndef FB
+// #ifndef FB
 
 void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_color) {
     if (fill_w < 0) fill_w = 0;
@@ -62,34 +62,34 @@ void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_
     }
 }
 
-#else
-
-void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_color)
-{
-    if (fill_w < 0) fill_w = 0;
-    if (fill_w > w) fill_w = w;
-
-    uint32_t border = WHITE;
-
-    // Top border
-    l_putrect(x - 1, y - 1, w + 2, 1, border);
-
-    // Bottom border
-    l_putrect(x - 1, y + h, w + 2, 1, border);
-
-    // Left border
-    l_putrect(x - 1, y, 1, h, border);
-
-    // Right border
-    l_putrect(x + w, y, 1, h, border);
-
-    // Filled portion
-    if (fill_w > 0)
-        l_putrect(x, y, fill_w, h, fill_color);
-}
-
-
-#endif
+// #else
+// 
+// void draw_bar(lfb_t *lfb, int x, int y, int w, int h, int fill_w, uint32_t fill_color)
+// {
+//     if (fill_w < 0) fill_w = 0;
+//     if (fill_w > w) fill_w = w;
+// 
+//     uint32_t border = WHITE;
+// 
+//     // Top border
+//     l_putrect(x - 1, y - 1, w + 2, 1, border);
+// 
+//     // Bottom border
+//     l_putrect(x - 1, y + h, w + 2, 1, border);
+// 
+//     // Left border
+//     l_putrect(x - 1, y, 1, h, border);
+// 
+//     // Right border
+//     l_putrect(x + w, y, 1, h, border);
+// 
+//     // Filled portion
+//     if (fill_w > 0)
+//         l_putrect(x, y, fill_w, h, fill_color);
+// }
+// 
+// 
+// #endif
 
 int text_width_5x5(const char *text, int scale) {
     if (scale < 1) scale = 1;
